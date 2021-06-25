@@ -7,10 +7,10 @@
     - `@import "style.css";`
 - CSS selectors
     - Specificity (form higher to lower, same specificity last rule wins)
-        - Inline `<div style="inline: style;"/>`
-        - Id `#id`
-        - Class `.class [attribute] :pseudo-class`
-        - Element `element ::pseudo-element`
+        1. Inline `<div style="inline: style;"/>`
+        2. Id `#id`
+        3. Class `.class [attribute] :pseudo-class`
+        4. Element `element ::pseudo-element`
     - Overwrite specificity `property: value !important;` (prefer more specific rules)
     - Universal selector `*`, `element`, `.class`, `#id`, `[attribute]`,
       `[attribute="exact"]`, `[attribute~="whitespace"]`, `[attribute*="substring"]`,
@@ -68,6 +68,23 @@
     - Import `@font-face { font-family: "FF"; src: url("ff.woff2") format("woff2");
       font-weight: ...; font-style: ...; }`
     - Use `body { font-family: "FF", sans; }`
+- Positioning
+    - Vertical margin collaps with the larger margin
+    - `maring: auto` center horizontally
+    - `position: static` (defualt) element in the flow, elements takes up the full width
+      of its parent
+    - `position: relative` element's original position remains in the flow, other
+      elements are not affected + `top`, `left`, `right`, `bottom` relative to element's
+      original position, elements takes up the full width of its parent
+    - `position: absolute` element is removed from the flow and floats abouve the flow,
+      other elements take spece of the original element + `top`, `left`, `right`,
+      `bottom` relative to the closest explicitly positioned ancestor element, element
+      takes only the necessary width
+    - `position: fixed` element is removed from the flow + `top`, `left`, `right`,
+      `bottom` always relative to the viewport (even on scroll, element remains in the
+      same position), element takes only the necessary width
+    - `position.sticky` element is `relative` when scrolling up to a `top`, `left`,
+      `right`, `botton` point, after which element becomes `fixed`
 
 - Boxes, shadows and opacity
 - Backgrounds and gradients

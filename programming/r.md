@@ -30,7 +30,8 @@
 - Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
 - R objects serialization `dput`, `dget`
 - R environments
-    - Global environment user-defined funcitons and objects `ls()`, `rm(ls())`
+    - Global environment user-defined funcitons and objects `ls()`, `rm(obj)`,
+      `detach("pakcage:x"|obj)`, `attach(obj)`
     - Package environment = build-in functions and objects `ls("package:ggplot2")`
     - Local environment = function lexical scope
     - Search path `search()` -> `.GlobalEnv, library(...), package:base`
@@ -51,6 +52,8 @@
         - Array `apply(x, margin, fun)`
         - List `lapply(x, fun)` -> list, `sapply(s, fun)` -> array
         - Data frame `tapply(x, factor.index, fun)`
+- Exceptions `message(msg)`, `warning(warn)`, `stop(err)`, `try(expr)`,
+  `tryCatch(expr, ..., finally)`, `suppressWarnings(expr)`
 
 - System functions `getwd`, `setwd`, `format`, `sprintf`
 - Math funcitons `sum`, `prod`, `round`

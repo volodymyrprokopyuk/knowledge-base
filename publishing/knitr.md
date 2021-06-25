@@ -5,11 +5,23 @@
     - Table `knitr.table.format`, `knitr.kable.NA`
 - Global knitr chunk options
     - Set `opts_chunk$set(option = value)`
-    - Evaluation `eval`, `include` all, `echo` source code, `results` text output,
-      `message`, `warning`, `fig.show` plot, `error`, `collapse` source + output
-    - Plot `dev`, `dev.args`, `fig.cap`, `fig.width`, `fig.height`, `fig.dim`
-    - Code `tidy`, `tidy.opts`. TODO `formatR`, `styler`
-    - HTML class `class.source`, `class.output`
+    - Evaluation
+        - Source `eval`, `error`, `collapse` source + output
+        - Output `include` all, `echo` source code, `results` text output, `message`,
+          `warning`
+    - Plot
+        - Device `dev`, `dev.args`
+        - Figure `fig.cap`, `fig.width`, `fig.height`, `fig.dim`, `fig.show`,
+          `fig.process`
+    - Code
+        - Format `tidy`, `tidy.opts`
+        - TODO `formatR`, `styler`
+    - Output
+        - Raw markdwon `results = 'asis'`
+        - Uncommented `comment = ""`
+        - Prompt `prompt = T` prefix source with `>` and `+`
+    - HTML attribute`[class|attr].[source|output|message|warning|error]`
+      `class.error`
 - Code
     - Inline code `r ...`
     - Code block ```{r label, options ...}\newline ... \newline```

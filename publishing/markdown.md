@@ -21,7 +21,7 @@
     - `*emphasis*`
     - `**strong emphasis**`
     - `***emphasis + strong emphasis***`
-    - `~~strikeout~~`
+    - `~~strikethrough~~`
     - `^superscript^`
     - `~subscript~`
     - `| preserves formatting`
