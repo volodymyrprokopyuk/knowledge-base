@@ -36,7 +36,7 @@
     - `<!-- comment -->`
 - Link
     - Web
-        - `[Inline link](https://organization.org)`
+        - `[Inline link](https://organization.org){target="_blank"}`
         - `[Link reference]: https://organization.org` <- `[Link reference]`
         - Raw URI inline link `<https://organization.org>`
     - Email

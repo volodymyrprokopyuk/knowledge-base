@@ -37,6 +37,7 @@
     - Subsetting `df[1, 1]`, `df[c(1), c("name")]`, `df$name`, `df[df$name > 0,]`
 
 ## Strings
+
 - String `nchar`, `cat`, `paste`, `sprintf`, `strsplit`, `substr`, `grep[l]`,
   `[g]regexpr`, `regexec`, `[g]sub`
 
@@ -56,6 +57,7 @@
         - Data frame `tapply(x, factor.index, fun)`
 
 ## Functions
+
     - `f <- function(...) { ... [return(...)] }` call by name (by need if memoized)
     - Function singature `args(func)`, `missing(arg)`
     - Arguments matching exact, partial, positional, mixed, variadic `list(...)`
@@ -63,7 +65,7 @@
 ## Environments
 
 - Global environment user-defined funcitons and objects `ls()`, `rm(obj)`,
-    `detach("pakcage:x"|obj)`, `attach(obj)`
+  `detach("pakcage:x"|obj)`, `attach(obj)`
 - Package environment = build-in functions and objects `ls("package:ggplot2")`
 - Local environment = function lexical scope
 - Search path `search()` -> `.GlobalEnv, library(...), package:base`
