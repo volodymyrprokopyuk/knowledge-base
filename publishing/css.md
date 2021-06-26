@@ -85,12 +85,15 @@
       same position), element takes only the necessary width
     - `position.sticky` element is `relative` when scrolling up to a `top`, `left`,
       `right`, `botton` point, after which element becomes `fixed`
+    - `z-index` stacking
+    - `float: left|right;` element is removed from the flow, element flows to the left
+      or to the right of the parent, other inline elements flow around the floated
+      element + `clear: left|right|both` to resume content below the floated element
+- TODO:
+    - `transform: perspective|rotate|translate|scale|skew`
+    - `transition` between two states + timing
+    - `animation` + `@keyframes` more than two states + timing
 
-- Boxes, shadows and opacity
-- Backgrounds and gradients
-- Web fonts and typography
-- Layout positioning and stacking
-- CSS transforms, transitions and animations
 - Flexbox
-- Responsive design, media queries and fluid typography
 - CSS grid
+- Responsive design, media queries and fluid typography
