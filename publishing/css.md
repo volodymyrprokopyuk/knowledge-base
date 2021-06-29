@@ -1,40 +1,65 @@
 # Cascading Style Sheets (CSS)
 
-## CSS inclusion
+## General aspects
 
-- `<div style="inline: style;"/>`
-- `<style>sel { style: block; }</style>`
-- `<link rel="stylesheet" href="style.css"/>`
-- `@import "style.css";`
+- CSS inclusion
+    - `<div style="inline: style;"/>`
+    - `<style>sel { style: block; }</style>`
+    - `<link rel="stylesheet" href="style.css"/>`
+    - `@import "style.css";`
+- CSS variables
+    - Variable inheritance: variables cascade down to descendant elements
+    - `:root { --global-variable: value; }` <- `var(--global-variable, [default])`
+    - Counter `:root { counter-reset: h1c; }`, `h1:before { counter-increment: h1c;
+        content: counter(h1c) ". "; }`
+- CSS units
+    - `px` usually used only for root `font-size`
+    - `em` variable, relative to inherited `font-size`
+    - `rem` constant, relative to root `font-size`
+    - `%` percentage of inherited `font-size` or `width` (responsive design)
+    - `wv`, `wh` relative to viewport (responsive design)
+    - `fr` CSS grid fraction
+    - `cm`, `mm`, `pt` absolute units (print styling)
+    - `calc(...)` unit calculation with CSS variables
+- CSS colors
+    - `#1a2b3c`
+    - `rgb(255, 255, 255)`, `rgb(255 255 255)`
+    - `rgba(255, 255, 255, 0.5)`, `rgba(255 255 255 / 0.5)`
 
 ## CSS selectors
 
 - Specificity (form higher to lower, same specificity last rule wins)
     1. Inline `<div style="inline: style;"/>`
     2. Id `#id`
-    3. Class `.class [attribute] :pseudo-class`
-    4. Element `element ::pseudo-element`
+    3. Class `.class`, `[attribute]`, `:pseudo-class`
+    4. Element `element`, `:pseudo-element`
 - Overwrite specificity `property: value !important;` (prefer more specific rules)
-- Universal selector `*`, `element`, `.class`, `#id`, `[attribute]`,
-    `[attribute="exact"]`, `[attribute~="whitespace"]`, `[attribute*="substring"]`,
-    `[attribute^="start"]`, `[attribute$="end"]`
-- Compound selector `element.class#id[attribute="exact"]`
-- Independent selectors `element, .class, #id, [attribute="exact"]`
+- Universal selector `*`
+- Common selectors `element`, `.class`, `#id`
+- Attribute selectors `[attribute]`
+    - Word `[attribute="exact"]`, `[attribute~="space-separated"]`
+    - Substring `[attribute*="substring"]`, `[attribute^="start"]`, `[attribute$="end"]`
+- Compound selector `element#id.class[attribute="exact"]`
+- Independent selectors `element, #id, .class, [attribute="exact"]`
 - [In]direct descendant combinator `element descendant`
 - Direct child combinator `element > child`
 - General sibling combinator `element ~ sibling`
 - Adjacent sibling combinator `element + sibling`
-- UI state pseudo-class `:active`, `:checked`, `:focus`, `:hover`, `:[in]valid`
-- Doc structure pseudo-class `:first-child`, `:last-chaild`, `:nth-child(n)`,
-    `:nth-child(2n)`, `:nth-child(odd | even)`, `:root` = `html`
+- UI state pseudo-class
+    - Actions `:active`, `:checked`, `:focus`, `:hover`
+    - Validation `:[in]valid`
+- Document structure pseudo-class
+    - Root `:root` = `html`
+    - Children `:first-child`, `:last-chaild`, `:nth-child(n)`, `:nth-child(2n)`,
+      `:nth-child(odd | even)`
 - Negate selector `:not(...)`
-- Pseudo-element `::first-line`, `::first-letter`, `::before`, `::after` + `content`
+- Pseudo-element `::before`, `::after` + `content`
 
 ## Box model
 
 - Box model `margin`, `border`, `padding` and `content`
 - `box-sizing: content-box | border-box` -> `width`, `height` (`margin` is never
-    considered) + `[min|max]-[width | height]`
+    considered) + `[min|max]-[width|height]`
 - `display: block | inline | inline-block`
 - `block` respects `width` and `height`, is palced on its own line, takes up the
     full width of the container and has just enough height to fit the content
@@ -43,29 +68,6 @@
 - `inline-block` respects `width` and `height` and is palced inline in the text flow
 - `display: none` removes element from the flow
 - `visibility: hidden` preserves element space in the flow
-
-## CSS units
-
-- `px` usually used only for root `font-size`
-- `em` variable, relative to inherited `font-size`
-- `rem` constant, relative to root `font-size`
-- `wv`, `wh` relative to viewport (responsive design)
-- `%` percentage of inherited `font-size` or `width` (responsive design)
-- `cm`, `mm`, `pt` absolute units (print styling)
-- `calc(...)` unit calculation with CSS variables
-
-##  CSS colors
-
-- `#1a2b3c`
-- `rgb(255, 255, 255)`, `rgb(255 255 255)`
-- `rgba(255, 255, 255, 0.5)`, `rgba(255 255 255 / 0.5)`
-
-## CSS variables
-
-- Variable inheritance: variables cascade down to descendant elements
-- `:root { --global-variable: value; }` <- `var(--global-variable, [default])`
-- Counter `:root { counter-reset: h1c; }`, `h1:before { counter-increment: h1c;
-    content: counter(h1c) ". "; }`
 
 ## Borders and backgrounds
 
@@ -86,9 +88,9 @@
       font-weight: ...; font-style: ...; }`
     - Use `body { font-family: "FF", sans; }`
 
-## Positioning
+## Positioning and floats
 
-- CSS overflow `overflow-[x | y]: visible | hiddent | scroll | auto`
+- CSS overflow `overflow-[x|y]: visible | hiddent | scroll | auto`
 - Vertical margin collaps with the larger margin
 - `maring: auto` center horizontally
 - `position: static` (defualt) element in the flow, elements takes up the full width
@@ -103,7 +105,7 @@
 - `position: fixed` element is removed from the flow + `top`, `left`, `right`,
     `bottom` always relative to the viewport (even on scroll, element remains in the
     same position), element takes only the necessary width
-- `position.sticky` element is `relative` when scrolling up to a `top`, `left`,
+- `position: sticky` element is `relative` when scrolling up to a `top`, `left`,
     `right`, `botton` point, after which element becomes `fixed`
 - `z-index` stacking
 - `float: left | right` element is removed from the flow, element flows to the left
@@ -112,24 +114,61 @@
 
 ## Flexbox layout
 
-- `display: flex | inline-flex` flex container
-- `flex-direction: [row | column][-reverse]` one-dimensional either horizontal (row) or
-  vertical (column) layout, block flex items are laid out one after another along the
-  main axis,
-- `flext-basis` initial size of a flex item
-- `flex-grow: 1` flex items grow proportionally to fit the container
-- `flext-shrink: 1` flex items shrink proportionally to fit the container, otherwise
-  flex items overflow, unless container `flex-wrap: wrap`
-- Alignment along the main axis `justify-content: flex-[start | end] | center |
-  spece-[between | around | evenly]`
-- Alignment along the cross axis `align-items: stretch | flex-[start | end] | center |
-  baseline` (`align-self` item-level override)
-- Align multiple rows / columns `align-conten: stretch  | flex-[start | end] | center |
-  space-[between | around | evenly]`
+- Display `display: flex | inline-flex` flex container parent + flex items children,
+  flex containers can be nested forming flexbox layout hierarchy with absolutely
+  centered flex items
+- Direction `flex-direction: [row|column][-reverse]` one-dimensional either horizontal
+  (row) or vertical (column) layout, block flex items are laid out one after another
+  along the main axis,
+- Sizing
+    - Initial flex item size `flext-basis`
+    - Grow `flex-grow: 1` flex items grow proportionally to fit the container
+    - Shrink `flext-shrink: 1` flex items shrink proportionally to fit the container,
+      otherwise flex items overflow, unless container `flex-wrap: wrap`
+- Alignment
+    - Main axis `justify-content: flex-[start|end] | center |
+      spece-[between|around|evenly]`
+    - Cross axis `align-items: stretch | flex-[start|end] | center | baseline`
+      (`align-self` item-level override)
+    - Container cross axis `align-content: stretch | flex-[start|end] | center |
+      space-[between|around|evenly]`
 
-## CSS grid
+## CSS grid layout
 
-## Responsive design, media queries and fluid typography
+- `display: grid | inline-grid` grid container + grid items (container's immediate
+  children) laid out in two-dimensional grid layout with rows and columns
+- Sizing / naming
+    - Row `grid-template-rows: [row-name] repeat(n | auto-fill | auto-fit, minmax(n, m |
+      auto))`, `grid-auto-rows`-
+    - Column `grid-template-columns: [column-name] ...`
+    - Area `grid-template-areas`
+    - Gap `gap`
+- Positioning
+    - Explicit positioning `grid-[row|column]: n | name`
+    - Row / column spanning `grid-[row|column]-[start|end]`, `grid-[row|column]: n |
+       name / m | name [span n]`
+- Alignment
+    - Row axis `justify-items: stretch | start | end | center` (`justify-self`
+      item-level override)
+    - Column axis `align-items: stretch | start | end | center` (`align-self` item-level
+      override)
+    - Container row axis `justify-content: stretch | start | end | center |
+      space-[between|around|evenly]`
+    - Container column axis `align-content: stretch | start | end | center |
+      space-[between|around|evenly]`
+
+## Responsive design
+
+- Responsive design = use `@media` queries with breakpoints to apply different
+  stylesheets or CSS rules depending on the viewport size
+- `<meta name="viewport" content="width=device-width, initial-scale=1.0,
+  user-scalable=yes">`
+- `<link rel="stylesheet" media="print" href="print.css">`
+- `@media screen | print | all [and | or | not ([min|max]-width: breakpoint)] {...}`
+- Responsive layout with flexbox `flex-direction: row | column` + `flex-wrap: wrap`
+- Fluid typography = `font-size: clamp(min, preferred, max)` automatically scales font
+  size depending on the viewport size without `@media` queries
+- Responsive images `img { max-width: 100%; height: auto; }`
 
 ## TODO
 

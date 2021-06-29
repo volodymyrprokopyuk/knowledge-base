@@ -1,19 +1,40 @@
 # R
 
-- TODO: `littler`, `styler`
+- TODO: `littler`, `styler`, `lintr`
 
 ## General aspects
 
-- Help `?obj`, show help `??"search"` search help
-- Literals `Inf`, `-Inf`, `NaN`, `NA` missing data, `NULL` null object
-- Type predicate `is.finite`, `is.infinite`, `is.nan`, `is.na`, `na.omit`, `is.null`
-- Copy-on-write semantics `a <- b`
-- Logical `TRUE`, `FALSE`, `T`, `F`, `any`, `all`, `T && || F`, `v & | v`, `! v`
+- Help in R console `?obj` show help, `??"search"` search help
+- Non-syntactic name `` `_name` ``
+- Immutable objects
+    - Copy-on-modify semantics for shared objects `x <- c(1, 2); y <- x; y[[1]] <- 10`
+    - Modify-in-place optimization for a single name `y[[2]] <- 20`
+    - Environments are always modified in place (reference semantics)
+    - Vector deep copy, list shallow copy
+    - Character vector uses global string pool
+- Type system
+    - Vector type: atomic vector (homogeneous, linear), list (heterogeneous, hierarchical)
+    - Node type: function, environment
+    - Implicit coercion: `as.logical` -> `as.integer` -> `as.double` -> `as.character`
 
 ## Vectors and factors
 
-- Vector (homogeneous, fixed, element) `c`, `length`, `seq`, `rep`, `sort`, `which`, `v2
-  <- v1`
+- Missing value `NA`, `is.na`, `na.omit`
+- Null object `NULL`, `is.null`
+- Atomic vector
+    - Logical `TRUE`, `FALSE`, `T`, `F`, `any`, `all`, `T && || F`, `v & | v`, `! v`,
+      `is.logical`
+    - Integer `1L`, `0x1aL`, `is.integer`
+    - Double `1.2`, `1.2e3`, `[-]Inf`, `NaN`, `is.double`, `is.[in]finite`, `is.nan`
+    - Character `"string"`, `'string'`, `is.character`
+    - Complex
+    - Raw (binary)
+
+- `dimension` attribute for matrix and array
+- `class` attribute for S3 (factor, date, datetime, data frame, tibble)
+
+- Vector (homogeneous, fixed, element)
+    - Creation `c` combine / append, `length`, `typeof`, `seq`, `rep`, `sort`, `which`
     - Subsetting (1-based) `v[1]` element (preserves structure), `v[c(1, 2)]`, `v[c(T,
       F)]`, `v[v > 0]` sub-vector, `v[... & | ...]` `v[-c(...)]`, v[-which(v < 0)]
       remove
@@ -51,16 +72,17 @@
     - Iteration `for (... in ...) { ... }` statement
     - Condition `while (...) { ... }` statement
     - Explicit exit `reapet` + `break` | `next` statements
-    - Implicit loop
+    - Implicit loop functions
         - Array `apply(x, margin, fun)`
         - List `lapply(x, fun)` -> list, `sapply(s, fun)` -> array
         - Data frame `tapply(x, factor.index, fun)`
 
 ## Functions
 
-    - `f <- function(...) { ... [return(...)] }` call by name (by need if memoized)
-    - Function singature `args(func)`, `missing(arg)`
-    - Arguments matching exact, partial, positional, mixed, variadic `list(...)`
+- `f <- function(...) { ... [return(...) | invisible(...)] }` call by name (by need if
+  memoized)
+- Function singature `args(func)`, `missing(arg)`
+- Arguments matching positional, exact / partial (avoid), mixed, variadic `list(...)`
 
 ## Environments
 
@@ -78,7 +100,7 @@
 
 ## Object-oriented programming (OOP)
 
-- S3 `attributes`, `attr`, `class`
+- S3 `attributes`, `attr` object metadata, `class` object type
 - Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
 - R objects serialization `dput`, `dget`
 
