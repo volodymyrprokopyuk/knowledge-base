@@ -28,32 +28,49 @@
 
 ## CSS selectors
 
-- Specificity (form higher to lower, same specificity last rule wins)
+- Cascade = CSS rules importance by source
+    - 1. User `important!`
+    - 2. Author `important!`
+    - 3. Author CSS
+    - 4. User CSS
+    - 5. Browser CSS
+    - Overwrite cascade and specificity `property: value !important;` (prefer more
+      specific rules)
+- Specificity = CSS rules importance by selector (same specificity last rule wins =
+  order of CSS files and CSS selectors matter)
     1. Inline `<div style="inline: style;"/>`
     2. Id `#id`
     3. Class `.class`, `[attribute]`, `:pseudo-class`
     4. Element `element`, `:pseudo-element`
-- Overwrite specificity `property: value !important;` (prefer more specific rules)
-- Universal selector `*`
-- Common selectors `element`, `.class`, `#id`
-- Attribute selectors `[attribute]`
-    - Word `[attribute="exact"]`, `[attribute~="space-separated"]`
+    - Set general style for common context-free elements, then override style for more
+      specific elements. Avoid tying CSS to `#id` and document-spacific context, use
+      context-free `.classes` instead
+- Common selectors `*` universal selector, `element`, `.class`, `#id`
+    - Attribute selectors `[attribute]`
+    - Whole word `[attribute="exact"]`, `[attribute~="space-separated"]`
     - Substring `[attribute*="substring"]`, `[attribute^="start"]`, `[attribute$="end"]`
-- Compound selector `element#id.class[attribute="exact"]`
-- Independent selectors `element, #id, .class, [attribute="exact"]`
-- [In]direct descendant combinator `element descendant`
-- Direct child combinator `element > child`
-- General sibling combinator `element ~ sibling`
-- Adjacent sibling combinator `element + sibling`
-- UI state pseudo-class
-    - Actions `:active`, `:checked`, `:focus`, `:hover`
-    - Validation `:[in]valid`
-- Document structure pseudo-class
-    - Root `:root` = `html`
-    - Children `:first-child`, `:last-chaild`, `:nth-child(n)`, `:nth-child(2n)`,
-      `:nth-child(odd | even)`
-- Negate selector `:not(...)`
-- Pseudo-element `::before`, `::after` + `content`
+    - Compound selector (AND) `element#id.class[attribute="exact"]`
+    - Independent selectors (OR) `element, #id, .class, [attribute="exact"]`
+- CSS combinators
+    - [In]direct descendant combinator `element descendant`
+    - Direct child combinator `element > child`
+    - General sibling combinator `element ~ sibling`
+    - Adjacent sibling combinator `element + sibling`
+- Pseudo-class
+    - UI state pseudo-class (state-based implicit classification)
+        - Link state `:link` unvisited, `:visited`,`:hover`, `:focus`, `:active` (order
+          matters: lord vader hates furry animals)
+        - Form validation `:required`, `:optional`, `:[in]valid`
+    - Document structure pseudo-class (position-based implicit classification)
+        - Root `:root` = `html`
+        - First / last child `:first-child`, `:last-chaild`
+        - Children `:nth-child(odd | even)`, `:nth-child(n)`, `:nth-child(3+2n)`,
+          `nth-last-child(3-n)`
+    - Negate selector `:not(...)`
+    - Target selector `:target` element `#id` contained in the URL hash `/content#id`
+- Pseudo-element = part of an element
+    - Content `::before`, `::after` + `content`
+    - Letter / line `::first-letter`, `::first-line`
 
 ## Box model
 

@@ -15,13 +15,11 @@
           `fig.process`
     - Code
         - Format `tidy`, `tidy.opts`
-        - TODO `formatR`, `styler`
     - Output
         - Raw markdwon `results = 'asis'`
         - Uncommented `comment = ""`
         - Prompt `prompt = T` prefix source with `>` and `+`
     - HTML attribute`[class|attr].[source|output|message|warning|error]`
-      `class.error`
 - Code
     - Inline code `r ...`
     - Code block ```{r label, options ...}\newline ... \newline```

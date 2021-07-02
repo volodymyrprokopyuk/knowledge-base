@@ -26,8 +26,10 @@
   </html>
   ```
 - Linking external resources
-    - JS `...<script src="script.js" [async | defer]></script></body>`
-    - CSS `...<link rel="stylesheet" href="style.css" [media="print"]></head>`
+    - JS `...<script src="script.js" [async | defer] [crossorigin="anonymous"]>
+      </script></body>`
+    - CSS `...<link rel="stylesheet" href="style.css" [media="print"]
+      [crossorigin="anonymous"]></head>`
     - Import CSS `@import "style.css";`, `@media print { @import "style.css"; }`
     - Favicon `...<link rel="shortcut icon" href="favicon.png"></head>`
 
@@ -65,6 +67,75 @@
 - Column grouping `<table> [<caption>] > <colgroup> [> <col span="2">] + <tr>`
 - Row grouping `<tr class="row-group">`
 - Heading scope `<th scope="column|row|colgroup|rowgroup">`
+
+## Images
+
+- External image `<img scr="image.png" alt="Description">`
+- Embedded image `<img src="data:image/png;base64,..." alt="Description">`
+- Responsive image = resolution switching per viewport size
+
+  ```html
+  <img sizes="viewport-condition image-size, ..."
+       scrset="image-url image-size, ..."
+       scr="fallback.png" alt="Description">`
+  ```
+
+- Alternative images = different images per viewport size
+
+  ```html
+  <picture>
+    <source media="viewport-condition" srcset="large.png">
+    <source media="viewport-condition" srcset="small.png">
+    <img src="fallback.png" alt="Description">`
+  </picture>
+  ```
+
+- Image map = image with clickable areas that usually act as hyperlinks
+
+  ```html
+  <img src="image.png" usemap="#image-map">
+  <map name="image-map">
+    <area shape="rectangle | circle | polygon" coords="x, y, ..." href="url">
+    <area shape="rectangle | circle | polygon" coords="x, y, ..." href="url">
+  </map>
+  ```
+
+## Input
+
+- Label
+
+  ```html
+  <label for="n">Label</label>
+  <input type="text" name="n">
+  ```
+
+- One-line edit box `<input type="text" name="n" id="a">`
+    - Types `text | number | range | email | password | color | file | submit`
+- File `<input type="file" name="n" id="a" accept="image/png" [multiple]>`
+- Multi-line edit area `<textarea>`
+- Independent heck box `<input type="checkbox" name="n" id="a" value="v" checked>`
+- Mutually exclusive radio button group
+
+  ```html
+  <fieldset>
+    <legend>Legend</legend>
+    <p>
+      <input type="radio" name="radio-group" id="a" value="v1" checked>`
+      <label for="a">Label a>
+    </p>
+    <p>
+      <input type="radio" name="radio-group" id="b" value="v2">`
+      <label for="b">Label b>
+    </p>
+  </fieldset>
+  ```
+
+- Input validation = is done automatically by the browser on form submission based on
+  input spacial attributes
+    - Length / range `<input required minlength="m" maxlength="n" min="m" max="n">`
+    - Pattern / file `<input pattern=".*" accept="image/png" title="Error">`
+    - Disabled `<input disabled readonly>`
+    - Focus / hint `<input autofocus placeholder="Example" autocomplete>`
 
 ## Document structure
 

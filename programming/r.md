@@ -6,6 +6,7 @@
 
 - Help in R console `?obj` show help, `??"search"` search help
 - Non-syntactic name `` `_name` ``
+- Subsetting + assignment = subassignement
 - Immutable objects
     - Copy-on-modify semantics for shared objects `x <- c(1, 2); y <- x; y[[1]] <- 10`
     - Modify-in-place optimization for a single name `y[[2]] <- 20`
@@ -13,48 +14,67 @@
     - Vector deep copy, list shallow copy
     - Character vector uses global string pool
 - Type system
-    - Vector type: atomic vector (homogeneous, linear), list (heterogeneous, hierarchical)
+    - Vector type: atomic vector + factor + date and time, list + data frame + tibble
     - Node type: function, environment
-    - Implicit coercion: `as.logical` -> `as.integer` -> `as.double` -> `as.character`
 
-## Vectors and factors
+## Vectors, factors, datetimes, matrices and arrays
 
-- Missing value `NA`, `is.na`, `na.omit`
-- Null object `NULL`, `is.null`
+- Missing value `NA`, `is.na(x)`, `na.omit(x)`
+- Null object = zero-length vector or absent vector `NULL`, `is.null(x)`
 - Atomic vector
-    - Logical `TRUE`, `FALSE`, `T`, `F`, `any`, `all`, `T && || F`, `v & | v`, `! v`,
-      `is.logical`
-    - Integer `1L`, `0x1aL`, `is.integer`
-    - Double `1.2`, `1.2e3`, `[-]Inf`, `NaN`, `is.double`, `is.[in]finite`, `is.nan`
-    - Character `"string"`, `'string'`, `is.character`
+    - Logical `TRUE`, `FALSE`, `T`, `F`, `any(cond)`, `all(cond)`, `T && || F`,
+      `v & | v`, `! v`, `is.logical(x)`
+    - Integer `1L`, `0x1aL`, `is.integer(x)`
+    - Double `1.2`, `1.2e3`, `[-]Inf`, `NaN`, `is.double(x)`, `is.[in]finite(x)`,
+      `is.nan(x)`
+    - Character `"string"`, `'string'`, `is.character(x)`
     - Complex
     - Raw (binary)
-
-- `dimension` attribute for matrix and array
-- `class` attribute for S3 (factor, date, datetime, data frame, tibble)
-
-- Vector (homogeneous, fixed, element)
-    - Creation `c` combine / append, `length`, `typeof`, `seq`, `rep`, `sort`, `which`
-    - Subsetting (1-based) `v[1]` element (preserves structure), `v[c(1, 2)]`, `v[c(T,
-      F)]`, `v[v > 0]` sub-vector, `v[... & | ...]` `v[-c(...)]`, v[-which(v < 0)]
-      remove
-- Matrix (homogeneous, column-first, row x column) `matrix`, `cbind`, `rbind`, `dim`,
-  `nrow`, `ncol`, `t`, `%*%`, `solve`
+- Vector (homogeneous, fixed, flat, linear, element)
+    - Creation `c(1, ...)`, `c(a = 1, ...)` combine / append, `seq(start, end, step)`,
+      `rep(obj, times, length.out)`
+    - Access `length(x)`, `names(x)`, `is.null(dim(x))`, `typeof(x)`,
+      `which(x, arr.ind)`, `sort(x, decreasing)`, `rev(x)`
+    - Subsetting (1-based) `v[1]` element (preserves structure), `v[c(1, 2)]`,
+      `v[c(T, F)]`, `v[v > 0]` sub-vector, `v[... & | ...]`
+    - Remove `v[-c(...)]`, `v[-which(v < 0)]`
+- Matrix (homogeneous, column-first, row x column)
+    - Creation `matrix(x, nrow, ncol)`, `cbind(...)`, `rbind(...)`
+    - Access `nrow(x)`, `ncol(x)`, `dim(x)`, `rownames()`, `colnames()`, `is.matrix(x)`,
+      `diag(x)`, `t(x)` transpose, `solve(x)` inverse, `%*%`
     - Subsetting `m[1]` column-first vector, `m[1, 1]` element, `m[1,]` row, `m[, 1]`
-      column, `m[c(...), c(...)]` sub-matrix, `m[-c(...), -c(...)]` remove, `diag`
-      diagonal
-- Array (homogeneous, row x column x layter x block) `array` + array subsetting
-- Factor (string vector with ordering) `factor`, `levels`, `c`, `cut`, `length` + factor
-  subsetting
+      column, `m[c(...), c(...)]` sub-matrix
+    - Remove`m[-c(...), -c(...)]` remove
+- Array (homogeneous, row x column x layter x block)
+    - Creation `array(x, dim, dimnames)`
+    - Access `dim(x)`, `dimnames(x)`, `is.array(x)`
+- S3 atomic vectors
+    - Factor = integer vector that represents categorical data with a fixed set of
+      predefined levels
+        - Creation `factor(x, levels)`, `ordered(x, levels)`
+        - Access `levels(x)`, `cut(x, breaks)`
+    - Date vector = double vector that represents the number of days since 1970-01-01
+        - Creation `Sys.Date()`, `as.Date("1970-01-01")`
+    - Calendar time = double vector that represents the number of seconds since
+      1970-01-01
+        - Creation `as.POSIXct("1970-01-01 00:00:00", tzone = "UTC")`
+    - Duration = double vector that represents the number of units between two datetimes
+        - Creation `as.difftime(x, units)`
 
-## Lists and data frames
+## Lists, data frames and tibbles
 
-- List (heterogeneous, extensible, nested) `list`, `length`, `names`
-    - Subsetting `l[[1]]` member reference -> single object, `l$name`,
-      `l[1]` list slicing -> list (preserves structure)
-- Data frame (hegerogeneous named list of equal-length vectors, observation records =
-  rows of variables = columns) `data.frame`, `nrow`, `ncol`, `dim`, `rbind`, `colnames`,
-  `rownames`
+- List = generic vector (heterogeneous, extensible, recursive, hierarchical, member)
+    - Create `list(...)` preserve, `c(...)` flatten
+    - Access `length(x)`, `names(x)`, `is.list(x)`
+    - Subsetting `l[[1]]` member reference -> single object (simplifies structure),
+      `l[1]` list slicing -> list (preserves structure),`l$name`
+- Data frame / tibble (hegerogeneous, rectangular named list of equal-length vectors,
+  observations [rows] of a set of variables [columns])
+    - Creation `data.frame | tibble(a = c(...), ..., [row.names])`, `rbind(...)`
+    - Tibble does not support `row.names` -> `rownames_to_column(df)` converts data
+      frame's `row.names` into a tibble's regular column
+    - Access `ncol(x)`, `nrow(x)`, `dim(x)`, `colnames(x)`, `rownames(x)`,
+      `is.data.frame(x)`, `is_tibble(x)`
     - Subsetting `df[1, 1]`, `df[c(1), c("name")]`, `df$name`, `df[df$name > 0,]`
 
 ## Strings
@@ -100,7 +120,11 @@
 
 ## Object-oriented programming (OOP)
 
-- S3 `attributes`, `attr` object metadata, `class` object type
+- Attributes = are ephemeral, lost by most operations, but `names` and `dim` are
+  preserved (to preserve other attributes, custom S3 class has to be created)
+    - Get / set ndivitual attribute `attr(obj, attr)`
+    - Get all attributes `attributes(obj)`
+    - Set multiple attributes `structure(obj, attr = value ...)`
 - Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
 - R objects serialization `dput`, `dget`
 
