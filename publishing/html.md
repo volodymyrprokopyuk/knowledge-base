@@ -25,9 +25,15 @@
     </body>
   </html>
   ```
+
 - Linking external resources
     - JS `...<script src="script.js" [async | defer] [crossorigin="anonymous"]>
       </script></body>`
+        - `async` and `defer` `script` can be palced in the `head`
+        - `async` loads JS in parallel, but starts executing JS immediately when
+          downlaoded
+        - `defer` loads JS in parallel, but only executes JS after HTML + CSS is
+          rendered
     - CSS `...<link rel="stylesheet" href="style.css" [media="print"]
       [crossorigin="anonymous"]></head>`
     - Import CSS `@import "style.css";`, `@media print { @import "style.css"; }`
@@ -102,41 +108,68 @@
 
 ## Input
 
-- Label
-
-  ```html
-  <label for="n">Label</label>
-  <input type="text" name="n">
-  ```
-
-- One-line edit box `<input type="text" name="n" id="a">`
-    - Types `text | number | range | email | password | color | file | submit`
+- One-line edit box `<input type="text| number | range | email | tel | password"
+  name="n" id="a">`
 - File `<input type="file" name="n" id="a" accept="image/png" [multiple]>`
+- Button `<intput type="button | reset" value="Action">`
+- Submit `<intput type="submit" value="Submit">`
+- Hidden `<intput type="hidden" value="data">`
+- Date `<intput type="date" value="yyyy-mm-dd">`
+- Time `<intput type="time" value="HH:MM:SS">`
+- Datetime `<intput type="datetime" value="yyyy-mm-dd HH:MM:SS">`
 - Multi-line edit area `<textarea>`
 - Independent heck box `<input type="checkbox" name="n" id="a" value="v" checked>`
 - Mutually exclusive radio button group
 
   ```html
-  <fieldset>
-    <legend>Legend</legend>
-    <p>
-      <input type="radio" name="radio-group" id="a" value="v1" checked>`
-      <label for="a">Label a>
-    </p>
-    <p>
-      <input type="radio" name="radio-group" id="b" value="v2">`
-      <label for="b">Label b>
-    </p>
-  </fieldset>
+  <form action="/url" method="get | post">
+    <fieldset>
+      <legend>Label + input legend</legend>
+      <label for="n">Label</label>
+      <input type="text" name="n">
+    </fieldset>
+    <fieldset>
+      <legend>Radio button legend</legend>
+      <p>
+        <input type="radio" name="radio-group" id="a" value="v1" checked>`
+        <label for="a">Label a>
+      </p>
+      <p>
+        <input type="radio" name="radio-group" id="b" value="v2">`
+        <label for="b">Label b>
+      </p>
+    </fieldset>
+    <intput type="submit" value="Submit">
+  </form>
   ```
 
 - Input validation = is done automatically by the browser on form submission based on
   input spacial attributes
     - Length / range `<input required minlength="m" maxlength="n" min="m" max="n">`
-    - Pattern / file `<input pattern=".*" accept="image/png" title="Error">`
-    - Disabled `<input disabled readonly>`
+    - Pattern / file `<input pattern=".*" accept="image/png" title="Validation error">`
+    - Disabled / readonly `<input disabled readonly>`
     - Focus / hint `<input autofocus placeholder="Example" autocomplete>`
 
 ## Document structure
 
-- `section`, `header`, `footer`, `nav`, `article`, `aside`, `main`
+- Generic `div` block-level container without semantic meaning for grouping other
+  elements that should be used as the last resort element when no other element is
+  suitable
+- Main site-wide navigation
+
+  ```html
+  <nav>
+    <ul>
+      <li><a href="url1">Link1</a></li>
+      <li><a href="url2">Link2</a></li>
+    </ul>
+  </nav>
+  ```
+
+- Single, unique, highly cohesive content `<main>`
+- Multiple units of self-contained content `<article>`
+- Introductory content `<header>`
+- Content meta data `<footer>`
+- Generic semantic grouping of related content `<section>`. E. g. group related
+  articles, define sections in a single article
+- Tengentially reated content `<aside>`

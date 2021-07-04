@@ -6,7 +6,9 @@
     - `<div style="inline: style;"/>`
     - `<style>sel { style: block; }</style>`
     - `<link rel="stylesheet" href="style.css"/>`
-    - `@import "style.css";`
+        - Prefer `link` over `@import` due to performance (time-to-render after HTML and
+          CSS + JS at the end of `body`) + compress CSS + cache CSS
+    - `@import url("style.css");`
 - CSS variables
     - Variable inheritance: variables cascade down to descendant elements
     - `:root { --global-variable: value; }` <- `var(--global-variable, [default])`
@@ -16,7 +18,8 @@
     - `px` usually used only for root `font-size`
     - `em` variable, relative to inherited `font-size`
     - `rem` constant, relative to root `font-size`
-    - `%` percentage of inherited `font-size` or `width` (responsive design)
+    - `%` percentage of inherited `font-size` or parent element `width` (responsive
+      design)
     - `wv`, `wh` relative to viewport (responsive design)
     - `fr` CSS grid fraction
     - `cm`, `mm`, `pt` absolute units (print styling)
@@ -28,23 +31,29 @@
 
 ## CSS selectors
 
-- Cascade = CSS rules importance by source
+- **Cascade** = CSS rules importance by source
     - 1. User `important!`
     - 2. Author `important!`
     - 3. Author CSS
     - 4. User CSS
     - 5. Browser CSS
-    - Overwrite cascade and specificity `property: value !important;` (prefer more
+    - Override cascade and specificity `property: value !important;` (prefer more
       specific rules)
-- Specificity = CSS rules importance by selector (same specificity last rule wins =
-  order of CSS files and CSS selectors matter)
+- **Specificity* = CSS rules importance by selector (same cascade and specificity last
+  rule
+  wins = order of CSS files and CSS selectors matters)
     1. Inline `<div style="inline: style;"/>`
     2. Id `#id`
     3. Class `.class`, `[attribute]`, `:pseudo-class`
     4. Element `element`, `:pseudo-element`
     - Set general style for common context-free elements, then override style for more
-      specific elements. Avoid tying CSS to `#id` and document-spacific context, use
-      context-free `.classes` instead
+      specific elements
+    = Avoid tying CSS to `#id` and document-spacific context `element`s, use
+      context-free `.classes` instead (utility-first CSS framework)
+- **Inheritance** = some properties are inherited by descendants
+    - Inherited styles have null specificity
+    - Styles set via `*` universal selector have zero specificity (`*` > inherited)
+    - Any style applied directly to and element overrides an inherited style
 - Common selectors `*` universal selector, `element`, `.class`, `#id`
     - Attribute selectors `[attribute]`
     - Whole word `[attribute="exact"]`, `[attribute~="space-separated"]`
@@ -56,7 +65,7 @@
     - Direct child combinator `element > child`
     - General sibling combinator `element ~ sibling`
     - Adjacent sibling combinator `element + sibling`
-- Pseudo-class
+- Pseudo-class = implicit classification
     - UI state pseudo-class (state-based implicit classification)
         - Link state `:link` unvisited, `:visited`,`:hover`, `:focus`, `:active` (order
           matters: lord vader hates furry animals)
@@ -74,9 +83,13 @@
 
 ## Box model
 
-- Box model `margin`, `border`, `padding` and `content`
-- `box-sizing: content-box | border-box` -> `width`, `height` (`margin` is never
-    considered) + `[min|max]-[width|height]`
+- Box model = element is a rectangular box with
+    - `margin` transparent distance between elements
+    - `border` frame around element's content
+    - `padding` element's gutter
+    - `content` element's data
+- `box-sizing: content-box | border-box` calculation of `width` and `height` (`margin`
+   is never considered) + `[min|max]-[width|height]` not srink smaller / not grow larger
 - `display: block | inline | inline-block`
 - `block` respects `width` and `height`, is palced on its own line, takes up the
     full width of the container and has just enough height to fit the content
