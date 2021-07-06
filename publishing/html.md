@@ -38,6 +38,32 @@
       [crossorigin="anonymous"]></head>`
     - Import CSS `@import "style.css";`, `@media print { @import "style.css"; }`
     - Favicon `...<link rel="shortcut icon" href="favicon.png"></head>`
+- Void elements (only opening tag) `<br>`, `<hr>`, `<meta>`, `<link>`, `<img>`,
+  `<source>` media source for `<picture>`, `<audio>` and `<video>`
+
+## Document structure
+
+- Generic `div` block-level container without semantic meaning for grouping other
+  elements that should be used as the last resort element when no other element is
+  suitable
+- Main site-wide navigation
+
+  ```html
+  <nav>
+    <ul>
+      <li><a href="url1">Link1</a></li>
+      <li><a href="url2">Link2</a></li>
+    </ul>
+  </nav>
+  ```
+
+- Single, unique, highly cohesive content `<main>`
+- Multiple units of self-contained content `<article>`
+- Introductory content `<header>`
+- Content meta data `<footer>`
+- Generic semantic grouping of related content `<section>`. E. g. group related
+  articles, define sections in a single article
+- Tengentially reated content `<aside>`
 
 ## Headings and paragraphs
 
@@ -106,6 +132,24 @@
   </map>
   ```
 
+## Media
+
+- Audio
+
+  ```html
+  <audio controls>
+    <source src="audio.mp3" type="audio/mpeg">
+  </audio>
+  ```
+
+- Video
+
+  ```html
+  <video width="800" height="600" controls autoplay loop muted poster>
+    <source src="video.mp4" type="video/mp4">
+  </video>
+  ```
+
 ## Input
 
 - One-line edit box `<input type="text| number | range | email | tel | password"
@@ -136,11 +180,25 @@
       </p>
       <p>
         <input type="radio" name="radio-group" id="b" value="v2">`
-        <label for="b">Label b>
+        <label for="b">Label b> <!-- label's for matches input's id -->
       </p>
     </fieldset>
     <intput type="submit" value="Submit">
   </form>
+  ```
+
+- Selection
+
+  ```html
+  <select [multiple]>
+    <option label="Option 0" value="0" selected>Fallback 0</option>
+    <optgroup label="Group 1">
+      <option label="Option 1" value="1" selected>Fallback 1</option>
+    </optgroup>
+    <optgroup label="Group 1">
+      <option label="Option 2" value="2">Fallback 2</option>
+    </optgroup>
+  </select>
   ```
 
 - Input validation = is done automatically by the browser on form submission based on
@@ -149,27 +207,3 @@
     - Pattern / file `<input pattern=".*" accept="image/png" title="Validation error">`
     - Disabled / readonly `<input disabled readonly>`
     - Focus / hint `<input autofocus placeholder="Example" autocomplete>`
-
-## Document structure
-
-- Generic `div` block-level container without semantic meaning for grouping other
-  elements that should be used as the last resort element when no other element is
-  suitable
-- Main site-wide navigation
-
-  ```html
-  <nav>
-    <ul>
-      <li><a href="url1">Link1</a></li>
-      <li><a href="url2">Link2</a></li>
-    </ul>
-  </nav>
-  ```
-
-- Single, unique, highly cohesive content `<main>`
-- Multiple units of self-contained content `<article>`
-- Introductory content `<header>`
-- Content meta data `<footer>`
-- Generic semantic grouping of related content `<section>`. E. g. group related
-  articles, define sections in a single article
-- Tengentially reated content `<aside>`

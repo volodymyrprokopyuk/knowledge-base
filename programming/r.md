@@ -5,7 +5,7 @@
 ## General aspects
 
 - Help in R console `?obj` show help, `??"search"` search help
-- Non-syntactic name `` `_name` ``
+- Non-syntactic name `` `_name` ``, `` `%...%` <- function(l, r) {...} ``
 - Subsetting + assignment = subassignement `x[i] <- v`, `x[] <- v`
 - Immutable objects
     - Copy-on-modify semantics for shared objects `x <- c(1, 2); y <- x; y[[1]] <- 10`
@@ -13,18 +13,28 @@
     - Environments are always modified in place (reference semantics)
     - Vector deep copy, list shallow copy
     - Character vector uses global string pool
-- Type system
-    - Vector type: atomic vector + factor + date and time, list + data frame + tibble
-    - Node type: function, environment
+- R type system
+    - Vector type
+        - Vector (atomic vector)
+            - Atomic vector (logical, integer, double, character, complex, raw)
+            - Factor (ordered factor)
+            - Date and time
+        - List (generic vector)
+            - List
+            - Data frame, tibble
+    - Node type
+        - Function
+        - Environment
 
 ## Vectors, factors, datetimes, matrices and arrays
 
 - Missing value `NA`, `is.na(x)`, `na.omit(x)`
 - Null object = zero-length vector or absent vector `NULL`, `is.null(x)`
 - Atomic vector
-    - Logical `TRUE`, `FALSE`, `T`, `F`, `any(cond)`, `all(cond)`, `T && || F`,
-      `v & | v`, `! v`, `is.logical(x)`
+    - Logical `TRUE`, `FALSE`, `T`, `F`, `any(cond)`, `all(cond)`, `is.logical(x)`
+        - Boolean operations `v[!v & v | xor(v1, v2)]`, `if (T && || F) {...}`
     - Integer `1L`, `0x1aL`, `is.integer(x)`
+        - Set operations `union`, `intersect`, `setdiff`, `setdiff(union, intersect)`
     - Double `1.2`, `1.2e3`, `[-]Inf`, `NaN`, `is.double(x)`, `is.[in]finite(x)`,
       `is.nan(x)`
     - Character `"string"`, `'string'`, `is.character(x)`
@@ -32,9 +42,10 @@
     - Raw (binary)
 - Vector (homogeneous, fixed, flat, linear, element)
     - Creation `c(1, ...)`, `c(a = 1, ...)` combine / append, `seq(start, end, step)`,
-      `rep(obj, times, length.out)`
+      `rep(obj, times, length.out)`, `vector(mode, length)`, `seq_along(length)`
     - Access `length(x)`, `names(x)`, `is.null(dim(x))`, `typeof(x)`,
-      `which(x, arr.ind)`, `order | sort(x, decreasing)`, `rev(x)`, `match(x, table)`
+      `which(x, arr.ind)` logical -> integer, `order | sort(x, decreasing)`, `rev(x)`,
+      `unique(x)`, `match(x, table)`, `sample(n)` random permutation
     - Subsetting `[...]` (preserves structure, returns multiple elements, 1-based)
         - Identity `v[]` original vector, `v[0]` zero-length vector
         - Postion `v[1]`, `v[c(1, 2)]`
@@ -102,13 +113,16 @@
 ## Control flow
 
 - Conditionals
-    - Atomic `if (... && || ...) { ... } [else { ... }]` statement
+    - Atomic `if (T && || F) { ... } [else { ... }]` statement
     - Vector `ifelse(test, yes, no)` function
     - Choice `switch(str.expr, match = value, ..., else)` function
 - Loops
-    - Iteration `for (... in ...) { ... }` statement
+    - Vector iteration `for (... in ...) { ... }` statement
+        - Preallocate the output container with `vector(mode, length)` when generating
+          data in a `for` loop
     - Condition `while (...) { ... }` statement
     - Explicit exit `reapet` + `break` | `next` statements
+    - Generic -> specific `repeat` -> `while` -> `for`
     - Implicit loop functions
         - Array `apply(x, margin, fun)`
         - List `lapply(x, fun)` -> list, `sapply(s, fun)` -> array
@@ -116,10 +130,30 @@
 
 ## Functions
 
+- Function object = `formals()` positional, named, variadic `...` + `body()` +
+  `environment()` lexical scoping
+- Lexical scoping = parse-time structures (vs dynamic scoping = runtime structures)
+    - Name masking = names defined inside a function mask names defined outside a
+      function
+    - Namespace sharing = functions and variables share the namespace, but non-function
+      objects are not considered when resolving function name
+    - Dynamic lookup = name resolution and evaluation happens at runtime, not at
+      definition time (function's behavior depends on objects defined outside function's
+      environment)
+    - Independent function execution = every time a function is called a new environment
+      is created to host its execution
+- R function can have `attributes()`, but primitive C function has all set to `NULL`
 - `f <- function(...) { ... [return(...) | invisible(...)] }` call by name (by need if
   memoized)
 - Function singature `args(func)`, `missing(arg)`
 - Arguments matching positional, exact / partial (avoid), mixed, variadic `list(...)`
+- `do.call(func, list)`
+- Lazy evaluation of function arguments = promise / thunk = expression + environment +
+  memoized value (et most once evaluation)
+- Default arguments are evaluated inside the function, hence can be defined in terms of
+  other arguments or even variables defined inside the function. `missing(arg) == T` if
+  default value is used
+- Explicitly passed function arguments are evaluated in outside (global) environment
 
 ## Environments
 
@@ -128,7 +162,7 @@
 - Package environment = build-in functions and objects `ls("package:ggplot2")`
 - Local environment = function lexical scope
 - Search path `search()` -> `.GlobalEnv, library(...), package:base`
-- Environment where object is defined `environment(obj)`
+- Environment where object is defined `environment(obj)`, `exists("name")`
 
 ## Conditions
 

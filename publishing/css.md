@@ -89,15 +89,49 @@
     - `padding` element's gutter
     - `content` element's data
 - `box-sizing: content-box | border-box` calculation of `width` and `height` (`margin`
-   is never considered) + `[min|max]-[width|height]` not srink smaller / not grow larger
-- `display: block | inline | inline-block`
-- `block` respects `width` and `height`, is palced on its own line, takes up the
-    full width of the container and has just enough height to fit the content
-- `inline` ignores `width` and `height`, is palced inline in the text flow, takes up
-    enough width and height to fit the content
-- `inline-block` respects `width` and `height` and is palced inline in the text flow
-- `display: none` removes element from the flow
+   is never considered)
+    - `[min|max]-[width|height]` not srink smaller / not grow larger
+- Block / inline element `display: block | inline | inline-block | none`
+    - `block` formatting context = respects `width`, `height`, vertical and horizantal
+      margins and paddings, is palced on its own line, takes up the full width of the
+      container and has just enough height to fit the content
+        - Vertical margins of block elements (siblings and parent-child) collapse with
+          the larger margin
+    - `inline` formatting context = ignores `width`, `height` and verical maring and
+      paddings, respects horizontal marings and paddings, is palced inline in the text
+      flow, takes up enough width and height to fit the content
+    - `inline-block` respects `width`, `height`, vertical and horizantal margins and
+      paddings, is palced inline in the text flow
+    - `display: none` removes element from the flow
 - `visibility: hidden` preserves element space in the flow
+
+## Positioning and floats
+
+- CSS overflow `overflow-[x|y]: visible | hiddent | scroll | auto`
+- Containing block = the nearest block-level parent (`position: static | relative`)
+- `maring: auto` centers content horizontally
+- `position: static` (defualt) element in the flow
+      - Block elements laid out vertically taking up the full width of parent
+      - Inline element laid out horizontally wrapping to new line when necessary
+- `position: relative` element's original position remains in the flow, other
+   elements are not affected + `top`, `left`, `right`, `bottom` relative to element's
+   original position, elements takes up the full width of its parent
+- `position: absolute` (rarely used) element is removed from the flow and floats abouve
+   the flow (use `z-index` to control stacking), other elements take spece of the
+   original element + `top`, `left`, `right`, `bottom` relative to the closest
+   explicitly positioned ancestor element, element takes only the necessary width
+- `position: fixed` (absolute to viewport) element is removed from the flow + `top`,
+  `left`, `right`, `bottom` always relative to the viewport (even on scroll, element
+   remains in the same position), element takes only the necessary width
+- `position: sticky` (relative + fixed) element is `relative` when scrolling up to a
+   `top`, `left`, `right`, `botton` point, after which element becomes `fixed`
+- `float: left | right` element is removed from the flow, element flows to the left or
+   to the right of the parent, other inline elements flow around the floated element +
+-  Clearing to resume content below the floated element or to make the containing
+   element to enclose floated elements (browser adds enough `margin-top` to the cleared
+   element to push it down past the float)
+     - HTML + CSS `<div class="clear"></div>` + `.clear { clear: left | right | both; }`
+     - CSS only `.container::after { content: " "; display: block; clear: both; }`
 
 ## Borders and backgrounds
 
@@ -117,32 +151,9 @@
     - Import `@font-face { font-family: "FF"; src: url("ff.woff2") format("woff2");
       font-weight: ...; font-style: ...; }`
     - Use `body { font-family: "FF", sans; }`
+- Multy-column layout
 
-## Positioning and floats
-
-- CSS overflow `overflow-[x|y]: visible | hiddent | scroll | auto`
-- Vertical margin collaps with the larger margin
-- `maring: auto` center horizontally
-- `position: static` (defualt) element in the flow, elements takes up the full width
-    of its parent
-- `position: relative` element's original position remains in the flow, other
-    elements are not affected + `top`, `left`, `right`, `bottom` relative to element's
-    original position, elements takes up the full width of its parent
-- `position: absolute` element is removed from the flow and floats abouve the flow,
-    other elements take spece of the original element + `top`, `left`, `right`,
-    `bottom` relative to the closest explicitly positioned ancestor element, element
-    takes only the necessary width
-- `position: fixed` element is removed from the flow + `top`, `left`, `right`,
-    `bottom` always relative to the viewport (even on scroll, element remains in the
-    same position), element takes only the necessary width
-- `position: sticky` element is `relative` when scrolling up to a `top`, `left`,
-    `right`, `botton` point, after which element becomes `fixed`
-- `z-index` stacking
-- `float: left | right` element is removed from the flow, element flows to the left
-    or to the right of the parent, other inline elements flow around the floated
-    element + `clear: left | right | both` to resume content below the floated element
-
-## Flexbox layout
+## Flexbox micro layout
 
 - Display `display: flex | inline-flex` flex container parent + flex items children,
   flex containers can be nested forming flexbox layout hierarchy with absolutely
@@ -163,7 +174,7 @@
     - Container cross axis `align-content: stretch | flex-[start|end] | center |
       space-[between|around|evenly]`
 
-## CSS grid layout
+## CSS grid macro layout
 
 - `display: grid | inline-grid` grid container + grid items (container's immediate
   children) laid out in two-dimensional grid layout with rows and columns
