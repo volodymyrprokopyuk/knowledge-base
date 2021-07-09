@@ -26,6 +26,9 @@
   </html>
   ```
 
+- Meta data `<meta name="author | description | keywords" content="...">`
+- Layout `<meta name="viweport" content="width=device-width, initial-scale=1.0
+  user-scalable=yes">`
 - Linking external resources
     - JS `...<script src="script.js" [async | defer] [crossorigin="anonymous"]>
       </script></body>`
@@ -75,6 +78,10 @@
     - `<ins>` inserted text (underline), `<del>` deleted text (strikethrough)
     - `<sub>` subscript, `<sup>` superscript
 - Abbreviation `<abbr title="Hypertext Markup Language">HTML</abbr>`
+- Block code `<pre><code>block code</code></pre>`
+- Inline code `<code>inline code</code>`
+- Block quote `<blockquote cite="quote-url">Block quote</blockquote>`
+- Inline quote `<q cite="quote-url">Inline quote</q>`
 
 ## Hyperlinks
 

@@ -1,10 +1,13 @@
 # R
 
-- TODO: `littler`, `styler`, `lintr`
+- TODO:
+    - R tools `littler`, `styler`, `lintr`
+    - R language `rlang`
+    - Statistics `psych`
 
 ## General aspects
 
-- Help in R console `?obj` show help, `??"search"` search help
+- Help in R console `?obj`, `` ?`(` `` show help, `??"search"` search help
 - Non-syntactic name `` `_name` ``, `` `%...%` <- function(l, r) {...} ``
 - Subsetting + assignment = subassignement `x[i] <- v`, `x[] <- v`
 - Immutable objects
@@ -143,11 +146,38 @@
     - Independent function execution = every time a function is called a new environment
       is created to host its execution
 - R function can have `attributes()`, but primitive C function has all set to `NULL`
-- `f <- function(...) { ... [return(...) | invisible(...)] }` call by name (by need if
-  memoized)
+- `f <- function(...) {on.exit(..., add = T, after = F) ... [return(...) |
+  invisible(...) | stop(...)] }` call by name = evaluate argument on first use (by need
+  if memoized)
+- Explicit `return(...)`, `invisible(...)` return prevents automatic printing,
+  `(f(...))` prints invisible return. `<-` returns invisibly and allows chaining.
+  Side-effecting functions should return invisibly
 - Function singature `args(func)`, `missing(arg)`
-- Arguments matching positional, exact / partial (avoid), mixed, variadic `list(...)`
-- `do.call(func, list)`
+- Order of arguments matching
+    - 1. Exact
+    - 2. Partial (avoid)
+    - 3. Positional (first or two most commonly used arguments)
+- Ellipsis = variadic arguments `list(...)`, `..n` to pass arguments to inner functions
+- Function call
+    - Prefix `f(x, ...)` any call can be written in prefix form, knowing the name of
+      non-prefix funciton allows to override its behavior
+    - Infix `x + | %...% y` is left-associative (prefix `` `+`(x, y) ``)
+    - Replacement `names(df) <- c(...)` in-place (copy) argument modification, (prefix
+      `` `names<-`(df, c(...)) ``)
+        - `` `f<-` <- \(x, value) { x[...] <- value; x } `` call `f(x) <- value`
+        - `` `f<-` <- \(x, extra, value) { ...; x }`` call `f(x, extra) <- value`
+    - Spacial forms (R language features = primitive C functions)
+        - Parentheses and braces `` (x) -> `(`(x)  ``, `` {x} -> `{`(x) ``
+        - Subsetting `` x[i] -> `[`(x, i) ``, `` x[[i]] -> `[[`(x, i) ``
+        - Control flow
+            - `` `if`(condition, consequent, alternative) ``
+            - `` `for`(i, sequence, action) ``
+            - `` `while`(condition, action)  ``
+            - `` `repeat`(action) ``
+            - `` `next`() ``
+            - `` `break`() ``
+        - Function `` `function`(arguments, body, environment) ``
+    - Apply `do.call(func, list)`
 - Lazy evaluation of function arguments = promise / thunk = expression + environment +
   memoized value (et most once evaluation)
 - Default arguments are evaluated inside the function, hence can be defined in terms of
@@ -157,12 +187,34 @@
 
 ## Environments
 
-- Global environment user-defined funcitons and objects `ls()`, `rm(obj)`,
-  `detach("pakcage:x"|obj)`, `attach(obj)`
-- Package environment = build-in functions and objects `ls("package:ggplot2")`
-- Local environment = function lexical scope
-- Search path `search()` -> `.GlobalEnv, library(...), package:base`
-- Environment where object is defined `environment(obj)`, `exists("name")`
+- Environment binds names to values and implements reference semantics (in-place
+  modification, not copying)
+- Every environment has a parent environment that is used to implement lexical scoping
+- The empty environment is the root of the environment hierarchy and does not have a
+  parent
+- Assignment `<- ` creates a binding in the current environment
+- Super assignment `<<-` rebinds an existing name in the parent of a current environment
+- Environment types
+    - Global environment = user-defined funcitons and objects
+    - Package environment = package external interface that exposes function to a user
+        - Package attached last to the search path by `library(package)`or
+          `require(package)` becomes an immediate parent of the global environment
+        - Package is loaded automatically when one of its functions is accessed via
+          `package::function`
+        - Search path `.GlobalEnv, library(b), library(a), Autoloads, package:base`
+        - Parent environment of a package varies based on order of other attached
+          packages
+    - Namespace = package internal interface that controls function variables lookup
+      that hides package internal implementation details from a user
+        - Every function in a package is associated with a pair of environments: package
+          environment + namespace environment
+        - Every binding in the package environment is also found in the namespace, so
+          every function can use every other function in a package
+    - Function environment = environment where a function is defined (closure)
+    - Execution environment = ephemeral environment created every time the function is
+      called
+- The parent of the global environment is the last loaded package
+- Ancestors of global environment inclue every attached package
 
 ## Conditions
 
