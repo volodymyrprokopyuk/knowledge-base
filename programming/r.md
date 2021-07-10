@@ -2,7 +2,9 @@
 
 - TODO:
     - R tools `littler`, `styler`, `lintr`
-    - R language `rlang`
+    - R language `rlang`, `lobstr`
+    - OOP `R6`
+    - Data structures `hash`
     - Statistics `psych`
 
 ## General aspects
@@ -41,6 +43,8 @@
     - Double `1.2`, `1.2e3`, `[-]Inf`, `NaN`, `is.double(x)`, `is.[in]finite(x)`,
       `is.nan(x)`
     - Character `"string"`, `'string'`, `is.character(x)`
+        - `nchar`, `cat`, `paste`, `sprintf`, `strsplit`, `substr`, `grep[l]`,
+          `[g]regexpr`, `regexec`, `[g]sub`
     - Complex
     - Raw (binary)
 - Vector (homogeneous, fixed, flat, linear, element)
@@ -74,7 +78,7 @@
 - S3 atomic vectors
     - Factor = integer vector that represents categorical data with a fixed set of
       predefined levels
-        - Creation `factor(x, levels)`, `ordered(x, levels)`
+        - Creation `factor(x, levels, labels)`, `ordered(x, levels, labels)`
         - Access `levels(x)`, `cut(x, breaks)`
     - Date vector = double vector that represents the number of days since 1970-01-01
         - Creation `Sys.Date()`, `as.Date("1970-01-01")`
@@ -107,11 +111,6 @@
         - Single vector `df[c(...)]` list subsetting
         - Vector per dimension `df[c(...), c(...)]` matrix subsetting
         - `df$name`, `df[df$name > 0,]`
-
-## Strings
-
-- String `nchar`, `cat`, `paste`, `sprintf`, `strsplit`, `substr`, `grep[l]`,
-  `[g]regexpr`, `regexec`, `[g]sub`
 
 ## Control flow
 
@@ -189,6 +188,10 @@
 
 - Environment binds names to values and implements reference semantics (in-place
   modification, not copying)
+    - Avoid copies of large data via R6 encapsulated OOP built on top of environments
+    - Manage state within a package across function calls via explicit environments
+      `set_a(x) { o <- e$a; e$a <- x; invisible(o) }`
+    - Environment is a hashmap via `hash` package
 - Every environment has a parent environment that is used to implement lexical scoping
 - The empty environment is the root of the environment hierarchy and does not have a
   parent
@@ -196,30 +199,62 @@
 - Super assignment `<<-` rebinds an existing name in the parent of a current environment
 - Environment types
     - Global environment = user-defined funcitons and objects
-    - Package environment = package external interface that exposes function to a user
+    - Package environment = package external interface that exposes functions to a user
         - Package attached last to the search path by `library(package)`or
           `require(package)` becomes an immediate parent of the global environment
         - Package is loaded automatically when one of its functions is accessed via
           `package::function`
-        - Search path `.GlobalEnv, library(b), library(a), Autoloads, package:base`
+        - Search path `.global -> library(b) -> library(a) -> Autoloads -> package:base`
         - Parent environment of a package varies based on order of other attached
           packages
-    - Namespace = package internal interface that controls function variables lookup
-      that hides package internal implementation details from a user
+    - Function environment = environment where a function is defined (closure) used to
+      implement lexical scoping
+    - Namespace = package internal interface that controls function variables resolution
+        - Namespace hides package internal implementation details from a user
         - Every function in a package is associated with a pair of environments: package
           environment + namespace environment
-        - Every binding in the package environment is also found in the namespace, so
-          every function can use every other function in a package
-    - Function environment = environment where a function is defined (closure)
-    - Execution environment = ephemeral environment created every time the function is
-      called
+        - Every binding in the package environment is also in the namespace, so every
+          function can use every other function in a package
+        - Imports environment = bindings to functions used by the package (NAMESPACE
+          file) `namespace -> imports -> base -> global`
+    - Execution environment = ephemeral environment (child of function environment)
+      created every time the function is called
+    - Caller environment = environment from which a function was called
+        - Call stack is made up of frames = evaluation contexts
+        - Frame = expression (function call) + execution environment + previous frame +
+          `on.exit()` handlers + `return()` context + condition system handlers
+        - Dynamic scoping = lookup variables in a call stack rather than in the
+          execution environment
 - The parent of the global environment is the last loaded package
 - Ancestors of global environment inclue every attached package
 
 ## Conditions
 
-- Exceptions `message(msg)`, `warning(warn)`, `stop(err)`, `try(expr)`,
-  `tryCatch(expr, ..., finally)`, `suppressWarnings(expr)`
+- Signal condition (with default behavior)
+    - Unrecoverable `stop(err)` = `rlang::abort(err)` abort function execution
+    - Recoverable `warning(warn)` = `rlang::warn(warn)` retained till function exit
+    - Informational `message(msg)` reported immediately
+- Handle condition
+    - Ignore `try({...})` error, `suppressWarnings({...})` warnings,
+      `suppressMessages({...})` messages
+    - Condition handlers temporarily override or supplement the default condition
+      behavior
+    - Handle error `tryCatch({...}, error | warning | message, finally)` registers
+      exiting handler (usually for error conditions), terminates wrapped code and return
+      control to the context where `tryCatch()` was called
+        - Handler function is passed a condition object
+        - `finally` is a block of code, not a function (`on.exit()` is implemented using
+          `finally`)
+    - Handle warning and message `withCallingHandlers({...}, error | warning | message)`
+      registers calling handlers (usually for warning and message conditions), after the
+      condition is handled control returns to the context where the condition was
+      signaled and the wrapped code is resumed
+        - The return value of a calling handler is ignored as the wrapped code resumes,
+          so calling handlers are only useful for their side effects
+        - By default the condition propagates to parent calling handlers after being
+          processed by the current calling handler (`rlang::cnd_muffle(cnd)`)
+
+## Functional programming (FP)
 
 ## Object-oriented programming (OOP)
 
@@ -231,8 +266,6 @@
 - Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
 - R objects serialization `dput`, `dget`
 - S4 `@ = $`, `slot(...) = [[...]]`
-
-## Functional programming (FP)
 
 ## Metaprogramming (MP)
 
