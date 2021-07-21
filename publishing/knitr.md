@@ -1,4 +1,4 @@
-# Knitr dynamic documents using R
+# knitr dynamic HTML documents with R
 
 - Global R options
     - Set `options(option = value)`
@@ -23,6 +23,26 @@
 - Code
     - Inline code `r ...`
     - Code block ```{r label, options ...}\newline ... \newline```
-- Table
-    - `kable(x, "pipe|html", caption, col.names, row.names, align, digits, format.args)`
-    - TODO `gt`, `reactable`
+
+# gt declarative HTML tables with R
+
+- Table `tibble |> gt(rowname_col, groupname_col)`
+- Header `tab_header(title, subtitle)`
+- Body
+    - Stubhead
+        - Spanner column label `tab_spanner(label, columns)`
+        - Column label `cols_label(name = label)`
+        - Stubhead label `tab_stubhead(label)`
+    - Stub
+        - Row group label `tab_row_group(label, rows)`, `gt(groupname_col)`,
+          `row_group_order(groups)`
+        - Row label `gt(rowname_col)` is a row header, not a data column
+        - Summary label `summary_rows(groups, columns, fns = list(...))`,
+          `grand_summary_rows(columns, fns = list(...))`
+        - Cell
+- Footer
+    - Footnotes `tab_footnote(footnote, locations = cells_body(columns, rows))` attached
+      to cells data
+    - Source notes `tab_source_note(source_note)` related to the whole table
+- Markup `html(str)`, `md(str)`
+- Export `as_raw_html(gt, inline_css)`

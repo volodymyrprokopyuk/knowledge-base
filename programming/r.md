@@ -3,9 +3,12 @@
 - TODO:
     - R tools `littler`, `styler`, `lintr`
     - R language `rlang`, `lobstr`
-    - OOP `R6`
+    - OOP `R6`, `proto`, `sloop`, `vctrs`
     - Data structures `hash`
     - Statistics `psych`
+    - Utils `logger`, `lgr`
+    - Profiling `profvis`
+    - Benchmarking `rbenchmark`, `microbenchmark`, `bench`, `benchr`
 
 ## General aspects
 
@@ -45,14 +48,15 @@
     - Character `"string"`, `'string'`, `is.character(x)`
         - `nchar`, `cat`, `paste`, `sprintf`, `strsplit`, `substr`, `grep[l]`,
           `[g]regexpr`, `regexec`, `[g]sub`
-    - Complex
+    - Complex `1+2i`
     - Raw (binary)
 - Vector (homogeneous, fixed, flat, linear, element)
-    - Creation `c(1, ...)`, `c(a = 1, ...)` combine / append, `seq(start, end, step)`,
-      `rep(obj, times, length.out)`, `vector(mode, length)`, `seq_along(length)`
+    - Creation `c(1, ...)`, `c(a = 1, ...)`, `append(x, values, after)` combine /
+      append, `seq(start, end, step)`, `rep(obj, times, length.out)`,
+      `vector(mode, length) = mode(length)`, `seq_along(x)`
     - Access `length(x)`, `names(x)`, `is.null(dim(x))`, `typeof(x)`,
       `which(x, arr.ind)` logical -> integer, `order | sort(x, decreasing)`, `rev(x)`,
-      `unique(x)`, `match(x, table)`, `sample(n)` random permutation
+      `unique(x)`, `match(x, table)`, `sample(n)` random permutation, `split(x, factor)`
     - Subsetting `[...]` (preserves structure, returns multiple elements, 1-based)
         - Identity `v[]` original vector, `v[0]` zero-length vector
         - Postion `v[1]`, `v[c(1, 2)]`
@@ -79,7 +83,7 @@
     - Factor = integer vector that represents categorical data with a fixed set of
       predefined levels
         - Creation `factor(x, levels, labels)`, `ordered(x, levels, labels)`
-        - Access `levels(x)`, `cut(x, breaks)`
+        - Access `levels(x)`, `cut(x, breaks)`, `interaction(...)`
     - Date vector = double vector that represents the number of days since 1970-01-01
         - Creation `Sys.Date()`, `as.Date("1970-01-01")`
     - Calendar time = double vector that represents the number of seconds since
@@ -91,7 +95,7 @@
 ## Lists, data frames and tibbles
 
 - List = generic vector (heterogeneous, extensible, recursive, hierarchical, member)
-    - Create `list(...)` preserve, `c(...)` flatten
+    - Create `list(...)`, `append(x, values, after)`, preserve, `c(...)` flatten
     - Access `length(x)`, `names(x)`, `is.list(x)`
     - Subsetting (preserves dimensionality)
         - Identity `l[]` original list, `l[0]` zero-length list
@@ -150,10 +154,11 @@
   if memoized)
 - Explicit `return(...)`, `invisible(...)` return prevents automatic printing,
   `(f(...))` prints invisible return. `<-` returns invisibly and allows chaining.
-  Side-effecting functions should return invisibly
+  Side-effecting functions should return their input invisibly to allow explicit capture
+  of the input in a pipe
 - Function singature `args(func)`, `missing(arg)`
 - Order of arguments matching
-    - 1. Exact
+    - 1. Exact (named arguments take precedence over positional)
     - 2. Partial (avoid)
     - 3. Positional (first or two most commonly used arguments)
 - Ellipsis = variadic arguments `list(...)`, `..n` to pass arguments to inner functions
@@ -183,6 +188,9 @@
   other arguments or even variables defined inside the function. `missing(arg) == T` if
   default value is used
 - Explicitly passed function arguments are evaluated in outside (global) environment
+- The enclosing environment of the manufactured function is the an execution environment
+  of the function factory (closure, force function factory arguments to avoid lazy
+  evaluation bugs)
 
 ## Environments
 
@@ -227,6 +235,8 @@
           execution environment
 - The parent of the global environment is the last loaded package
 - Ancestors of global environment inclue every attached package
+- Attach functions to an environment `with(funcs, ...)` -> `attach(funcs)` ->
+  `rlang::env_bind(e, !!!funcs)`
 
 ## Conditions
 
@@ -236,15 +246,17 @@
     - Informational `message(msg)` reported immediately
 - Handle condition
     - Ignore `try({...})` error, `suppressWarnings({...})` warnings,
-      `suppressMessages({...})` messages
+      `suppressMessages({...})` messages (all implemented in terms of `tryCatch()`)
     - Condition handlers temporarily override or supplement the default condition
       behavior
     - Handle error `tryCatch({...}, error | warning | message, finally)` registers
       exiting handler (usually for error conditions), terminates wrapped code and return
       control to the context where `tryCatch()` was called
         - Handler function is passed a condition object
+        - The return value of an exiting handler is returned to the caller
         - `finally` is a block of code, not a function (`on.exit()` is implemented using
           `finally`)
+        - Existing handler is called in the context of the call to `tryCatch()`
     - Handle warning and message `withCallingHandlers({...}, error | warning | message)`
       registers calling handlers (usually for warning and message conditions), after the
       condition is handled control returns to the context where the condition was
@@ -253,23 +265,88 @@
           so calling handlers are only useful for their side effects
         - By default the condition propagates to parent calling handlers after being
           processed by the current calling handler (`rlang::cnd_muffle(cnd)`)
+        - Calling handler is called in the context that signaled the condition
+- Custom condition
+
+  ```r
+  tryCatch(
+    custom_condition = \(cnd) list(message = cnd$message, detail = cnd$detail),
+    abort | signal(
+      message = "Custom message",
+      class = "custom_condition",
+      detail = "Extra meta"))
+  ```
 
 ## Functional programming (FP)
 
 ## Object-oriented programming (OOP)
 
+- OOP fundamentals
+    - Polymprphism
+        - Single function = uniform interface
+        - Multiple objects = different implementations
+    - Encapsulation
+        - Informaiton hiding = representation
+        - Abstraction = interpretation
+    - Inheritance
+        - Structure inheritance = object fileds (single vs multiple inheritance)
+        - Behavior inheritance = method dispatch (single vs multiple dispatch)
+- OOP systems
+    - Functional OOP
+        - Methods belong to generic functions (behavior)
+        - Method call looks like function call
+        - Classes defines only object fields (structure)
+    - Encapsulated OOP
+        - Methods belong to objects
+        - Object encapsulats both structure (fields) and behavior (methods)
+    - Prototyp-based (classless) OOP
+        - Inherit from a chain of objects (not classes) that are dynamically mutated at
+          runtime
+        - Clone and extend objects that become prototypes for more specialized objects
+- `typeof(x)` base objects, `class(x)` S3 and S4 classes
+- Base types
+    - Vector `NULL`, `logical`, `integer`, `double`, `character`, `complex`, `raw`,
+      `list`
+    - Function `closure` regular R function, `special` internal R function,
+      `builtin` primitive C function
+    - Environment `environment`
+    - S4 type `S4`
+    - Language `symbol` name, `language` expression, `pairlist` formals
 - Attributes = are ephemeral, lost by most operations, but `names` and `dim` are
   preserved (to preserve other attributes, custom S3 class has to be created)
-    - Get / set ndivitual attribute `attr(obj, attr)`
+    - Get / set indivitual attribute `attr(obj, attr)`
     - Get all attributes `attributes(obj)`
     - Set multiple attributes `structure(obj, attr = value ...)`
+- S3
+    - S3 object is a base type (vector, list, data frame) with at least a `class`
+      attribute (`unclass(x)` returns the base type)
+    - Creation `structure(x, class = "a_class")`, `class(x) <- "a_class"`
+        - User helper `a_class(base, attrs ...)` provides user interface to S3 object
+          creation, coerces the input to acceptable by the constructor
+        - Efficient low-level constructor `new_a_class(base, attrs ...)` enforces
+          consistent structure of objects and checks types of the base object and
+          attributes
+        - Expensive optional validator `validate_a_class(x)` returns a valid object or
+          thrown a validation exception
+    - Generic function (GF) `a_generic <- \(x, args ...) UseMethod("a_generic", x)`
+      performs method dispatch to a concrete method implementation based on the `class`
+      attribute of the first argument (single dispatch)
+    - Method `a_generic.a_class(x, args ...)` must implement the generic interface
+      defiined by the GF
+    - Inheritance
+        - Class vector `c("subclass", "superclass")`
+        - Delegetion `NextMethod()`
+        - To allow subclassing the parent constructor needs `...` and the `class`,
+          argument
+    - Method dispatch encompasses inheritance, base types, internal generics, group
+      generics
+    - Access `class(x)`, `inherits(x, "a_class")`
 - Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
 - R objects serialization `dput`, `dget`
 - S4 `@ = $`, `slot(...) = [[...]]`
 
 ## Metaprogramming (MP)
 
-- System functions `getwd`, `setwd`, `format`, `sprintf`
-- Math funcitons `sum`, `prod`, `round`
-- Evaluation `eval(parse(text = "1 + 2"))`
-- Errors: `message`, `warning`, `stop`
+- System functions `getwd`, `setwd`
+- Formatting `cat`, `paste`, `print`, `format`, `sprintf`
+- Math funcitons `[cum]sum`, `[cum]prod`, `[cum]min|max`, `round`

@@ -43,6 +43,7 @@
     - Favicon `...<link rel="shortcut icon" href="favicon.png"></head>`
 - Void elements (only opening tag) `<br>`, `<hr>`, `<meta>`, `<link>`, `<img>`,
   `<source>` media source for `<picture>`, `<audio>` and `<video>`
+- Special symbols `&deg;`, `&micro;`, `&Alpha;`, `&alpha;`, `&permil;`, `&euro;`
 
 ## Document structure
 
@@ -117,6 +118,16 @@
   <img sizes="viewport-condition image-size, ..."
        scrset="image-url image-size, ..."
        scr="fallback.png" alt="Description">`
+  ```
+
+- Figure = self-contained content (image, illustration, diagram, code snippet) with an
+  optional caption
+
+  ```html
+  <figure>
+    <img scr="image.png" alt="Description">
+    <figcaption>Caption</figcaption>
+  </figure>
   ```
 
 - Alternative images = different images per viewport size
