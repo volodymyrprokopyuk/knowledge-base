@@ -5,6 +5,7 @@
     - R language `rlang`, `lobstr`
     - OOP `R6`, `proto`, `sloop`, `vctrs`
     - Data structures `hash`
+    - IO `rio`
     - Statistics `psych`
     - Utils `logger`, `lgr`
     - Profiling `profvis`
@@ -299,7 +300,7 @@
     - Encapsulated OOP
         - Methods belong to objects
         - Object encapsulats both structure (fields) and behavior (methods)
-    - Prototyp-based (classless) OOP
+    - Prototype-based (classless) OOP
         - Inherit from a chain of objects (not classes) that are dynamically mutated at
           runtime
         - Clone and extend objects that become prototypes for more specialized objects
@@ -317,11 +318,11 @@
     - Get / set indivitual attribute `attr(obj, attr)`
     - Get all attributes `attributes(obj)`
     - Set multiple attributes `structure(obj, attr = value ...)`
-- S3
+- S3 (functional OOP = informal structure + GF + single inheritance + single dispatch)
     - S3 object is a base type (vector, list, data frame) with at least a `class`
       attribute (`unclass(x)` returns the base type)
     - Creation `structure(x, class = "a_class")`, `class(x) <- "a_class"`
-        - User helper `a_class(base, attrs ...)` provides user interface to S3 object
+        - User helper `a_class(base, attrs ...)` provides user interface to a S3 object
           creation, coerces the input to acceptable by the constructor
         - Efficient low-level constructor `new_a_class(base, attrs ...)` enforces
           consistent structure of objects and checks types of the base object and
@@ -335,15 +336,51 @@
       defiined by the GF
     - Inheritance
         - Class vector `c("subclass", "superclass")`
-        - Delegetion `NextMethod()`
+        - Delegetion to a superclass `NextMethod()`
         - To allow subclassing the parent constructor needs `...` and the `class`,
           argument
-    - Method dispatch encompasses inheritance, base types, internal generics, group
-      generics
-    - Access `class(x)`, `inherits(x, "a_class")`
-- Data sets serialization `read.table`, `read.csv`, `write.table`, `read.csv`
-- R objects serialization `dput`, `dget`
-- S4 `@ = $`, `slot(...) = [[...]]`
+- R6 (encapsulated OOP with reference semantics built on top of environments)
+    - Methods belong to in-place mutable objects (not GFs) `object$method()`
+    - Creation `R6Class(classname = AClass, public = list(a_filed, a_method))`
+        - `$initialize(...)` overrides the default behavior of `$new(...)`
+        - `$finalize()` automatic cleanup of resources acquired by the initializer
+    - Access `c <- AClass$new(...)`, `c$field`, `c$method(...)`, `self$member`
+    - Side-effecting R6 methods should `invisible(self)` for method chaining
+    - Extend an exiting class with `AClass$set("public", "name", field | method)`
+    - Inheritance `R6Class(inherit)`
+        - `super$member` delegate to a superclass
+    - Access control `R5Class(public, private, active)`
+        - Access within the class `private$member`
+        - `active` is dynamic property with accessor function
+    - Reference semantics (in-place modification vs copy-on-modify) or `$clone(deep)`
+- S4 (functional OOP = formal structure + GF + multiple inheritance + multiple dispatch)
+    - Class definition `setClass(classname, slots, prototype)` prototype = fields
+      default values
+    - Object instantiation
+        - Low-level constructor `new("AClass", slots ...)`
+        - User helper `AClass(...)` provides user interface to a S3 object creation,
+          coerces the input to acceptable by the constructor
+        - Validator `setValidity(classname, \(object) "error" | T)` called automatically
+          by `new()`. Explicit validation `validObject(x)`
+    - Subsetting = low-level slot access `@`, `slot(object, name)`
+    - High-level slot accessor functions
+        - Getter
+            - Generic `setGeneric("aSlot", \(x) standardGeneric("aSlot"))`
+            - Method `setMethod("aSlot", "AClass", \(x) x@aSlot)`
+        - Setter
+            - Generic `setGeneric("aSlot<-", \(x, value) standardGeneric("aSlot<-"))`
+            - Method `setMethod("aSlot<-", "AClass",
+              \(x, value) { x@aSlot <- value; validObject(x); x })`
+    - Inheritance `setClass(contains)`
+    - Generic `setGeneric(signature)` define interface
+        - `signature` explicitly defines arguments used in method dispatch, otherwise
+          all arguments are used in method dispatch
+    - Method dispatch
+        - `ANY` pseudo-class matches any class, is always the farther method (equivalent
+          to S3 `default`)
+        - `MISSING` pseudo-class matches whenever the argument is missing
+        - Multiple inheritance -> dispatches on the closest method (on equal distance
+          alphabetic order is used = kind of random)
 
 ## Metaprogramming (MP)
 
