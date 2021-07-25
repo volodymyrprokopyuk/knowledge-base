@@ -7,9 +7,12 @@
     - Data structures `hash`
     - IO `rio`
     - Statistics `psych`
+    - Math `Matrix`
+    - Data `data.table`
     - Utils `logger`, `lgr`
     - Profiling `profvis`
     - Benchmarking `rbenchmark`, `microbenchmark`, `bench`, `benchr`
+    - Destructuring `zeallot`
 
 ## General aspects
 
@@ -318,7 +321,9 @@
     - Get / set indivitual attribute `attr(obj, attr)`
     - Get all attributes `attributes(obj)`
     - Set multiple attributes `structure(obj, attr = value ...)`
-- S3 (functional OOP = informal structure + GF + single inheritance + single dispatch)
+- S3
+    - Functional OOP = informal structure + GF + single inheritance + single dispatch,
+      simple and concise
     - S3 object is a base type (vector, list, data frame) with at least a `class`
       attribute (`unclass(x)` returns the base type)
     - Creation `structure(x, class = "a_class")`, `class(x) <- "a_class"`
@@ -339,8 +344,13 @@
         - Delegetion to a superclass `NextMethod()`
         - To allow subclassing the parent constructor needs `...` and the `class`,
           argument
-- R6 (encapsulated OOP with reference semantics built on top of environments)
-    - Methods belong to in-place mutable objects (not GFs) `object$method()`
+- R6
+    - Encapsulated OOP with non-idiomatic to R reference semantics built on top of
+      environments
+    - Encapsulated objects with methods in a local namespace vs generic functions in the
+      global namespace
+    - Methods belong to in-place mutable objects (not GFs) `object$method()` and allow
+      side-effects and return value in the same method for method chaining
     - Creation `R6Class(classname = AClass, public = list(a_filed, a_method))`
         - `$initialize(...)` overrides the default behavior of `$new(...)`
         - `$finalize()` automatic cleanup of resources acquired by the initializer
@@ -353,7 +363,9 @@
         - Access within the class `private$member`
         - `active` is dynamic property with accessor function
     - Reference semantics (in-place modification vs copy-on-modify) or `$clone(deep)`
-- S4 (functional OOP = formal structure + GF + multiple inheritance + multiple dispatch)
+- S4
+    - Functional OOP = formal structure + GF + multiple inheritance + multiple dispatch,
+      strict and suitable for large projects
     - Class definition `setClass(classname, slots, prototype)` prototype = fields
       default values
     - Object instantiation

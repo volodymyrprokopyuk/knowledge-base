@@ -1,5 +1,18 @@
 # tidyverse
 
+- Data analysis lifecycle
+    - Import `readr`
+    - Tidy `tidyr`
+    - while (!done)
+        - Transform `dplyr`
+        - Visualize `ggplot2` (knowledge generation)
+        - Model `modelr` (knowledge generation)
+    - Communicate `knitr`
+- Data analysis
+    - Hypothesis generation (visualization + modeling, each observation used multiple
+      times)
+    - Hypothesis confirmation (each observation is only used once)
+
 ## purrr functional programming in R
 
 ### General aspects
@@ -49,17 +62,38 @@
 - First match value / index `detect(.x, .p)`, `detect_index(.x, .p)`
 - Keep discard `keep(.x, .p)`, `discard(.x, .p)`
 
+
+
 ## ggplot2 grammar for graphics
 
 ### General aspects
+
+- Plot template = the grammar of graphics = formal system for building plots as a set of
+  layers
+    - 1. `data` set of data to plot
+    - 1. `geom` representation of insignts from the dataset
+    - 1. `aes`thetic mapping of data values to graphic properties
+    - 1. `stat` transformation of the dataset
+    - 1. `position` adjustment within the coordinate system
+    - 1. `coord` system to represent data values
+    - 1. `facet` shceme to partition the dataset into subplots
+
+  ```r
+  ggplot(<data>) +
+    <geom_function>(aes(<mapping>), <stat>, <position>) +
+    <coord_function> +
+    <facet_function> +
+    ... <layer 2>
+  ```
 
 - Plot `ggplot(data, mapping = aes())` maps data properties to graphic properties
 - Data (tibble data frame, numerical + categorical) = each row represents one
   observation of potentially multiple variables (stored in columns)
 - Geoms (points, lines, bars, boxes)
 - Mapping
-    - Aesthetic mapping `aes(x, y, color, fill, size, shape, group)`
-    - Aesthetic setting `geom_point(color)`
+    - Aesthetic mapping `aes(x, y, color, fill, size, shape, alpha, linetype, group)`
+      associates data values with graphic properties (levels)
+    - Aesthetic setting `geom_point(color)` without any relation to data values
 - Scales
     - Palette `scale_fill_brewer(palette)`, `scale_fill_manual(values)`,
     `scale_color_manual(values)`
@@ -67,31 +101,47 @@
 - Guides
     - Labels `labs(title, subtitle, caption, x, y)`, `xlab(label)`, `ylab(label)`
     - Limits `lims(x, y)`, `xlim(lower, upper)`, `ylim(lower, upper)`
-- Theme `theme(axis, legend, panel, plot)`
+- Coordinates
+    - `coord_flip()` swaps x with y axes
+    - `coord_polar()` turns a bar plot into pie plot
+    - `coord_quickmap()`, `coord_map()` sets correct aspect ratio for maps
+- Theme `theme(axis, legend, panel, plot, aspect.ratio)`
 
-### Scatter plot
+### Scatter plot (raw data)
 
-- `geom_point(mapping, data)`
+- `geom_point(data, mapping, position = "identity | jitter", show.legend)`
+    - `position = identity` values are rounded so the points appear on a grid
+    - `position = jitter` values have small amount of random nose to avoid overplotting
+- `geom_point(position = "jitter")` = `geom_jitter()`
 
-### Line plot
+### Line plot (raw data)
 
-- `geom_line(mapping, data)`
+- `geom_line(data, mapping)`
+- `geom_smooth(data, mapping)` `stat_smooth()` fits a model to data, plots predictions
+  from the model
 
-### Bar plot (numeric values of discrete categories)
+### Bar plot (stat counts or values of discrete categories)
 
-- Count `geom_bar()` (`stat_count()`)
-- Value `geom_col(fill, color, position = "dodge | stack | fill", width)`
-  (`stat_idenitty()`) >= `geom_bar(stat = "identity")`
+- `stat` = statistical transformation = algorithm to caclulate new values from the
+  dataset. `stat` returns special variables `..count..`, `..prop..`, `..density..`
+- `stat` and `geom` usually can be used interchangeably as every `geom` has a default
+  `stat` and viceversa
+- `aes(y = ..count..)` = `aes(stat(count))`
+- Count `geom_bar(data, mapping, stat = "count")` = `stat_count(geom = "bar")`
+- Value `geom_col(fill, color, position = "dodge | stack | fill", width)` =
+  `stat_idenitty(geom = "col")` >= `geom_bar(stat = "identity")`
 - Labels `geom_text(aes(label, x, y), vjust, hjust)`
 - Cleveland dot plot (cleaner alternative to a bar plot) `geom_point()`
 
-### Histogram (continuous bins)
+### Histogram (stat counts of bins)
 
-- Count within bins `geom_histogram(bins, binwidth)` (`stat_bin()`)
+- Count within bins `geom_histogram(bins, binwidth, stat = "bin")` =
+  `stat_bin(geom = "histogram")`
 
-### Box plot (distribution comparison)
+### Box plot (stat distribution summary)
 
-- `geom_boxplot()`
+- `geom_boxplot(data, mapping)`
+- `geom_pointrange(data, mapping)` = `stat_summary(data, mapping, fun.min, fun.max, fun)`
 
 ### Function curve
 
@@ -99,6 +149,11 @@
 ggplot(tibble(x = -4:4), aes(x = x)) + stat_function(fun = \(x) x^2, geom = "line")
 ggplot(tibble(x = -4:4), aes(x = x)) + stat_function(fun = ~ .x^2, geom = "line")
 ```
+### Facet plot
+
+- Partition a plot of categorical variables into subplots
+    - One variable `facet_wrap(~ categorical, nrow, ncol)`
+    - Two variables `facet_grid(cat1 ~ cat2)`
 
 ### Area plot
 
