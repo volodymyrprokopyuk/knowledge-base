@@ -5,9 +5,9 @@
 - Global knitr chunk options
     - Set `opts_chunk$set(option = value)`
     - Evaluation
-        - Source `eval` evaluate code, `error` report error, `collapse` source + output
-        - Output `include` source + output, `echo` source code, `results` text output,
-          `message`, `warning`
+        - Source `eval` evaluate code, `error` report error
+        - Output `collapse` source + output, `include` source + output,
+          `echo` source code, `results` text output, `message`, `warning`
     - Plot
         - Device `dev`, `dev.args`
         - Figure `fig.cap`, `fig.width`, `fig.height`, `fig.dim`, `fig.show`,

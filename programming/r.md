@@ -1,22 +1,39 @@
 # R
 
 - TODO:
-    - R tools `littler`, `styler`, `lintr`
+    - R tools `littler`, `styler` DONE
     - R language `rlang`, `lobstr`
     - OOP `R6`, `proto`, `sloop`, `vctrs`
     - Data structures `hash`
     - IO `rio`
-    - Statistics `psych`
+    - Statistics `psych`, `easystats`
     - Math `Matrix`
     - Data `data.table`
     - Utils `logger`, `lgr`
     - Profiling `profvis`
-    - Benchmarking `rbenchmark`, `microbenchmark`, `bench`, `benchr`
+    - Benchmarking `bench` DONE
     - Destructuring `zeallot`
+    - Database `RPostgres`
+    - Web `plumber`, `jsonlite` DONE
+    - Parallelism and concurrency `future` interface, `callr` swap / fork, `parallel`
+      cluster, `batchtools` batch HPC (Slurm)
+    - Plotting `ggally`, `ggstatsplot`
 
 ## General aspects
 
-- Help in R console `?obj`, `` ?`(` `` show help, `??"search"` search help
+- R evolution
+    - Assembler = machine instructions + memory locations
+    - Fortran = data types + atomics + arrays + subroutines
+    - S = (object = vector + attributes) + side-effect free, functional computation +
+      interactive environment + local reference + copy-on-modify of non-local reference
+    - R
+        - Functional OOP = different objects + same generics (interface) + different
+          methods (implementations) + immutable objects created by generics
+        - Encapsulated OOP = mutable objects + reference semantics + side effects +
+          mutable objects mutataed by methods
+- Show package help `package?ggplot2`
+- Show object help `?ggplot2::object`
+- Search help `??"search"`
 - Non-syntactic name `` `_name` ``, `` `%...%` <- function(l, r) {...} ``
 - Subsetting + assignment = subassignement `x[i] <- v`, `x[] <- v`
 - Immutable objects
@@ -209,6 +226,8 @@
   parent
 - Assignment `<- ` creates a binding in the current environment
 - Super assignment `<<-` rebinds an existing name in the parent of a current environment
+- Active binding = access and assignment operations on objects in environment are
+  programmed in R
 - Environment types
     - Global environment = user-defined funcitons and objects
     - Package environment = package external interface that exposes functions to a user
@@ -322,10 +341,10 @@
     - Get all attributes `attributes(obj)`
     - Set multiple attributes `structure(obj, attr = value ...)`
 - S3
-    - Functional OOP = informal structure + GF + single inheritance + single dispatch,
-      simple and concise
-    - S3 object is a base type (vector, list, data frame) with at least a `class`
-      attribute (`unclass(x)` returns the base type)
+    - Functional OOP = informal structure (attributes) + GF + single inheritance +
+      single dispatch, simple and concise
+    - S3 object is a base type (class-less vector, list, data frame) with at least a
+      `class` attribute (`unclass(x)` returns the base type)
     - Creation `structure(x, class = "a_class")`, `class(x) <- "a_class"`
         - User helper `a_class(base, attrs ...)` provides user interface to a S3 object
           creation, coerces the input to acceptable by the constructor
@@ -335,37 +354,18 @@
         - Expensive optional validator `validate_a_class(x)` returns a valid object or
           thrown a validation exception
     - Generic function (GF) `a_generic <- \(x, args ...) UseMethod("a_generic", x)`
-      performs method dispatch to a concrete method implementation based on the `class`
-      attribute of the first argument (single dispatch)
+      performs instance-based method dispatch to a concrete method implementation based
+      on the `class` attribute of the first argument (single dispatch)
     - Method `a_generic.a_class(x, args ...)` must implement the generic interface
       defiined by the GF
     - Inheritance
-        - Class vector `c("subclass", "superclass")`
+        - `class` vector `c("subclass", "superclass")`
         - Delegetion to a superclass `NextMethod()`
         - To allow subclassing the parent constructor needs `...` and the `class`,
           argument
-- R6
-    - Encapsulated OOP with non-idiomatic to R reference semantics built on top of
-      environments
-    - Encapsulated objects with methods in a local namespace vs generic functions in the
-      global namespace
-    - Methods belong to in-place mutable objects (not GFs) `object$method()` and allow
-      side-effects and return value in the same method for method chaining
-    - Creation `R6Class(classname = AClass, public = list(a_filed, a_method))`
-        - `$initialize(...)` overrides the default behavior of `$new(...)`
-        - `$finalize()` automatic cleanup of resources acquired by the initializer
-    - Access `c <- AClass$new(...)`, `c$field`, `c$method(...)`, `self$member`
-    - Side-effecting R6 methods should `invisible(self)` for method chaining
-    - Extend an exiting class with `AClass$set("public", "name", field | method)`
-    - Inheritance `R6Class(inherit)`
-        - `super$member` delegate to a superclass
-    - Access control `R5Class(public, private, active)`
-        - Access within the class `private$member`
-        - `active` is dynamic property with accessor function
-    - Reference semantics (in-place modification vs copy-on-modify) or `$clone(deep)`
 - S4
-    - Functional OOP = formal structure + GF + multiple inheritance + multiple dispatch,
-      strict and suitable for large projects
+    - Functional OOP = formal structure (slots) + GF + multiple inheritance + multiple
+      dispatch, strict and suitable for large projects
     - Class definition `setClass(classname, slots, prototype)` prototype = fields
       default values
     - Object instantiation
@@ -393,9 +393,212 @@
         - `MISSING` pseudo-class matches whenever the argument is missing
         - Multiple inheritance -> dispatches on the closest method (on equal distance
           alphabetic order is used = kind of random)
+- R6
+    - Encapsulated OOP with non-idiomatic to R reference semantics built on top of
+      environments (stateful simulation)
+    - Encapsulated object = fileds + methods in a local namespace (R6) vs generic
+      functions in the global namespace (S3, S4)
+    - Methods belong to an in-place mutable object (not GFs) and allow side-effects +
+      return value via `invisible(self)` in the same method for method chaining
+    - Reference semantics (in-place modification vs copy-on-modify) or `$clone(deep)`
+    - Definition `AClass <- R6Class("AClass",
+      public = list(a_filed = NULL, a_method = \() ...))`
+        - Public `$initialize(...)` is called by `$new(...)`
+        - Private `$finalize()` automatic on GC cleanup of resources acquired by
+          `$new(...)`
+        - Field containing an R6 object
+            - Shared across all instances if created in the class definition
+            - Per instance if created in the `initialize(...)`
+    - Access control `R5Class(public = list(), active = list(), private = list())`
+        - `active` = property = dymanic field with an accessor and a mutator implemented
+          as a single function using `if (missing(value)) read else write`
+    - Creation `instance <- AClass$new(...)`
+    - Access `instance$a_field`, `instance$a_field <- value`, `instance$a_method(...)`
+    - Internal access to public / private members `self|private$a_member`,
+      `self|private$a_member <- value`
+    - Inheritance `SubClass <- R6Class("SubClass", inherit = SuperClass)`
+        - Delegetion to a super class `super$a_member`
+    - Extend an exiting class with `AClass$set("public", "name", a_field | a_method)`
+    - R6 example
+
+        ```r
+        Counter <-
+          R6Class(
+            "Counter",
+            public = list(
+              initialize = \(init = 0) private$counter = init,
+              # Public method
+              increment = \(val = 1) private$counter <- private$counter + val),
+            active = list(
+              # Read-only property
+              state = \() private$counter,
+              # Read-write property
+              value = \(val) if (missing(val)) private$counter else private$counter <- val),
+            private = list(
+              # private field
+              counter = 0,
+              finalize = \() cat("<Counter>: cleaning up...")))
+        ```
 
 ## Metaprogramming (MP)
 
 - System functions `getwd`, `setwd`
 - Formatting `cat`, `paste`, `print`, `format`, `sprintf`
 - Math funcitons `[cum]sum`, `[cum]prod`, `[cum]min|max`, `round`
+
+## Package
+
+- Minimal R package `devtools::create(path)` -> `R/` + `DESCRIPTION` + `NAMESPACE` +
+  `[README.md]`
+- Package statges
+    - Source = local source code repository <- `devtools::create(path)`
+    - Bundle = platform-agnostic `.tar.gz` compressed source with built vignettes <-
+      `devtools::build()`
+    - Binary = platform=specific `.tgz` compressed compiled R bytecode, C code, package
+      metadata and documentation <- `devtools::build(binary = T)`
+    - Installed = binary package decompressed into a package library <-
+      `install.packages(pkgs)` remote packages, `devtools::install(pkg)` local package
+    - Loaded = loads and attaches an installed package <- `library(package)`,
+      `devtools::load_all()` (`package::function` only loads, but does not attach)
+- Library = directory containing installed packages
+    - Library search path `.libPaths()` -> system library, user library
+- `R/*.R` code
+    - Use common prefix in file names as directories are not allowed in `R/`
+    - Use `styler` for code formatting
+      `Rscript -e "styler::style_file('$SOURCE.R', strict = T)"`
+    - Script = code is run when the script is loaded `source("script.R")` -> immediate
+      execution results
+    - Package = code is run when the package is built `devtools::build(package)` ->
+      cached build-time results when the package is loaded
+    - The top-level R code in a package is only executed when the package is built, not
+      when the package is loaded -> never run code in the top-level of a package ->
+      package should only create objects, mosty functions
+    - Do not use `library(package)` in a package (modifies the global environment) ->
+      use `DESCRIPTION` to specify package dependencies at install and load time
+    - Do not use `source(file)` in a package (modifies the current enfironment) -> use
+      `devtools::load_all()` which automatically `source()` all files in `R/`
+    - Place package side effects in `.onLoad|.onAttach|.onUnload(libname, pkgname)` that
+      are called automatically by R (e. g. to set package `options()`)
+- `DESCRIPTION` package metadata + package dependencies on other packages
+    - `Title` concise (one line), `Description` extended (one paragraph)
+    - `Version` major.minor.patch.devel
+    - `Authors@R: c(person(...), ...)`
+    - `URL` package repository
+    - `License`
+        - MIT / BSD (license must always be distirbuted with the code)
+        - GPL (derivative work must also be GPL)
+        - CC (public domain: anyone can use the code for any purpose)
+    - `Imports` (just load) mandatory package deps, `Suggests` optional package deps <-
+      `devtools::use_package(package, type)`
+    - `Depends: R (>= 4.0.0)` (load + attach)
+- Documentation
+    - Reference documentation `roxygen2 #' @tag Markdown -> man/*.Rd -> TEXT|HTML|PDF`
+      <- `devtools::document()` (document functions, S3 / S4 generics and methods, R6
+      classes, datasets, packages)
+    - Hight-level documentation vignettes `vignettes/*.Rmd` <-
+      `devloots::build_vignettes()` -> `browserVignettes(package)`, `vignette(x)`
+- Automated testing `tests/testthat/test-*.R`, `tests/testthat.R` <- `devloots::test()`
+    - `expect_*(actual, expected)`ation = verifies the expected outcome via binary
+      assertion
+    - `test_that("Goal", { ... })` = defines the goal of a group of expectations (each
+      test is run in its own environment and is self contained)
+    - Single `context()` per file = groups related tests together
+- `NAMESPACE` package imports and exports of objects from other packages <-
+  `devtools::document()`
+    - Package dependencies on objects are looked up in the `NAMESPACE` imports (not the
+      global namespace)
+    - `NAMESPACE` exports specify objects provided by the package
+    - Object lookup = global environment -> `search()` path (reversed list of attached
+      packages)
+    - Load an installed package with `::` = load code and data + register S3, S4
+      generics and methods = access package objects with `package::object`
+    - Attach a loaded package with `library(x)` (laod + attach) = add package objects to
+      the `search()` path = access package object directly with `object`
+    - `library(x)` throws an error -> use in a script, but never in a package -> use
+      `DESCRIPTION.Imports` (just loads a package) and `DESCRIPTION.Depends` (loads +
+      attaches a package)
+    - Always use `Imports` as the package should minimize changes to the global
+      environment (including the `search()` path)
+    - Only use `Depends` if the package directly extends tha base package by providing
+      new objects along with the objects from the base package
+    - `requireNamespace("x", quietly = T)` returns `F` -> use in a package to check
+      availability of `Suggest`ed packages
+    - `NAMESPACE` is usually generated by `roxygen2`
+        - `#' @export` -> `export()`, `S3method()`, `exportClass()`, `exportMethod()`
+          (export as little as possible)
+- Dataset
+    - `data/*.Rdata` files do not use the `NAMESPACE` mechanism and do not need to be
+      exported
+
+## `data.table` data manipulation and analysis vs SQL data storage and access
+
+- Concise and consistent (cryptic, but powerful) syntax for in-memory (column store vs
+  SQL row store) data manipulation
+- In-memory processing, by reference in-place update with no memory allocation for
+  intermediate results by default or `shallow()` copy-on-update semantics (referential
+  transparency)
+  `dt[i, j, by / keyby, ...]` =
+  `FROM[WHERE / ORDER BY -> row subset, join / reorder; SELECT -> compute, update;
+   GROUP BY -> aggregate]` 1. subset / reorder `i`, 3. compute / update `j` 2. group by
+   `by / keyby`
+    - `i`: `a == b` condition, `a:b` range, `order(a, -b)` sort
+    - `j`: `a` vector, `.(A = a | B = expr(b) | ..columns | -c(...) | year:day)`
+      data.table
+    - `by`: `.(a | B = expr(b))`, `c("a", "b")`
+    - Chaining `dt[...][...]`
+- Special variables
+    - `.N` = `length(col)` number of observations in the current group / subset
+    - `.SD` (reflexive reference to a subset of data) = data.table (without `:=`)
+        with all columns (except the grouping columns) or `.SDcols` (character name,
+        interger position, logical mask, `patterns(...)`) for the current group
+        - Identity `dt[, .SD]` == `dt[]`
+        - Column subsetting `dt[, ..cols]`, `dt[, .SD, .SDcols = cols]`
+        - Grouping `dt[, .SD[1 | sample(.N, 1L) | .N], by = ...]`
+- Create `data.table(..., key)`, `fread(file|https|stdin)`
+- Coerce `setDT(df|list)` in-place, `as.data.table(other)` copy
+- Reference semantics = add new columns, update or delete existing columns in-place
+    - `shallow(dt)` copy = copies a pointer to an object, leaving a single copy of data
+    - Deep `copy(dt)` = copies data of an object, creating two copies of data
+    - `dt[, A := a]`, `dt[, c("A", "B") := .(a, b)]`, `dt[, ``:=``(A = a, B = b)]`
+    - `:=` returns the result invisibly, use additional `[]` to print the result
+    - Delete column `dt[, A := NULL]`, `dt[, c("A", "B") := NULL]`,
+      `dt[, ``:=``(A = NULL, B = NULL)]`
+    - Dereferencing `dt[, (cols) := .(...)]`
+    - Only `:=`, and all `set*()` funcitons have reference sumantics on a data.table
+- Keys = fast binary search subsetting by equality (vs vector scan) with shorter syntax
+  suitable for repeated subsetting on the same column
+    - At most one key can be set on multiple columns, which physically reorders the rows
+      by key columns by reference (creating the reordered column) always in increasing
+      order and marks the columns as key columns in subsequent subsetting by setting the
+      `sorted` attribute on the data.table
+    - Duplicatge keys are allowed (uniqueness is not enforced)
+    - Set a key `dt |> setkey(a, b)`, `dt |> setkeyv(c("a", "b"))`
+    - Get a key `key(dt)`
+    - Remove the key `dt |> setkey(NULL)`
+    - Key subset (only the first column) `dt[.(c("a", "b"))]` == `dt[c("a", "b")]`
+      column a matches a OR b
+    - Key subset (multiple columns) `dt[.(c("a", "b"), c("c", "d"))]` columna a matches
+      a OR b AND column b matches c OR d
+    - Key subset (only the second column) `dt[.(unique(a), c("c", "d"))]`
+    - Choose matching rows `dt[..., mult = "first|all|last", nomatch = NULL|NA]`
+- Indices
+    - Compute and cache multiple indices temporarily on the fly without
+      physical reordering of a data.table (by creating an order vector in the `index`
+      attribute)
+    - The `on` argument is mandatory for indices (cleaner syntax) and is recommended for
+      the key
+    - Set an index `dt |> setindex(a, b)`, `dt |> setindexv(c("a", "b"))` create and
+      cache the index
+    - Get indices `dt |> indices()`
+    - Remove all indices `dt |> setindex(NULL)`
+    - Indices subset `dt[.(c("a", "b")), on = c("a", "b")]` creates, but does not cache
+      the index
+    - Auto indexing = automatically computes and caches an index on the first use of
+      `==` or `%in%`
+- Reshaping
+    - `melt(id.vars, measure.vars, variable.name, value.name)` wide to long
+    - `dcast(id.var1 + id.var2 ~ measure.variable, value.name)` long to wide
+- Programming on data.table
+    - data.table provides a robust mechanism built of upon `substitute2()` for
+      parameterizing expressions passed to `i`, `j` and `by / keyby` arguments of
+      `[.data.table`

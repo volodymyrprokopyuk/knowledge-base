@@ -1,7 +1,25 @@
 # PostgreSQL
 
 - Query
-    - `WITH [RECURSIVE] _ AS` named subquery can be used in other named subqueries
+    - `WITH _ AS` named subquery (CTE = Common Table Expression) is evaluated only once
+      and  can be used in other named subqueries
+    - Recursive query can refer to its own output
+
+      ```sql
+      WITH RECURSIVE t(n) AS (
+        -- non-recursive term is evaluated at the beginning -> create result and create
+        -- working table
+        VALUES (1)
+        UNION ALL
+        -- recursive term is evalutaed as long as the working table is not empty
+        SELECT n + 1
+        -- self-reference to the current content of the working table -> append to result
+        -- overwrite the working table
+        FROM t
+        WHERE n < 5) -- eventually returns the empty working table -> stops iteration
+      SELECT n FROM t;
+      ```
+
     - `SELECT DISTINCT ON (...)` computed value, column alias `c`, `agg_func(DISTINCT
       ... ORDER BY ...)`
     - `FROM` table alias `t`, `t(c)`
@@ -44,11 +62,42 @@ CREATE AGGREGATE <agg> (type, ...) (
   FINALFUNC = transform the final state value into the aggregate output value)
 ```
 
-- `WITH ... INSERT INTO ... VALUES | SELECT (JOIN ...) ON CONFLICT ... DO NOTHING | DO
-  UPDATE SET ... EXCLUDED RETURNING *`
+- `WITH ... INSERT INTO ... VALUES | SELECT (JOIN ...) ON CONFLICT ... DO NOTHING | DO UPDATE SET ... EXCLUDED RETURNING *`
 - `WITH ... UPDATE ... SET ... FROM (JOIN ...) WHERE ... RETURNING *`
 - `WITH ... DELETE FROM ... USING (JOIN ...) WHERE ... RETURNING *`
 - `TRUNCATE ...`
+- `EXPLAIN (ANALYZE, COSTS OFF)`
+    - An index is used if only a small subset of data is retrieved using an operator
+      supported by the index on a table with a large enough number of rows + up-to-date
+      statistics `ANALYZE`
+    - Scan types
+        - Sequential scan = reads all table from a disk, fast for small tables
+        - Index scan = scans index, randomly reads some records from a disk, fast on
+          small subset of records from a large table
+        - Index only scan = scans index, does not read from disk as all queried data is
+          stored in the index
+    - Join types
+        - Nested loop = scans the innter table for each row in the outer table, fast
+          for small tables
+        - Merge join = merges sorted large tables, requires initial sort
+        - Hash join = scans the outer table for matches in a hash of inner table,
+          requires initial hashing, only for equality conditions
+- JSONB + JSONPath operators and indexes
+    - Not all index types support all operator classes, so create indexes based on the
+      type of operators in queries
+    - Operator types
+        - Existence `?`, `?|`, `?&` only top-level object key or array element matching
+        - Containment `@>`, `<@` nested structure + content matching
+        - JSONPath `@@`, `@?`
+    - GIN (generalized inverted index) serching for individual elements in composite
+      structures (`jsonb`)
+        - `jsonb_ops` operator class (default) creates independent indexes for each key
+          and value (large index size), supports existence (use GIN expression index to
+          check existence of nested keys), containment and JSONPath
+        - `jsonb_path_ops` operator class creates indexes only for values (smaller index
+          size), supports containment and JSONPath
+    - BTREE (binary tree) comparison `=`, `<` `<=`, `>`, `>=` of whole objects
+    - HASH (hash) equality `=` of whole objects (smaller index size, than BTREE)
 - **Normalization**. Reduces data redundacy, improves data consistency, allows to extend
   the data model without changing existing tables (DDL)
     - **Anomalies**
@@ -77,3 +126,13 @@ CREATE AGGREGATE <agg> (type, ...) (
         - **Read committed**
         - **Repeatable read**
         - **Serializable**
+- Random string of length
+
+  ```sql
+  CREATE FUNCTION random_string(length integer) RETURNS text LANGUAGE SQL AS $$
+  SELECT string_agg(substring(
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      (random() * 62 + 1)::integer, 1), '')
+  FROM generate_series(1, length);
+  $$;
+  ```
