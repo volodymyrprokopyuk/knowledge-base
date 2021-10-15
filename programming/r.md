@@ -1,14 +1,14 @@
 # R
 
 - TODO:
-    - R tools `littler`, `styler` DONE
+    - R tools `littler`, `styler` DONE, `argparser`, `r-optparse`, `docopt`
     - R language `rlang`, `lobstr`
     - OOP `R6`, `proto`, `sloop`, `vctrs`
-    - Data structures `hash`
+    - Data structures `hash`, `clock`
     - IO `rio`
     - Statistics `psych`, `easystats`
     - Math `Matrix`
-    - Data `data.table`
+    - Data `data.table`, `vroom`, `fst`
     - Utils `logger`, `lgr`
     - Profiling `profvis`
     - Benchmarking `bench` DONE
@@ -35,6 +35,7 @@
 - Show object help `?ggplot2::object`
 - Search help `??"search"`
 - Non-syntactic name `` `_name` ``, `` `%...%` <- function(l, r) {...} ``
+- Anonymous body `{ ...; ... }`
 - Subsetting + assignment = subassignement `x[i] <- v`, `x[] <- v`
 - Immutable objects
     - Copy-on-modify semantics for shared objects `x <- c(1, 2); y <- x; y[[1]] <- 10`
@@ -104,7 +105,8 @@
     - Factor = integer vector that represents categorical data with a fixed set of
       predefined levels
         - Creation `factor(x, levels, labels)`, `ordered(x, levels, labels)`
-        - Access `levels(x)`, `cut(x, breaks)`, `interaction(...)`
+        - Access `levels(x)`, `droplevles(x)`, `cut(x, breaks)`, `interaction(...)`,
+          `reorder(x)`
     - Date vector = double vector that represents the number of days since 1970-01-01
         - Creation `Sys.Date()`, `as.Date("1970-01-01")`
     - Calendar time = double vector that represents the number of seconds since
@@ -532,8 +534,9 @@
 
 ## `data.table` data manipulation and analysis vs SQL data storage and access
 
+- data.table = in-memory, ordered columns store
 - Concise and consistent (cryptic, but powerful) syntax for in-memory (column store vs
-  SQL row store) data manipulation
+  SQL row store, ordered data.table vs unordered SQL) data manipulation
 - In-memory processing, by reference in-place update with no memory allocation for
   intermediate results by default or `shallow()` copy-on-update semantics (referential
   transparency)
@@ -542,15 +545,20 @@
    GROUP BY -> aggregate]` 1. subset / reorder `i`, 3. compute / update `j` 2. group by
    `by / keyby`
     - `i`: `a == b` condition, `a:b` range, `order(a, -b)` sort
-    - `j`: `a` vector, `.(A = a | B = expr(b) | ..columns | -c(...) | year:day)`
-      data.table
+    - `j`: `a` vector, `.(A = a | B = expr(b) | ..columns | -c(...) | year:day |
+      invisible(ggplot(...)))` data.table
     - `by`: `.(a | B = expr(b))`, `c("a", "b")`
     - Chaining `dt[...][...]`
+    - Append rows / data.tables `rbindlist(list(dt, ...))` (rows cannot be efficiently
+      inserted or deleted in the middle of a data.table)
+    - Append / update columns `:=`
+    - Change column order `setcolorder(col, ...)`
 - Special variables
     - `.N` = `length(col)` number of observations in the current group / subset
     - `.SD` (reflexive reference to a subset of data) = data.table (without `:=`)
         with all columns (except the grouping columns) or `.SDcols` (character name,
-        interger position, logical mask, `patterns(...)`) for the current group
+        interger position, logical mask, `patterns(...)`) for the current group if
+        access to all columns of `.SD` is required
         - Identity `dt[, .SD]` == `dt[]`
         - Column subsetting `dt[, ..cols]`, `dt[, .SD, .SDcols = cols]`
         - Grouping `dt[, .SD[1 | sample(.N, 1L) | .N], by = ...]`
@@ -568,9 +576,9 @@
 - Keys = fast binary search subsetting by equality (vs vector scan) with shorter syntax
   suitable for repeated subsetting on the same column
     - At most one key can be set on multiple columns, which physically reorders the rows
-      by key columns by reference (creating the reordered column) always in increasing
-      order and marks the columns as key columns in subsequent subsetting by setting the
-      `sorted` attribute on the data.table
+      by key columns by reference always in increasing order and marks the columns as
+      key columns in subsequent subsetting by setting the `sorted` attribute on the
+      data.table (key does not use memory)
     - Duplicatge keys are allowed (uniqueness is not enforced)
     - Set a key `dt |> setkey(a, b)`, `dt |> setkeyv(c("a", "b"))`
     - Get a key `key(dt)`
@@ -583,8 +591,7 @@
     - Choose matching rows `dt[..., mult = "first|all|last", nomatch = NULL|NA]`
 - Indices
     - Compute and cache multiple indices temporarily on the fly without
-      physical reordering of a data.table (by creating an order vector in the `index`
-      attribute)
+      physical reordering (but consuming memory) of a data.table
     - The `on` argument is mandatory for indices (cleaner syntax) and is recommended for
       the key
     - Set an index `dt |> setindex(a, b)`, `dt |> setindexv(c("a", "b"))` create and
@@ -596,9 +603,34 @@
     - Auto indexing = automatically computes and caches an index on the first use of
       `==` or `%in%`
 - Reshaping
-    - `melt(id.vars, measure.vars, variable.name, value.name)` wide to long
-    - `dcast(id.var1 + id.var2 ~ measure.variable, value.name)` long to wide
+    - Wide-to-long `melt(id.vars, measure.vars, variable.name, value.name)`
+    - Long-to-wide `dcast(id.var + ... ~ measure.var + ..., value.name)`
 - Programming on data.table
-    - data.table provides a robust mechanism built of upon `substitute2()` for
+    - data.table provides a robust mechanism built upon `data.table::substitute2()` for
       parameterizing expressions passed to `i`, `j` and `by / keyby` arguments of
-      `[.data.table`
+      `[.data.table(..., env = list(...))`
+- Join as subsetting via keys or indices
+    - Right (outer) equi join (default) `x |> setkey(id); y |> setkey(id); x[y, j]`,
+      `x[y, j, on = .(id | a = b), nomatch = NA]` (all rows from `y` + matching rows
+      from `x` with duplicates)
+    - (Inner) equi join `x[y, j, on = .(id), nomatch = NULL]` (only matching rows from
+      `x` and `y` with duplicates)
+    - Full (outer) equi join `x |> setkey(id); y |> setkey(id)` (key on both tables is
+      the implicit joining variable) `x[y[c(x$id, y$id) |> unique()]]` (left join +
+      right join)
+    - Anti-join `x[!y, j, on = .(id)]` (only `x` rows with no match in `y`)
+    - Semi-join `x[na.omit(x[y, on = .(id), which = T])]` (only `x` rows with match in
+      `y` without duplicates)
+    - Non-equi join `x[y, j, on = .(x.col <= y.col, ...)]`
+    - Rolling join `x[y, j, on = .(id), roll = T | -Inf]` (join on a rolling window of
+      values, not the exact match)
+    - Overlapping range join `x |> setkey(start, end)`, `x |> foverlaps(y)`
+    - Grouping by each `i` `x[y, j, by = .EACHI]` evaluates `j` on matched subset of `x`
+      corresponding to each row in `y`
+    - Update on join (recode factor)
+
+      ```r
+      f <- factor(c("small", "large", "large", "small", "medium"))
+      data.table(f)[.(f = levels(f), to = c("L", "M", "S")), f := i.to, on = .(f)]$f
+      levels(f) <- list(S = "small", M = "medium", L = "large")
+      ```
