@@ -120,3 +120,18 @@
     - Length `${#v}`
 
 - Atoms, arrays, associative arrays
+
+
+## curl options
+
+-s silent -S show error -L follow redirects -k insecure
+-X request -H header -u user:password -d 'data', @file
+-D - dump response header
+
+## Regular expressions
+
+- (?:...) non-capturing group
+- (?=...) positive lookahead
+- (?!...) negative lookahead
+- (?<=...) positive lookbehind
+- (?<!...) negative lookbehind

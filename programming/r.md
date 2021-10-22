@@ -3,12 +3,12 @@
 - TODO:
     - R tools `littler`, `styler` DONE, `argparser`, `r-optparse`, `docopt`
     - R language `rlang`, `lobstr`
-    - OOP `R6`, `proto`, `sloop`, `vctrs`
-    - Data structures `hash`, `clock`
-    - IO `rio`
+    - OOP `R6` DONE, `proto`, `sloop`, `vctrs`
+    - Data structures `hash`, `clock`, `fastmap`
+    - IO `fs`
     - Statistics `psych`, `easystats`
     - Math `Matrix`
-    - Data `data.table`, `vroom`, `fst`
+    - Data `data.table` DONE, `fst`
     - Utils `logger`, `lgr`
     - Profiling `profvis`
     - Benchmarking `bench` DONE
@@ -456,29 +456,30 @@
     - Source = local source code repository <- `devtools::create(path)`
     - Bundle = platform-agnostic `.tar.gz` compressed source with built vignettes <-
       `devtools::build()`
-    - Binary = platform=specific `.tgz` compressed compiled R bytecode, C code, package
+    - Binary = platform-specific `.tgz` compressed compiled R bytecode, C code, package
       metadata and documentation <- `devtools::build(binary = T)`
-    - Installed = binary package decompressed into a package library <-
+    - Installed = binary package decompressed into a package library in `.libPaths()` <-
       `install.packages(pkgs)` remote packages, `devtools::install(pkg)` local package
     - Loaded = loads and attaches an installed package <- `library(package)`,
-      `devtools::load_all()` (`package::function` only loads, but does not attach)
+      `devtools::load_all()` (`package::function(...)` only loads, but does not attach)
 - Library = directory containing installed packages
-    - Library search path `.libPaths()` -> system library, user library
+    - Library search path `.libPaths()` -> system library, user library, package private
+      library
 - `R/*.R` code
     - Use common prefix in file names as directories are not allowed in `R/`
     - Use `styler` for code formatting
       `Rscript -e "styler::style_file('$SOURCE.R', strict = T)"`
-    - Script = code is run when the script is loaded `source("script.R")` -> immediate
-      execution results
-    - Package = code is run when the package is built `devtools::build(package)` ->
+    - Script = code is run when the script is loaded via `source("script.R")` ->
+      immediate execution results
+    - Package = code is run when the package is built with `devtools::build(package)` ->
       cached build-time results when the package is loaded
     - The top-level R code in a package is only executed when the package is built, not
       when the package is loaded -> never run code in the top-level of a package ->
-      package should only create objects, mosty functions
+      package should only create objects, mostly functions
     - Do not use `library(package)` in a package (modifies the global environment) ->
       use `DESCRIPTION` to specify package dependencies at install and load time
-    - Do not use `source(file)` in a package (modifies the current enfironment) -> use
-      `devtools::load_all()` which automatically `source()` all files in `R/`
+    - Do not use `source(file)` in a package (modifies the current environment) -> use
+      `devtools::load_all()` which automatically `source()`s all files in `R/`
     - Place package side effects in `.onLoad|.onAttach|.onUnload(libname, pkgname)` that
       are called automatically by R (e. g. to set package `options()`)
 - `DESCRIPTION` package metadata + package dependencies on other packages
@@ -492,30 +493,30 @@
         - CC (public domain: anyone can use the code for any purpose)
     - `Imports` (just load) mandatory package deps, `Suggests` optional package deps <-
       `devtools::use_package(package, type)`
-    - `Depends: R (>= 4.0.0)` (load + attach)
+    - `Depends: R (>= 4.0.0)` system library, extenal executable (load + attach)
 - Documentation
     - Reference documentation `roxygen2 #' @tag Markdown -> man/*.Rd -> TEXT|HTML|PDF`
       <- `devtools::document()` (document functions, S3 / S4 generics and methods, R6
       classes, datasets, packages)
     - Hight-level documentation vignettes `vignettes/*.Rmd` <-
-      `devloots::build_vignettes()` -> `browserVignettes(package)`, `vignette(x)`
+      `devloots::build_vignettes()` -> `browseVignettes("package")`, `vignette("x")`
 - Automated testing `tests/testthat/test-*.R`, `tests/testthat.R` <- `devloots::test()`
-    - `expect_*(actual, expected)`ation = verifies the expected outcome via binary
-      assertion
-    - `test_that("Goal", { ... })` = defines the goal of a group of expectations (each
+    - `expect_*(actual, expected)` action (expectation) = verifies the expected outcome
+      via a binary assertion
+    - `test_that("Goal", { ... })` = defines the goal for a group of expectations (each
       test is run in its own environment and is self contained)
     - Single `context()` per file = groups related tests together
-- `NAMESPACE` package imports and exports of objects from other packages <-
+- `NAMESPACE` package imports of objects from other packages + package exports <-
   `devtools::document()`
     - Package dependencies on objects are looked up in the `NAMESPACE` imports (not the
       global namespace)
-    - `NAMESPACE` exports specify objects provided by the package
+    - `NAMESPACE` exports specifies objects provided by the package
     - Object lookup = global environment -> `search()` path (reversed list of attached
       packages)
     - Load an installed package with `::` = load code and data + register S3, S4
       generics and methods = access package objects with `package::object`
     - Attach a loaded package with `library(x)` (laod + attach) = add package objects to
-      the `search()` path = access package object directly with `object`
+      the `search()` path = access package objects directly with `object`
     - `library(x)` throws an error -> use in a script, but never in a package -> use
       `DESCRIPTION.Imports` (just loads a package) and `DESCRIPTION.Depends` (loads +
       attaches a package)
