@@ -1,0 +1,49 @@
+%YAML 1.2 # YAML directive
+%TAG !c! tag:custom.org,2022: # tag: URI scheme
+--- # Separatex directives from document content
+# YAML is human-readable, data-oriented Unicode data serialization language
+
+# Conventional block style of sequence and mapping for clarity
+# Indentation for structure, each entry on its own line
+blockSequence: # Ordered sequence
+  - The first
+  - The second
+blockMapping: # Unordered mapping
+  first: The first
+  second: The second
+
+--- # Separates two documents in the same file
+# Optional flow style of sequence and mapping for compactness
+# Explicit indicators (square brackets, curly braces), comma-separated entries
+flowSequence: [The first, The second]
+flowMapping: {first: The first, second: The second}
+
+--- # Block and flow styles for scalars
+blockScalars: # Multiline strings
+  literalStyle: |
+    Line breaks are significant and preserved
+  foldedStyle: >
+    Line breaks are insignificant and folded to a space
+flowScalars: # Can span multiple lines, line breaks are always folded
+  plainStyle: # Untagged nodes = implicit typing
+    bool: [true, false]
+    integer: [12, 0o67, 0xAB]
+    float: [1.2, 1.2e3, .inf, -.inf, .nan]
+    string:
+      Line breaks are always folded
+  doubleQuotedStyle: "Supports escape sequences \n"
+  singleQuotedStyle: 'Literally treats escape sequences \n'
+
+--- # Data types and tagging
+# Tag is URI specified in a shorthand notation
+globalTag: !!str 2022-03-30 # Standard data type
+localTag:
+  - !aDate 2022-03-30 # Custom data type
+  - !c!aDate 2022-03-30
+
+--- # Node labeling and referencing
+anchor:
+  - &a1 The first # Anchor, label
+alias:
+  - *a1 # Alias, reference
+... # End of document without starting a new one
