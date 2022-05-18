@@ -52,7 +52,7 @@
 - Three-valuded logic `TRUE`, `FALSE`, `NULL` + `=`, `<>`
     - `IS DISTINCT FROM` two-valued logic with `NULL`
 - Conditional `CASE _ WHEN _ THEN _ ELSE _ END`
-- Aggregate function `count(*) FILTER (WHERE ...)`
+- Aggregate function `count(*) FILTER (WHERE ...)` (conditional aggregation)
 
 ```sql
 CREATE AGGREGATE <agg> (type, ...) (

@@ -1,6 +1,6 @@
 %YAML 1.2 # YAML directive
 %TAG !c! tag:custom.org,2022: # tag: URI scheme
---- # Separatex directives from document content
+--- # Separates directives from document content
 # YAML is human-readable, data-oriented Unicode data serialization language
 
 # Conventional block style of sequence and mapping for clarity
@@ -14,12 +14,14 @@ blockMapping: # Unordered mapping
 
 --- # Separates two documents in the same file
 # Optional flow style of sequence and mapping for compactness
-# Explicit indicators (square brackets, curly braces), comma-separated entries
+# Explicit indicators, comma-separated entries
+#   - Square brackets [sequence, items]
+#   - Curly braces {mapping: pairs}
 flowSequence: [The first, The second]
 flowMapping: {first: The first, second: The second}
 
 --- # Block and flow styles for scalars
-blockScalars: # Multiline strings
+blockScalars: # Multiline strings or custom types
   literalStyle: |
     Line breaks are significant and preserved
   foldedStyle: >
