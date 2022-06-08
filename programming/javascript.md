@@ -1,6 +1,6 @@
 # JavaScript
 
-## Lexical scope and closures (inside-out variable lookup and resolution)
+## Lexical scope and closures for variable lookup
 
 - Tokenization (stateless) | lexing (stateful) => parsing (AST + per-scope
   hoisting of `var`aible and `function` declarations) => optimization => code
@@ -43,7 +43,7 @@
   not related to lexical scope
 - Binding rules for `this` (from the highest to the lowest precedence)
     - `new` binding = construction call of regular funciton with the `new`
-      operator `new f()`, `this` points to a brand new obect, which is
+      operator `new f()`, `this` points to a brand new object, which is
       automatically returned from the function (unless the function returns its
       own alternate object). The `new` operator ignores `this` hard binding with
       `bind()`
@@ -107,7 +107,7 @@
     ```
 - `[[Get]]` own property lookup => prototype chain lookup => return `undefined`
 - `[[Put]]` accessor descriptor (`set`, `get`) => property descriptor
-  (`writable`) => assign value
+  (`writable`) => prototype chain lookup => assign value directly to the object
 - Object immutability `Object.preventExtensions()`, `Object.seal()`,
   `Object.freeze()`
 
@@ -135,4 +135,48 @@
     })
     for (const e of o) { console.log(e) } // 1, 2
     ```
-## Object prototype (behavior delation via linked objects)
+## Object prototype for property lookup (behavior delation via linked objects)
+
+- Prototype chain = every object has an `o.prototype` link to another object
+  ending at `Object.prototype` (kind of global scope for variables)
+    ```js
+    const o = { a: 1 }
+    // new object o2.[[Prototype]] = o (prototype chain)
+    const o2 = Object.create(o)
+    console.log("a" in o2) // true
+    console.log(o2.a) // 1
+    for (const p in o2) { console.log(p, o2[p]) } // a, 1
+    ```
+- All `function`s get by default a public, non-enumerable property `prototype`
+  pointing to an object => each object created via `new F()` operator is linked
+  to the `F.prototype` effectively delegating access to `F.prototype`'s
+  properties (prototypal inheritance)
+    ```js
+    function F() { this.a = 1 }
+    F.prototype.b = 2
+    const o = new F() // constructor call returns an object
+    console.log(o.a, o.b) // 1, 2
+    console.log(F.prototype.constructor === F, o instanceof F) // true, true
+    console.log(Object.getPrototypeOf(o) === F.prototype) // true
+    function G() {
+      F.call(this) // call parent constructor
+      this.c = 3
+    }
+
+    // prototypal inheritance
+    // Option 1. Throws away G.prototype = new object o.[[Prototype]] = F.prototype
+    G.prototype = Object.create(F.prototype) prototype chain
+    // true, true, not G
+    console.log(G.prototype.constructor === F, o instanceof F)
+
+    // Option 2. Updates G.prototype (the right ES6 way)
+    Object.setPrototypeOf(G.prototype, F.prototype) // prototype chain
+    G.prototype.d = 4
+    const o2 = new G()
+    console.log(o2.a, o2.b, o2.c, o2.d) // 1, 2, 3, 4
+    // true, true, true
+    console.log(G.prototype.constructor === G, o2 instanceof G, o2 instanceof F)
+    console.log(F.prototype.isPrototypeOf(o2)) // true
+    ```
+- Purely flat data storage `o = Object.create(null)` without `prototype`
+  delegation
