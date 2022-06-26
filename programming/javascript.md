@@ -34,7 +34,7 @@
 - Closure = a returned function can access its lexical scope even when the
   function is executing outside its lexical scope
 
-## This (dynamic binding rules)
+## `this` dynamic binding rules
 
 - `this` is dynamically defined at runtime (late binding) for every function,
   depends on the location where a function is called (call-site), not where a
@@ -62,7 +62,7 @@
   syntactic replacement for `self = this` closures. The lexical `this` binding
   of an arrow function cannot be overrided even with `new`
 
-## Object (property and accessor descriptors)
+## `object` property and accessor descriptors
 
 - Type vs object
     ```js
@@ -85,22 +85,22 @@
     ```js
     const o = { }
     Object.defineProperty( // property descriptor
-    o, "a", { value: 1, writable: true, enumerable: true, configurable: true }
+      o, "a", { value: 1, writable: true, enumerable: true, configurable: true }
     )
     o.a = 2
     console.log(o) // 2
 
     const o = { }
     Object.defineProperty(o, "a", { // accessor descriptor
-    set: function(val) { this._a = val },
-    get: function() { return this._a * 2 }
+      set: function(val) { this._a = val },
+      get: function() { return this._a * 2 }
     })
     o.a = 1
     console.log(o.a) // 2
 
     const o = { // object literal setter and getter
-    set a(val) { this._a = val },
-    get a() { return this._a * 2 }
+      set a(val) { this._a = val },
+      get a() { return this._a * 2 }
     }
     o.a = 1
     console.log(o.a) // 2
@@ -124,18 +124,18 @@
     Object.defineProperty(o, Symbol.iterator, {
       writable: false, enumerable: false, configurable: true,
       value: function() {
-          const o = this
-          const keys = Object.keys(o)
-          let i = 0 // iterator state
-          function next() {
-            return { value: o[keys[i++]], done: (i > keys.length) }
-          }
-          return { next }
+        const o = this
+        const keys = Object.keys(o)
+        let i = 0 // iterator state
+        function next() {
+          return { value: o[keys[i++]], done: (i > keys.length) }
+        }
+        return { next }
       }
     })
     for (const e of o) { console.log(e) } // 1, 2
     ```
-## Object prototype for property lookup (behavior delation via linked objects)
+## Object `prototype` for property lookup
 
 - Prototype chain = every object has an `o.prototype` link to another object
   ending at `Object.prototype` (kind of global scope for variables)
@@ -150,33 +150,196 @@
 - All `function`s get by default a public, non-enumerable property `prototype`
   pointing to an object => each object created via `new F()` operator is linked
   to the `F.prototype` effectively delegating access to `F.prototype`'s
-  properties (prototypal inheritance)
+  properties (prototypal inheritance = objects are linked to other objects)
     ```js
-    function F() { this.a = 1 }
-    F.prototype.b = 2
-    const o = new F() // constructor call returns an object
-    console.log(o.a, o.b) // 1, 2
-    console.log(F.prototype.constructor === F, o instanceof F) // true, true
-    console.log(Object.getPrototypeOf(o) === F.prototype) // true
-    function G() {
-      F.call(this) // call parent constructor
-      this.c = 3
-    }
-
-    // prototypal inheritance
-    // Option 1. Throws away G.prototype = new object o.[[Prototype]] = F.prototype
-    G.prototype = Object.create(F.prototype) prototype chain
-    // true, true, not G
-    console.log(G.prototype.constructor === F, o instanceof F)
-
-    // Option 2. Updates G.prototype (the right ES6 way)
-    Object.setPrototypeOf(G.prototype, F.prototype) // prototype chain
-    G.prototype.d = 4
+    function F() { this.a = 1 } // constructor
+    F.prototype.b = function() { return 2 } // method
+    const o = new F()
+    console.log(o.a, o.b()) // 1, 2
+    function G() { F.call(this); this.c = 3 } // call parent constructor
+    // Prototypal inheritance Option 1. Overwrite G.prototype
+    G.prototype = Object.create(F.prototype)
+    // Prototypal inheritance Option 2. Update G.prototype
+    Object.setPrototypeOf(G.prototype, F.prototype)
+    G.prototype.d =
+      function() { return F.prototype.b.call(this) + 2 } // call parent method
     const o2 = new G()
-    console.log(o2.a, o2.b, o2.c, o2.d) // 1, 2, 3, 4
-    // true, true, true
-    console.log(G.prototype.constructor === G, o2 instanceof G, o2 instanceof F)
-    console.log(F.prototype.isPrototypeOf(o2)) // true
+    console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
     ```
 - Purely flat data storage `o = Object.create(null)` without `prototype`
   delegation
+- Behavior delegation via `prototype` links / chain (objects are linked to other
+  objects forming a network of peers, not a vertical hierarchy as with classes)
+- Mutual delegation of two objects to each other forming cycle is disallowed
+- ES6 class = syntax sugar built on top of prototypal inheritance and behavior
+  delegation
+    ```js
+    class F {
+      constructor() { this.a = 1 } // constructor + property
+      b() { return 2 } // method
+    }
+    const o = new F()
+    console.log(o.a, o.b()) // 1, 2
+    class G extends F { // prototypal ihheritance
+      constructor() { super(); this.c = 3 }// call parent constructor
+      d() { return super.b() + 2 } // call parent method
+    }
+    const o2 = new G()
+    console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
+    ```
+- Function chaining
+    ```js
+    function N(x) { this.a = x }
+    N.prototype.add = function add(x) { this.a += x; return this }
+    console.log(new N(1).add(2).add(3).a) // 6
+    ```
+
+## Types
+
+- Types are related to values, not variables (which may store any value)
+- `let x; typeof x === "undefined"` vs `typeof <undeclared> === "undefined"`
+- `function` is a `[[Call]]`able `object`
+- The type of value determines whether the value will be assigned by copy
+  (primitives `boolean`, `number`, `string`, `symbol`) or by reference
+  (`object`s, `array`, `function`, automatically boxed values)
+- `symbol` special unique primitive type used for collision-free internal
+  properies on objects
+    ```js
+    const sym = Symbol("a")
+    const o = { [sym]: 1 }
+    console.log(o[sym]) // 1, collision-free property
+    ```
+
+## Coercion
+
+- Coercion always results in one of the scalar primitive types
+- `null == undefined // true`
+- Both `==` (implicit coercion) and `===` (no coercion) compare two `object`s by
+  reference (not by value) `{ a: 1 } ==(=) { a: 1 } // false`
+- Use `===` (to avoid coercion) instead of `==` with `true`, `false`, `0`, `""`,
+  `[]`
+
+## JS grammar
+
+- Assignment expression returns assigned value `a = 1 // 1`
+- `continue <label>` continues an outer loop `label: for(...)`
+- `break <label>` breaks out of an inner loop or a block `label: { ... }`
+- `let a = b || <default value>` vs `a && a.b()` guarded operation + short
+  circuiting
+- `=`, `?:` right-associative
+
+## Async
+
+- Single-threaded event loop (sequential execution on every tick)
+    ```js
+    let events = [] // queue, FIFO
+    while(true) {
+      if (events.length) { // tick
+        let event = events.shift()
+        try { event() } // atomic unit of work run to completion
+        catch (e) { console.log(e) }
+      }
+    }
+    ```
+- Concurrency = split 2 or more tasks into atomic steps, schedule steps from all
+  tasks to the event loop (interleave steps from different tasks), execute steps
+  in the event loop in order to progress simultaneously on all tasks
+- Callbacks = strict separation between now (current code) and later (callback).
+  Non-linear definition of a sequential control flow and error handling, trust
+  issues due to control delegation (inversion of control, continuation)
+    ```js
+    function timeoutify(fun, timeout) {
+      let id = setTimeout(() => {
+        id = null
+        fun(new Error("timeout"))
+      }, timeout)
+      return (...a) => {
+        if (id) {
+          clearTimeout(id)
+          fun(null, ...a)
+        }
+      }
+    }
+    function f(e, d) {
+      if (e) { console.error(e) } else { console.log(d) }
+    }
+    const tf = timeoutify(f, 500)
+    setTimeout(() => tf(1), 400) // 1
+    ```
+- Trustable promises = composable, time consistent, future, eventual value
+  placeholder
+  (proxy) that behaves the same across now and later (by making both of them
+  always async later). Async flow control completion event (promise object) to
+  subscribe to (separation of consumers from producer) possibly multiple
+  consumers. Solves the trust issues of callbacks by inverting callback control
+  delegation. Once a promise is settled, the resolved value or rejected reason
+  becomes immutable
+    ```js
+    function timeoutPromise(timeout) {
+      return new Promise((_, reject) =>
+        setTimeout(() => reject("timeout"), timeout)
+      )
+    }
+    function f(x, timeout) {
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(x), timeout)
+      )
+    }
+    Promise.race([f(1, 400), timeoutPromise(500)])
+      .then(console.log).catch(console.error)
+    ```
+- Promises are guaranteed to be async. Promises don't get rid of callbacks, they
+  just let the caller control callbacks locally via `Promise.then(cb)` instead
+  of passing callabcks to a third party code as in case of callbacks only
+  approach. Repeated calls to `resolve` and `reject` are ignored
+- `Promise.resolve(x)` normilizes values and misbehaving thenable to trustable
+  and compliant Promises
+- `p.then()` automatically creates a new Promise in a chain resolved with the
+  `return`ed value or the unwrapped `return`ed Promise or rejected with the
+  `throw`n error
+    ```js
+    Promise.resolve(1)
+      .then(x => x + 1)
+      .then(x => new Promise(resolve => setTimeout(_ => resolve(x * 2), 100)))
+      .then(console.log) // 4
+    ```
+- `p.catch()`ed rejection restores the Promise chain back to normal
+    ```js
+    Promise.resolve(1)
+      // default rejection handler: e => { throw e } for incoming errors
+      .then(_ => { throw new Error("oh") })
+      // default resolution handler: x => { return x } for incoming values
+      .catch(e => { console.error(e.message); return 2 }) // for outgoing errors
+      .then(console.log) // oh, 2 (back to normal)
+    ```
+- `Promise.all([])` a gate that resolves with the array of results of all
+  concurrent, unordered Promises or rejects with the first rejected Promise
+- `Promise.race([])` a latch that resolves or rejects with the first settled
+  Promise (the other Promises cannot be canceled due to immutability, hense are
+  settled and just ignored)
+- Promises API
+    - `Promise.resolve(x)`, `Promise.reject(x)`
+    - `p.then(success, [failure])`, `p.catch(failure)`, `p.finally(always)`
+    - `Promise.race([]) => first success / first failure`
+    - `Promise.any([]) => first success / all failure`
+    - `Promise.allSettled([]) => [all either success or failure]`
+    - `Promise.all([]) => [all success] / first failure`
+- Callback => promise
+    ```js
+    function f(x, cb) {
+      setTimeout(_ => { if (x >= 0) { cb(null, "ok") } else { cb("oh") } }, 100)
+    }
+    f(1, console.log)
+    f(-1, console.error)
+    function promisify(f) {
+      return function(...args) {
+        return new Promise((resolve, reject) => {
+          f.apply(null, args.concat(
+            function(e, x) { if (e) { reject(e) } else { resolve(x) } }))
+        })
+      }
+    }
+    const ff = promisify(f)
+    ff(1).then(console.log)
+    ff(-1).catch(console.error)
+    ```
