@@ -291,7 +291,12 @@
 - Promises are guaranteed to be async. Promises don't get rid of callbacks, they
   just let the caller control callbacks locally via `Promise.then(cb)` instead
   of passing callabcks to a third party code as in case of callbacks only
-  approach. Repeated calls to `resolve` and `reject` are ignored
+  approach. Repeated calls to `resolve` and `reject` are ignored. Promise must
+  be `return`ed to form a valid promise chain
+    ```js
+    Promise.resolve(1).then(console.log)
+    console.log(2) // 2, 1
+    ```
 - `Promise.resolve(x)` normilizes values and misbehaving thenable to trustable
   and compliant Promises
 - `p.then()` automatically creates a new Promise in a chain resolved with the
@@ -342,4 +347,13 @@
     const ff = promisify(f)
     ff(1).then(console.log)
     ff(-1).catch(console.error)
+    ```
+- Sequential composition of promises
+    ```js
+    const f = x => new Promise((resolve) => setTimeout(_ => resolve(x + 1), 100))
+    const p = [f, f].reduce((p, f) => p.then(f), Promise.resolve(1))
+    p.then(console.log) // 3
+    let r = 1
+    for (const ff of [f, f]) { r = await ff(r) }
+    console.log(r) // 3
     ```
