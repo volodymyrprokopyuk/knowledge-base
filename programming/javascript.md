@@ -266,9 +266,9 @@
     const tf = timeoutify(f, 500)
     setTimeout(() => tf(1), 400) // 1
     ```
-- Trustable promises = composable, time consistent, future, eventual value
-  placeholder
-  (proxy) that behaves the same across now and later (by making both of them
+- Trustable and composiable promises = composable, time consistent, future,
+  eventual value placeholder (proxy) that behaves the same across now and later
+  (by making both of them
   always async later). Async flow control completion event (promise object) to
   subscribe to (separation of consumers from producer) possibly multiple
   consumers. Solves the trust issues of callbacks by inverting callback control
@@ -356,4 +356,134 @@
     let r = 1
     for (const ff of [f, f]) { r = await ff(r) }
     console.log(r) // 3
+    ```
+
+## Generators
+
+- Generators = a new type of function that does not run to completion (as
+  regular functions do), but creates an iterator, suspends maintaining the
+  iternal state at every `const y = yield x; const { value } it.next(y)
+  // value == x` and resumes on each iteration (two-way message passing during
+  generator execution). Generators implement cooperative (by `yield`ing
+  control), not preemptive (by extractal context switch) multitasking (generator
+  suspends itself via `yield`, iterator resumes the generator via `it.next()`)
+    ```js
+    function* f(x) {
+      console.log(x++)
+      // yield waits for a value passed by it.next(v)
+      const y = yield "a" // yield requires 2 iterations: start + resume
+      console.log(y, x) // implicit return undefined;
+    }
+    const it = f(1) // creates iterator + initiates generator
+    const { value } = it.next() // starts generator (must always be empty)
+    console.log(value)
+    const r = it.next("b") // message to generator + resumes generator 1, a, b, 2
+    console.log(r) // { value: undefined, done: true }
+    ```
+- Early termination (via `break`, `return`, `throw`) of the `for/of gen*()`
+  automatically terminates generator's iterator (or manually via `gen.return()`)
+    ```js
+    const iterator = function(n) {
+      let v = 0
+      return {
+        [Symbol.iterator]() { return this },
+        next() {
+          return v < n ? { value: ++v, done: false } :
+          { value: undefined, done: true } }
+      }
+    }
+    for (const i of iterator(3)) { console.log(i) } // 1, 2, 3
+
+    const generator = function*(n) {
+      let v = 0
+      while (v < n) { yield ++v }
+    }
+    for (const i of generator(3)) { console.log(i) } // 1, 2, 3
+
+    const generator = function*() {
+      let v = 0
+      try {
+        while (true) { yield ++v }
+      } finally { console.log("finally") }
+    }
+    let gen = generator()
+    for (const i of gen) {
+      if (i > 2) { const { value } = gen.return("return"); console.log(value) }
+      console.log(i) // 1, 2, finally, return, 3
+    }
+    ```
+- Generators express async flow control in sequential, sync-like form through
+  async iteration (`it.next()`) of a generator
+    ```js
+    function f(x, cb) {
+      setTimeout(_ => x === "oh" ? cb(new Error(x)) : cb(null, x), 100)
+    }
+    function cb(err, data) { if (err) { it.throw(err) } else { it.next(data) } }
+    function* gen() {
+      try {
+        const a = yield f(1, cb)
+        console.log(a)
+        const b = yield f("oh", cb)
+      } catch (e) { console.error(e.message) }
+    }
+    const it = gen()
+    it.next() // 1, oh
+    ```
+- Promise-yielding generators (basis for `async/await`)
+    ```js
+    function f(x) {
+      return new Promise((resolve, reject) =>
+        setTimeout(_ => x === "oh" ? reject(new Error(x)) : resolve(x), 100)
+      )
+    }
+    function* gen() {
+      try {
+        const a = yield f(1)
+        console.log(a)
+        const b = yield f("oh")
+        // const b = yield f(2)
+        // console.log(b)
+      } catch(e) { console.error(e.message) }
+    }
+    const it = gen()
+    it.next().value
+      .then(a => it.next(a).value.then(b => it.next(b)))
+      .catch(e => console.log(e.message)) // 1, oh
+    ```
+- `yield *` delegation for composition of generators
+    ```js
+    function* a() { yield 1; yield* b(); yield 4 }
+    function* b() { yield 2; yield 3 }
+    for (const i of a()) { console.log(i) } // 1, 2, 3, 4
+    ```
+
+# Web workers
+
+- Web workder = event listener and subscriber in a separate thread that uses
+  messaging for communication and does not share any scope or resources (e. g.
+  DOM) with other workders or the main JS program (event loop)
+
+# ES6+
+
+- `let` block scoped variable (vs `var` function scoped + hoisting)
+- `const` block scoped variable that must be initialized and cannot be
+  reassigned (constant reference, while the content of reference types can still
+  be modified)
+- Spread arguments `f(...[1, 2, 3])` => `f.apply(null, [1, 2, 3])`
+- Spread array `[1, ...[2, 3], 4]` => `[1, [2, 3], 4].flat()`
+- Gather parameters `function f(...args) {...}` => `[args]`
+- Object / array destructuring and transformations
+    ```js
+    const o = { a: 1, b: 2, c: 3 }
+    const a = [10, 20, 30]
+    let o2 = { }
+    let a2 = [];
+    ({ a: o2.A, b: o2.B, c: o2.C } = o)  // object => object
+    console.log(o2); // { A: 1, B: 2, C: 3 }
+    [a2[2], a2[1], a2[0]] = a  // array => array
+    console.log(a2); // [ 30, 20, 10 ]
+    ({ a: a2[0], b: a2[1], c: a2[2] } = o) // object => array
+    console.log(a2); // [ 1, 2, 3 ]
+    [o2.A, o2.B, o2.C] = a // array => object
+    console.log(o2) // { A: 10, B: 20, C: 30 }
     ```
