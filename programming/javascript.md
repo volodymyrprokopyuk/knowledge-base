@@ -54,7 +54,7 @@
     - Implicit binding = function invocation `o.f()` through a containing
       context object `{ f: f }`, `this` points to the containing context object
     - Default binding = standalone function invocation `f()` including callback
-      invocation, `this` = `undefined` as the global object is not eligible for
+      invocation, `this` == `undefined` as the global object is not eligible for
       the default binding in the `strict mode`
 - Lexical `this` (`bind` alternative) = arrow functions `(...) => { ... }`
   discard all the traditional rules for `this` binding and instead use the
@@ -113,8 +113,9 @@
 
 ## Iteration (`[Symbol.iterator]`)
 
-- Iteration over arrays (indexing) and objects (properties). Custom iterator
-  `{ [Symbol.iterator]: function () { return { next } } }` + `for/of`
+- Iteration over arrays (indexing) and objects (properties). Ordered, sequential
+  pull-based consumption of data. Custom iterator
+  `{ [Symbol.iterator]: function () { return { next() {...} } } }` + `for/of`
     ```js
     const a = [1, 2]
     for (let i = 0; i < a.length; ++i) { console.log(a[i]) } // 1, 2
@@ -135,6 +136,21 @@
     })
     for (const e of o) { console.log(e) } // 1, 2
     ```
+- `Symbol.iterator` interface `{ next(x), [return(x), throw(e)] }` =>
+  `{ value, donce }`
+- Iterable interface `o[Symbol.iterator]` => `{ next() }`
+    ```js
+    function iterator(n) { // iterator configuration
+      let i = 0; // iterator state
+      const next = _ => ({ value: i < n ? i : undefined, done: ++i > n })
+      // iterable + iterator
+      return { [Symbol.iterator]() { return this }, next }
+    }
+    for (const i of iterator(5)) { console.log(i) }
+    ```
+- Array destructuring `[a, b]` and the `...` spread operator can consume an
+  iterator
+
 ## Object `prototype` for property lookup
 
 - Prototype chain = every object has an `o.prototype` link to another object
@@ -361,12 +377,18 @@
 ## Generators
 
 - Generators = a new type of function that does not run to completion (as
-  regular functions do), but creates an iterator, suspends maintaining the
-  iternal state at every `const y = yield x; const { value } it.next(y)
-  // value == x` and resumes on each iteration (two-way message passing during
-  generator execution). Generators implement cooperative (by `yield`ing
-  control), not preemptive (by extractal context switch) multitasking (generator
-  suspends itself via `yield`, iterator resumes the generator via `it.next()`)
+  regular functions do), but creates an iterator that controls execution of the
+  generator, suspends maintaining the iternal state at every `yield` and resumes
+  on each iteration `it.next()`
+- `yield` is right-associative like `=` assignment
+- Generator usage: a. procude a series of vaules b. async control flow (queue of
+  tasks to perorm sequentially)
+- Two-way message passing = `const y = yield x` returns `x` before suspending
+  and receives `y` after resuming, `const { value: x }= it.next(y)` receives `x`
+  from a suspended generator and passes `y` resuming the generator
+- Generators implement cooperative (by `yield`ing control), not preemptive
+  (by extractal context switch) multitasking. Gnerator suspends itself via
+  `yield`, iterator resumes the generator via `it.next()`
     ```js
     function* f(x) {
       console.log(x++)
@@ -380,8 +402,21 @@
     const r = it.next("b") // message to generator + resumes generator 1, a, b, 2
     console.log(r) // { value: undefined, done: true }
     ```
-- Early termination (via `break`, `return`, `throw`) of the `for/of gen*()`
-  automatically terminates generator's iterator (or manually via `gen.return()`)
+- `it.next()` + `yield` + `it.next()`
+    ```js
+    function* gen() {
+      const a = yield 1
+      const b = yield 2
+      console.log(a, b)
+    }
+    const it = gen() // create controlling iterator
+    const { value: a } = it.next() // start generator
+    const { value: b } = it.next(10)
+    it.next(20) // 10, 20 (finish generator)
+    console.log(a, b) // 1, 2
+    ```
+- Early termination (via `break`, `return`, `throw`) of the `for/of`
+  automatically terminates generator's iterator (or manually via `it.return()`)
     ```js
     const iterator = function(n) {
       let v = 0
@@ -450,11 +485,28 @@
       .then(a => it.next(a).value.then(b => it.next(b)))
       .catch(e => console.log(e.message)) // 1, oh
     ```
-- `yield *` delegation for composition of generators
+- `yield *` delegation for composition of generators. `yield *` requires an
+  iterable, it then invokes that iterable's iterator and delegates generator's
+  control to that iterator until it is exhausted
     ```js
     function* a() { yield 1; yield* b(); yield 4 }
     function* b() { yield 2; yield 3 }
     for (const i of a()) { console.log(i) } // 1, 2, 3, 4
+    ```
+- Error handling in generators
+    ```js
+    function* gen() {
+      try {
+        yield 1
+      } catch (e) { console.error(e.message) } // uh
+      throw new Error("oh")
+    }
+    const it = gen()
+    try {
+      const { value: a } = it.next()
+      console.log(a) // 1
+      it.throw(new Error("uh"))
+    } catch (e) { console.error(e.message) } // oh
     ```
 
 # Web workers
@@ -470,7 +522,6 @@
   reassigned (constant reference, while the content of reference types can still
   be modified)
 - Spread arguments `f(...[1, 2, 3])` => `f.apply(null, [1, 2, 3])`
-- Spread array `[1, ...[2, 3], 4]` => `[1, [2, 3], 4].flat()`
 - Gather parameters `function f(...args) {...}` => `[args]`
 - Object / array destructuring and transformations
     ```js
@@ -486,4 +537,117 @@
     console.log(a2); // [ 1, 2, 3 ]
     [o2.A, o2.B, o2.C] = a // array => object
     console.log(o2) // { A: 10, B: 20, C: 30 }
+    ```
+- Spread gather destructuring
+    ```js
+    const [x, ...y] = a
+    console.log(x, y, [x, ...y]) // 10, [ 20, 30 ], [ 10, 20, 30 ]
+    const { a, ...x } = o
+    console.log(a, x, { a, ...x }) // 1 { b: 2, c: 3 } { a: 1, b: 2, c: 3 }
+    ```
+- Default values destructuring vs default parameters
+    ```js
+    const [p, q, r, s = 0] = a
+    console.log(p, q, r, s) // 10, 20, 30, 0
+    const { a: p, d: s = 0 } = o
+    console.log(p, s) // 1, 0
+    f({ x = 10 } = { }, { y } = { y: 10 }) { ... }
+    ```
+- Concise methods `{ f() { ... } }` imply anonymous function expression `{ f:
+  function() { ... } }`
+- Getter and setter
+    ```js
+    const o = {
+      _a: 1,
+      get a() { return this._a },
+      set a(v) { this._a = v }
+    }
+    o.a++
+    console.log(o.a) // 2
+    ```
+- Computed property name
+    ```js
+    const p = "a"
+    const o = { [p]: 1 }
+    console.log(o.a, o[p]) // 1, 1
+    ```
+- Tagget template literal
+    ```js
+    function tag(strings, ...values) {
+      return `${strings[1].trim()} ${values[0] + 1} ${strings[0]}`
+    }
+    const a = 1
+    console.log(tag`A ${a + 1} B`) // B 3 A
+    ```
+- Arrow functions are always anonymous (no named reference for recursion or
+  event binding / unbinding) function expressions (there is no function
+  declarations) + parameters destructuring, default values and spread / gather
+  operator
+- Inside arrow function the `this` binding is not dynamic, but is instead
+  lexical (arrow function is a nicer alternative to `const self = this` or
+  `f.bind(this)`)
+- `for (index; condition; increment)`, `for property in object`,
+  `for element of iterator`
+- `RegExp` sticky `y` flag restricts the pattern to match just at the position
+  of the `lastIndex` which is set to the next character beyond the end of the
+  previous match (`y` flag implies a virtual anchor at the beginning of the
+  pattern) vs non-sticky patterns are free to move ahead in their matching
+- `Symbol("desc")` = primitive type with immutable, unique, hidden value used
+  for collision-free object properties (e. g. `Symbol.iterator` => `for/of`)
+    ```js
+    function Singleton() {
+      // const instance = Symbol("instance")
+      const instance = Symbol.for("singleton.instance") // Symbol registry
+      if (!Singleton[instance]) {
+        this.a = 1
+        Singleton[instance] = this
+      }
+      return Singleton[instance]
+    }
+    const s1 = new Singleton()
+    const s2 = new Singleton()
+    console.log(s1, s2, s1 === s2, new Number(1) === new Number(1))
+    // Singleton { a: 1 }, Singleton { a: 1 }, true, false
+    ```
+
+# Modules
+
+- Modules = one module per file, module has static API resolved at compile time
+  with immutable bindings (read-only reference, one-way live link, not copy) and
+  blocking import, module is a singleton, there is no global scope in modules,
+  circular imports are supported
+- Export
+    - Named exports `export var | const | let | function | class | { a, b as B }`
+      not `export`ed object are private to the module
+    - Single default export `export default { a, b}` or `export { a as default
+      }` per module (not mutually exclusive with named exports) rewards with
+      simpler `import` syntax
+    - Reexport from another module `export * | { a, b as B } from "another"`
+- Import (all imported bindings are immutable and hoisted)
+    - Named import `import { a, b as B } from "module"` binds to top-level
+      identifiers in the current scope
+    - Default import `import m | { default as m } from "module"`
+    - Wildcard import to a single namespace `import * as ns from "module"`
+
+# Classes
+
+- Class = a macro that populates the `constructor` function `prototype` with
+  methods and establishes `prototype` through `extends`
+    ```js
+    class A {
+      constructor(a) { this._a = a }
+      get a() { return this._a }
+      set a(v) { this._a = v }
+    }
+    class B extends A { // prototype delegation
+      constructor(a, b) {
+        super(a) // parent constructor
+        this.b = b
+      }
+      static c = 10 // statics are on the constructor function, not the prototype
+      sum() { return super.a + this.b } // parent object
+    }
+    const b = new B(1, 2)
+    b.a += 3
+    console.log(b.a, b.sum(), B.c) // 4, 6, 10
     ```
