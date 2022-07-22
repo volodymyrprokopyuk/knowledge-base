@@ -169,25 +169,42 @@
 
 ## Flexbox micro layout
 
-- **Display** `display: flex | inline-flex` flex container parent + flex items
+- **Display** (container) `display: [inline-]flex` flex container parent + flex
+  items children. `display: flex` enables flex context for container's direct
   children. Flex containers can be nested forming flexbox layout hierarchy with
   absolutely centered flex items
-- **Direction** `flex-direction: [row|column][-reverse]` one-dimensional either
-  horizontal (row) or vertical (column) layout. Block flex items are laid out
-  one after another along the main axis
-- **Sizing**
-    - Initial flex item size `flex-basis`
-    - Grow `flex-grow: 1` flex items grow proportionally to fit the container
-    - Shrink `flext-shrink: 1` flex items shrink proportionally to fit the
-      container, otherwise flex items overflow, unless container `flex-wrap:
-      wrap`
-- **Alignment**
-    - Main axis `justify-content: flex-[start|end] | center |
-      spece-[between|around|evenly]`
-    - Cross axis `align-items: stretch | flex-[start|end] | center | baseline`
-      (`align-self` item-level override)
-    - Container cross axis `align-content: stretch | flex-[start|end] | center |
-      space-[between|around|evenly]`
+- Flex container can alter width and height of flex items (expand to fill
+  available space or shrink to prevent overflow) to best fill the available
+  space to accommodate to different screen sizes
+- Flexbox layout is direction- and order-agnostic (as opposed to
+  vertically-based `block` or horizontally-based `inline`)
+- **Direction** (container) + `flex-flow` shorthand
+    - `flex-direction: row|column[-reverse]` one-dimensional either horizontal
+       (row) or vertical (column) layout. `flex-direction` defines the main axis
+       either horizontal (row) or vertical (column). The cross axis is
+       perpendicular to the main axis. Block flex items are laid out one after
+       another along the main axis
+- **Alignment** (container)
+    - Main axis `justify-content: flex-(start|end) | center |
+      space-(between|around|evenly)`
+    - Cross axis `align-items: stretch | flex-(start|end) | center | baseline`
+      (`align-self: stretch | flex-(start|end) | center | baseline` item-level
+      override)
+    - Container cross axis (only for multi-line flex containers with `flex-wrap:
+      wrap`) `align-content: stretch | flex-(start|end) | center |
+      space-(between|around|evenly)`
+    - Minimum gutter between rows and columns (not on the outer edges) `gap:
+      <row> <column>`, `row-gap`, `column-gap`
+- **Ordering** (item)
+    - `order: 1` explicit item order (source iter order by default)
+- **Sizing** (item) + `flex` shorthand
+    - Initial size of a flex item before the remaining space is distributed
+      `flex-basis`
+    - Grow proportion `flex-grow: 1` flex items grow proportionally to fit the
+      container
+    - Shrink proportion `flext-shrink: 1` flex items shrink proportionally to
+      fit the container, otherwise flex items overflow, unless container
+      `flex-wrap: wrap`
 
 ## CSS grid macro layout
 
