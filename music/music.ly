@@ -65,7 +65,13 @@
   \clef treble
   \key a \minor
   \time 4/4
-  a'1 |
+  <a= c e gis>1-\markup mMM |
+  <b d f a>-\markup sd7 |
+  <c e gis b>-\markup MMm |
+  <d f a c>-\markup m7 |
+  <e gis b d>-\markup D7 |
+  <f a c e>-\markup M7 |
+  <gis=' b d f>-\markup d7 \bar "|."
 }
 
 \markup \huge \bold { \vspace #2 em harmonic 7th chords }
@@ -74,7 +80,13 @@
   \clef treble
   \key e \minor
   \time 4/4
-  e'1 |
+  <e'=' g b dis>1-\markup mMM |
+  <fis a c e>-\markup sd7 |
+  <g b dis fis>-\markup MMm |
+  <a c e g>-\markup m7 |
+  <b dis fis a>-\markup D7 |
+  <c e g b>-\markup M7 |
+  <dis='' fis a c>-\markup d7 \bar "|."
 }
 
 \markup \huge \bold { \vspace #2 dm harmonic 7th chords }
@@ -83,7 +95,13 @@
   \clef treble
   \key d \minor
   \time 4/4
-  d'1 |
+  <d'=' f a cis>1-\markup mMM |
+  <e g bes d>-\markup sd7 |
+  <f a cis e>-\markup MMm |
+  <g bes d f>-\markup m7 |
+  <a cis e g>-\markup D7 |
+  <bes d f a>-\markup M7 |
+  <cis='' e g bes>-\markup d7 \bar "|."
 }
 
 \markup \huge \bold { \vspace #2 am melodic 7th chords }
