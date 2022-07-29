@@ -7,11 +7,33 @@
   \key c \major
   \time 4/4
   \textLengthOn
-  <c' e g b>1-\markup { M7 }-\markup { MmM }-\markup { M3P5M7 } |
+  <c'=' e g b>1-\markup { M7 }-\markup { MmM }-\markup { M3P5M7 } |
   <c e g bes>-\markup { D7 }-\markup { Mmm }-\markup { M3P5m7 } |
   <c ees g bes>-\markup { m7 }-\markup { mMm }-\markup { m3P5m7 } |
   <c ees ges bes>-\markup { sd7 }-\markup { mmM }-\markup { m3d5M7 } |
   <c=' ees ges beses>-\markup { d7 }-\markup { mmm }-\markup { m3d5d7 } \bar "|."
+}
+
+\relative {
+  \clef treble
+  \key g \major
+  \time 4/4
+  <g'=' b d fis>1-\markup M7 |
+  <g b d f>-\markup D7 |
+  <g bes d f>-\markup m7 |
+  <g bes des f>-\markup sd7 |
+  <g=' bes des fes>-\markup d7 \bar "|."
+}
+
+\relative {
+  \clef treble
+  \key f \major
+  \time 4/4
+  <f'=' a c e>1-\markup M7 |
+  <f a c ees>-\markup D7 |
+  <f aes c ees>-\markup m7 |
+  <f aes ces ees>-\markup sd7 |
+  <f=' aes ces eeses>-\markup d7 \bar "|."
 }
 
 \markup \huge \bold { \vspace #2 cM 7th chords }
@@ -20,7 +42,7 @@
   \clef treble
   \key c \major
   \time 4/4
-  <c' e g b>1-\markup M7 |
+  <c'=' e g b>1-\markup M7 |
   <d f a c>-\markup m7 |
   <e g b d>-\markup m7 |
   <f a c e>-\markup M7 |
