@@ -735,3 +735,12 @@
     const a = new Array(9999)
     console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
     ```
+
+## Functions
+
+- Number of function parameters `fn.length` vs number of function arguments
+  `arguments.length`
+- Named parameters (object destructuring) `function f({ a, b }) { ... }` call
+  `f({ a: 1, b: 2 })`
+- Fat arrow `=>` functions are always anonymous, however their names can be
+  inferred
