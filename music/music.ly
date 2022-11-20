@@ -1,4 +1,40 @@
-\version "2.23.10"
+\version "2.23.81"
+
+chNameExceptions = {
+  <c e g b>-\markup \super "△7"
+  <c e gis bes>-\markup { + \super 7 }
+  <c ees ges bes>-\markup \super "ø7"
+}
+
+\layout {
+  \context {
+    \ChordNames
+    chordNameExceptions =
+    #(append (sequential-music-to-chord-exceptions chNameExceptions #t)
+      ignatzekExceptions)
+  }
+}
+
+#(define (replace-step repl pitches)
+  (map (lambda (pitch)
+    (if (eqv? (ly:pitch-steps pitch) (ly:pitch-steps repl)) repl pitch))
+  pitches))
+
+chordmodifiers.hdim =
+  #(lambda (pitches) (replace-step #{ ees' #} (replace-step #{ ges' #} pitches)))
+
+chSeq = \chordmode {
+  \key c \major
+  c1 c:m c:aug c:dim \break
+  c1:maj7 c:m7 c:aug7 c:dim7 c:7 c:m7.5- c:hdim7
+}
+
+<<
+  \new Staff = chStaff \chSeq
+  \new ChordNames = chNames \chSeq
+>>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \markup \huge \bold { Key types of 7th chords }
 
