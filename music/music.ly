@@ -1,8 +1,14 @@
 \version "2.23.81"
 
 chNameExceptions = {
+  % Triads
+  <c e g>-\markup \super "△"
+  <c ees g>-\markup \super "−"
+  <c e gis>-\markup \super "+"
+  % Seventh chords
   <c e g b>-\markup \super "△7"
-  <c e gis bes>-\markup { + \super 7 }
+  <c ees g bes>-\markup \super "−7"
+  <c e gis bes>-\markup \super "+7"
   <c ees ges bes>-\markup \super "ø7"
 }
 
@@ -28,6 +34,11 @@ chSeq = \chordmode {
   c1 c:m c:aug c:dim \break
   c1:maj7 c:m7 c:aug7 c:dim7 c:7 c:m7.5- c:hdim7
 }
+
+<<
+  \new Staff = cMajor \chSeq
+  \new ChordNames = cMajor \chSeq
+>>
 
 cMajor = \chordmode {
   \key c \major
