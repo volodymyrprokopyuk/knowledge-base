@@ -29,9 +29,37 @@ chSeq = \chordmode {
   c1:maj7 c:m7 c:aug7 c:dim7 c:7 c:m7.5- c:hdim7
 }
 
+cMajor = \chordmode {
+  \key c \major
+  c1:maj7 d:m7 e:m7 f:maj7 g:7 a:m7 b:hdim7 \bar "|."
+}
+
+gMajor = \chordmode {
+  \key g \major
+  g1:maj7 a:m7 b:m7 c:maj7 d:7 e:m7 fis:hdim7 \bar "|."
+}
+
+fMajor = \chordmode {
+  \key f \major
+  f:maj7 g:m7 a:m7 bes:maj7 c:7 d:m7 e:hdim7 \bar "|."
+}
+
+\markup { \huge \bold \concat { C \super "△" } }
 <<
-  \new Staff = chStaff \chSeq
-  \new ChordNames = chNames \chSeq
+  \new Staff = cMajor \cMajor
+  \new ChordNames = cMajor \cMajor
+>>
+
+\markup { \huge \bold \concat { G \super "△" } }
+<<
+  \new Staff = gMajor \gMajor
+  \new ChordNames = gMajor \gMajor
+>>
+
+\markup { \huge \bold \concat { F \super "△" } }
+<<
+  \new Staff = fMajor \fMajor
+  \new ChordNames = fMajor \fMajor
 >>
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
