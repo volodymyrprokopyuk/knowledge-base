@@ -1,15 +1,15 @@
 \version "2.23.81"
 
 chNameExceptions = {
-  % Triads
-  <c e g>-\markup \super "△"
-  <c ees g>-\markup \super "−"
-  <c e gis>-\markup \super "+"
-  % Seventh chords
-  <c e g b>-\markup \super "△7"
-  <c ees g bes>-\markup \super "−7"
-  <c e gis bes>-\markup \super "+7"
-  <c ees ges bes>-\markup \super "ø7"
+  % % Triads
+  % <c e g>-\markup \super "△"
+  % <c ees g>-\markup \super "−"
+  % <c e gis>-\markup \super "+"
+  % % Seventh chords
+  % <c e g b>-\markup \super "△7"
+  % <c ees g bes>-\markup \super "−7"
+  % <c e gis bes>-\markup { + \super 7 }
+  % <c ees ges bes>-\markup \super "ø7"
 }
 
 \layout {
@@ -26,51 +26,64 @@ chNameExceptions = {
     (if (eqv? (ly:pitch-steps pitch) (ly:pitch-steps repl)) repl pitch))
   pitches))
 
-chordmodifiers.hdim =
-  #(lambda (pitches) (replace-step #{ ees' #} (replace-step #{ ges' #} pitches)))
+chordmodifiers.hdm =
+  #(lambda (pitches)
+    (replace-step #{ ees' #} (replace-step #{ ges' #} pitches)))
 
 chSeq = \chordmode {
   \key c \major
   c1 c:m c:aug c:dim \break
-  c1:maj7 c:m7 c:aug7 c:dim7 c:7 c:m7.5- c:hdim7
+  c1:maj7 c:m7 c:aug7 c:dim7 c:7 c:hdm7 \break
+  c1:3.5.2 c:sus2 c:sus4
 }
 
 <<
-  \new Staff = cMajor \chSeq
-  \new ChordNames = cMajor \chSeq
+  \new Staff = cMaj \chSeq
+  \new ChordNames = cMaj \chSeq
 >>
 
-cMajor = \chordmode {
+cMaj = \chordmode {
   \key c \major
-  c1:maj7 d:m7 e:m7 f:maj7 g:7 a:m7 b:hdim7 \bar "|."
+  c1:maj7 d:m7 e:m7 f:maj7 g:7 a:m7 b:hdm7 \bar "|."
 }
 
-gMajor = \chordmode {
+gMaj = \chordmode {
   \key g \major
-  g1:maj7 a:m7 b:m7 c:maj7 d:7 e:m7 fis:hdim7 \bar "|."
+  g1:maj7 a:m7 b:m7 c:maj7 d:7 e:m7 fis:hdm7 \bar "|."
 }
 
-fMajor = \chordmode {
+fMaj = \chordmode {
   \key f \major
-  f:maj7 g:m7 a:m7 bes:maj7 c:7 d:m7 e:hdim7 \bar "|."
+  f:maj7 g:m7 a:m7 bes:maj7 c:7 d:m7 e:hdm7 \bar "|."
+}
+
+aMinHarm = \chordmode {
+  \key a \minor
+  a:m7.7+ b:hdm7 c:maj7.5+ d:m7 e:7 f:maj7 gis:dim7 \bar "|."
 }
 
 \markup { \huge \bold \concat { C \super "△" } }
 <<
-  \new Staff = cMajor \cMajor
-  \new ChordNames = cMajor \cMajor
+  \new Staff = cMaj \cMaj
+  \new ChordNames = cMaj \cMaj
 >>
 
 \markup { \huge \bold \concat { G \super "△" } }
 <<
-  \new Staff = gMajor \gMajor
-  \new ChordNames = gMajor \gMajor
+  \new Staff = gMaj \gMaj
+  \new ChordNames = gMaj \gMaj
 >>
 
 \markup { \huge \bold \concat { F \super "△" } }
 <<
-  \new Staff = fMajor \fMajor
-  \new ChordNames = fMajor \fMajor
+  \new Staff = fMaj \fMaj
+  \new ChordNames = fMaj \fMaj
+>>
+
+\markup { \huge \bold \concat { A \super "−" } }
+<<
+  \new Staff = aMinHarm \aMinHarm
+  \new ChordNames = aMinHarm \aMinHarm
 >>
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
