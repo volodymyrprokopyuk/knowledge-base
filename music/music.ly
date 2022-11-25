@@ -47,7 +47,7 @@ gMaj = \chordmode {
 
 gMinAlt = \chordmode {
   \key g \minor
-  g1:m7 a:hdm7 bes:maj7 c2:m7 c:7 d:7 d:m7 ees1:maj7 f2:7 f:dim7 \bar "|."
+  g1:m7 a:hdm7 bes:maj7 c2:m7 c:7 d:7 d:m7 ees1:maj7 f2:7 fis:dim7 \bar "|."
 }
 
 fMaj = \chordmode {
@@ -57,7 +57,7 @@ fMaj = \chordmode {
 
 fMinAlt = \chordmode {
   \key f \minor
-  f1:m7 g:hdm7 aes:maj7 bes2:m7 bes:7 c:7 c:m7 des1:maj7 ees2:7 ees2:dim7 \bar "|."
+  f1:m7 g:hdm7 aes:maj7 bes2:m7 bes:7 c:7 c:m7 des1:maj7 ees2:7 e2:dim7 \bar "|."
 }
 
 aMinHarm = \chordmode {
