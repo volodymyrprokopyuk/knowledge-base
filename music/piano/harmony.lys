@@ -1,0 +1,33 @@
+\version "2.23.81"
+
+{% macro tone(text, align = -3.8) %}
+  \markup { \halign #{{ align }} \small "{{ text }}" }
+{% endmacro %}
+
+{% macro fing(text, raise = 3) %}
+  \markup { \raise #{{ raise }} "{{ text }}" }
+{% endmacro %}
+
+{% macro degr(text, lower = 6) %}
+  \markup { \lower #{{ lower }} "{{ text }}" }
+{% endmacro %}
+
+{% macro dname(text, lower = 17) %}
+  \markup { \lower #{{ lower }} \halign #-0.7 \rotate #90 "{{ text }}" }
+{% endmacro %}
+
+\relative {
+  \omit Staff.TimeSignature
+  \omit Staff.BarLine
+  \slurUp
+  c'1(^{{ tone("1t") }}^{{ fing("5") }}_{{ degr("I") }}_{{ dname("tónica") }}
+  d)(^{{ tone("1t") }}^{{ fing("4") }}_{{ degr("ii") }}_{{ dname("supertónica") }}
+  \once \slurDown
+  e)(_{{ tone("½t") }}^{{ fing("3") }}_{{ degr("iii") }}_{{ dname("mediante") }}
+  f)(^{{ tone("1t") }}^{{ fing("2") }}_{{ degr("IV") }}_{{ dname("subdominante") }}
+  g)(^{{ tone("1t") }}^{{ fing("1") }}_{{ degr("V") }}_{{ dname("dominante") }}
+  a)(^{{ tone("1t") }}^{{ fing("1") }}_{{ degr("vi") }}_{{ dname("superdominante") }}
+  \once \slurDown
+  b)(_{{ tone("½t") }}^{{ fing("2") }}_{{ degr("vii") }}_{{ dname("la sensible") }}
+  c)^{{ fing("3") }}_{{ degr("I") }}_{{ dname("tónica") }}
+}
