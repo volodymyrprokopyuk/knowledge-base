@@ -28,17 +28,14 @@
   \omit Staff.TimeSignature
   \omit Staff.BarLine
   \slurUp
-  c'1(^{{ tone("1t") }}^{{ fing("5") }}_{{ degr("I") }}_{{ dname("tónica") }}
-    ^{{ rTitle("Digitación", 3, 1.5) }}
-    _{{ rTitle("Grados", -5.7, 1.7) }}
-    _{{ rTitle("Nombres", -10, 1.6) }}
-  d)(^{{ tone("1t") }}^{{ fing("4") }}_{{ degr("ii") }}_{{ dname("supertónica") }}
+  c'1(^{{ tone("1t") }}_{{ degr("I") }}_{{ dname("tónica") }}
+  d)(^{{ tone("1t") }}_{{ degr("ii") }}_{{ dname("supertónica") }}
   \once \slurDown
-  e)(_{{ tone("½t") }}^{{ fing("3") }}_{{ degr("iii") }}_{{ dname("mediante") }}
-  f)(^{{ tone("1t") }}^{{ fing("2") }}_{{ degr("IV") }}_{{ dname("subdominante") }}
-  g)(^{{ tone("1t") }}^{{ fing("1") }}_{{ degr("V") }}_{{ dname("dominante") }}
-  a)(^{{ tone("1t") }}^{{ fing("1") }}_{{ degr("vi") }}_{{ dname("superdominante") }}
+  e)(_{{ tone("½t") }}_{{ degr("iii") }}_{{ dname("mediante") }}
+  f)(^{{ tone("1t") }}_{{ degr("IV") }}_{{ dname("subdominante") }}
+  g)(^{{ tone("1t") }}_{{ degr("V") }}_{{ dname("dominante") }}
+  a)(^{{ tone("1t") }}_{{ degr("vi") }}_{{ dname("superdominante") }}
   \once \slurDown
-  b)(_{{ tone("½t") }}^{{ fing("2") }}_{{ degr("vii") }}_{{ dname("la sensible") }}
-  c)^{{ fing("3") }}_{{ degr("I") }}_{{ dname("tónica") }}
+  b)(_{{ tone("½t") }}_{{ degr("vii") }}_{{ dname("la sensible") }}
+  c)_{{ degr("I") }}_{{ dname("tónica") }}
 }
