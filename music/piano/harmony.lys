@@ -1,7 +1,7 @@
 \version "2.23.81"
 
 {% macro tone(text, align = -3.8) %}
-  \markup { \halign #{{ align }} \small "{{ text }}" }
+  \markup { \halign #{{ align }} \fontsize #-1 "{{ text }}" }
 {% endmacro %}
 
 {% macro fing(text, raise = 3) %}
@@ -16,11 +16,22 @@
   \markup { \lower #{{ lower }} \halign #-0.7 \rotate #90 "{{ text }}" }
 {% endmacro %}
 
+{% macro rTitle(text, raise, align) %}
+  \markup { \raise #{{ raise }} \halign #{{ align }} "{{ text }}" }
+{% endmacro %}
+
+{% macro lTitle(text, lower, align) %}
+  \markup { \lower #{{ lower }} \halign #{{ align }} "{{ text }}" }
+{% endmacro %}
+
 \relative {
   \omit Staff.TimeSignature
   \omit Staff.BarLine
   \slurUp
   c'1(^{{ tone("1t") }}^{{ fing("5") }}_{{ degr("I") }}_{{ dname("tónica") }}
+    ^{{ rTitle("Digitación", 3, 1.5) }}
+    _{{ rTitle("Grados", -5.7, 1.7) }}
+    _{{ rTitle("Nombres", -10, 1.6) }}
   d)(^{{ tone("1t") }}^{{ fing("4") }}_{{ degr("ii") }}_{{ dname("supertónica") }}
   \once \slurDown
   e)(_{{ tone("½t") }}^{{ fing("3") }}_{{ degr("iii") }}_{{ dname("mediante") }}
