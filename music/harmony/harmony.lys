@@ -1,5 +1,25 @@
 \version "2.24.0"
 
+{% macro chordStaff(title, chords) %}
+  \markup { \huge \bold "{{ title }}" }
+  <<
+    \new Staff = aMinHarm \{{ chords }}
+    \new ChordNames = aMinHarm \{{ chords }}
+  >>
+{% endmacro %}
+
+{% macro pianoChordStaff(title, rightHand, leftHand) %}
+  \markup { \huge \bold "{{ title }}" }
+  \new PianoStaff = {{ rightHand + leftHand }} {
+    <<
+      \new Staff = cMaj \{{ rightHand }}
+      \new ChordNames = cMaj \{{ rightHand }}
+      \new Staff = cMinAlt \{{ leftHand }}
+      \new ChordNames = cMinAlt \{{ leftHand }}
+    >>
+  }
+{% endmacro %}
+
 chNameExceptions = {
   % % Triads
   % <c e g>-\markup \super "△"
@@ -29,6 +49,18 @@ chNameExceptions = {
 chordmodifiers.hdm =
   #(lambda (pitches)
     (replace-step #{ ees' #} (replace-step #{ ges' #} pitches)))
+
+cTriads = \chordmode {
+  c1 c'/e c'/g | c:m c':m/ees c':m/g | c:dim c':dim/ees c':dim/ges \bar "|."
+}
+
+gTriads = \chordmode {
+  g1 g'/b g/d | g:m g':m/bes g:m/d | g:dim g':dim/bes g:dim/des \bar "|."
+}
+
+fTriads = \chordmode {
+  f1 f'/a f/c | f:m f':m/aes f:m/c | f:dim f':dim/aes f:dim/ces \bar "|."
+}
 
 cMaj = \chordmode {
   \key c \major
@@ -90,68 +122,18 @@ dMinMel = \chordmode {
   d1:m7.7+ e:m7 f:maj7.5+ g:7 a:7 b:hdm7 cis:hdm7 \bar "|."
 }
 
-\markup { \huge \bold { \concat { C \super "△" } / Cm } }
-\new PianoStaff = cMajMin {
-  <<
-    \new Staff = cMaj \cMaj
-    \new ChordNames = cMaj \cMaj
-    \new Staff = cMinAlt \cMinAlt
-    \new ChordNames = cMinAlt \cMinAlt
-  >>
-}
+{{ chordStaff("C triads", "cTriads") }}
+{{ chordStaff("G triads", "gTriads") }}
+{{ chordStaff("F triads", "fTriads") }}
 
-\markup { \huge \bold { \concat { G \super "△" } / Gm } }
-\new PianoStaff = gMajMin {
-  <<
-    \new Staff = gMaj \gMaj
-    \new ChordNames = gMaj \gMaj
-    \new Staff = gMinAlt \gMinAlt
-    \new ChordNames = gMinAlt \gMinAlt
-  >>
-}
+{{ pianoChordStaff("C/Cm", "cMaj", "cMinAlt") }}
+{{ pianoChordStaff("G/Gm", "gMaj", "gMinAlt") }}
+{{ pianoChordStaff("F/Fm", "fMaj", "fMinAlt") }}
 
-\markup { \huge \bold { \concat { F \super "△" } / Fm } }
-\new PianoStaff = fMajMin {
-  <<
-    \new Staff = fMaj \fMaj
-    \new ChordNames = fMaj \fMaj
-    \new Staff = fMinAlt \fMinAlt
-    \new ChordNames = fMinAlt \fMinAlt
-  >>
-}
+{{ chordStaff("Am harm.", "aMinHarm") }}
+{{ chordStaff("Em harm.", "eMinHarm") }}
+{{ chordStaff("Dm harm.", "dMinHarm") }}
 
-\markup { \huge \bold "Am harm." }
-<<
-  \new Staff = aMinHarm \aMinHarm
-  \new ChordNames = aMinHarm \aMinHarm
->>
-
-\markup { \huge \bold "Em harm." }
-<<
-  \new Staff = eMinHarm \eMinHarm
-  \new ChordNames = eMinHarm \eMinHarm
->>
-
-\markup { \huge \bold "Dm harm." }
-<<
-  \new Staff = dMinHarm \dMinHarm
-  \new ChordNames = dMinHarm \dMinHarm
->>
-
-\markup { \huge \bold "Am mel." }
-<<
-  \new Staff = aMinMel \aMinMel
-  \new ChordNames = aMinMel \aMinMel
->>
-
-\markup { \huge \bold "Em mel." }
-<<
-  \new Staff = eMinMel \eMinMel
-  \new ChordNames = eMinMel \eMinMel
->>
-
-\markup { \huge \bold "Dm mel." }
-<<
-  \new Staff = dMinMel \dMinMel
-  \new ChordNames = dMinMel \dMinMel
->>
+{{ chordStaff("Am mel.", "aMinMel") }}
+{{ chordStaff("Em mel.", "eMinMel") }}
+{{ chordStaff("Dm mel.", "dMinMel") }}
