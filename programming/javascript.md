@@ -1,66 +1,67 @@
 # JavaScript
 
-## Lexical scope and closures for variable lookup
+## Lexical scope and closures
 
-- Tokenization (stateless) | lexing (stateful) => parsing (AST + per-scope
-  hoisting of `var`aible and `function` declarations) => optimization => code
-  generation (JIT) => execution (variable assignment, function call)
+- JS pipeline = tokenization (stateless) | lexing (stateful) => parsing (AST +
+  per-scope hoisting of `var`aible and `function` declarations) => optimization
+  => code generation (JIT) => execution (variable assignment, function call)
+- Compiler (code generator) = variable creation in the appropriate scope
 - Engine (orchestrator) = variable lookup for variable / parameter assignment
   (LHS container) and variable / parameter referencing (RHS value)
-- Compiler (code generator) = variable creation in the appropriate scope
-- Scope (nested storage tree) = variable storage and retrieval + shadowing
-- Function creates a new nested function scope not accessible from the outside
-  (module pattern)
+- **Scope** (variable storage tree) = variable storage and retrieval + shadowing
+- **Lexical scope** (closures) is defined statically at write-time (the scope
+  chain is based on the source code)
+- **Closure** = a returned function can access its lexical scope even when the
+  function is executing outside its lexical scope
+- **Dynamic scope** (`this`) defined at execution-time and depends on the
+  execution path (the scope chain is based on the call stack)
+- **Block scope** (`const`, `let`) = declare variables as close as possible to
+  where they are used
+    - `var` => function scope + hoisting (of variable and function declaration)
+    - Function declarations are hoisted before variable declarations
+    - `const`, `let` => block scope at any `{ ... }` even explicitly defined
+    - `try/catch(e)` => block scope
+- **Module pattern** = function creates a new nested function scope not
+  accessible from the outside
 
     ```js
     function module(a) {
       let b = a // private state
-      function f() { return ++b } // closure over state
+      function f() { return ++b } // closure over the private state
       return { f } // public interface
     }
     const m = module(10) // module instance
     console.log(m.f()) // 11
     ```
-- Lexical scope (closures) is defined statically at write-time (the scope chain
-  is based on the source code)
-    - Dynamic scope (`this`-like) defined at execution-time and depends on the
-      execution path (the scope chain is based on call stack)
-- Block scope (`const`, `let`) = declare variables as close as possible to where
-  they are used
-    - `var` => function scope + hoisting (of variable and function declarations)
-    - `const`, `let` => block scope at any `{ ... }` even explicitly defined
-    - `try/catch(e)` => block scope
-- Function declarations are hoisted before variable declarations
-- Closure = a returned function can access its lexical scope even when the
-  function is executing outside its lexical scope
 
 ## `this` dynamic binding rules
 
-- `this` is dynamically defined at runtime (late binding) for every function,
-  depends on the location where a function is called (call-site), not where a
-  function is declared (lexical scope) and how a funciton is called, implicitly
-  passes an execution context object (like dynamic scope) to a function and is
-  not related to lexical scope
+- `this` is dynamically defined for every function at runtime (late binding, not
+  write-time lexical scope); the value of `this` depends on the location of a
+  function call (not the location of function declaration) and how a funciton is
+  called; `this` implicitly passes the execution context object (like dynamic
+  scope) to the function
 - Binding rules for `this` (from the highest to the lowest precedence)
-    - `new` binding = construction call of regular funciton with the `new`
-      operator `new f()`, `this` points to a brand new object, which is
-      automatically returned from the function (unless the function returns its
-      own alternate object). The `new` operator ignores `this` hard binding with
+    - **`new` binding** = construction call of a funciton with the `new`
+      operator `new f()`. `this` points to a brand new object, which is
+      automatically returned from the function (unless the function returns
+      another object). The `new` operator ignores `this` hard binding with
       `bind()`
-    - Explicit binding = function invocation through `f.call(this, args, ...)`
-      or `f.apply(this, [args])` including the hard binding `ff = f.bind(this,
-      args, ...)` (partial application + currying), `this` points to the first
-      argument
-    - Implicit binding = function invocation `o.f()` through a containing
-      context object `{ f: f }`, `this` points to the containing context object
-    - Default binding = standalone function invocation `f()` including callback
-      invocation, `this` == `undefined` as the global object is not eligible for
-      the default binding in the `strict mode`
-- Lexical `this` (`bind` alternative) = arrow functions `(...) => { ... }`
-  discard all the traditional rules for `this` binding and instead use the
+    - **Explicit binding** = function invocation through `f.call(this, args,
+      ...)` or `f.apply(this, [args])` including the **hard binding** `const ff
+      = f.bind(this, args, ...)` (partial application + currying). `this` points
+      to the first argument
+    - **Implicit binding** = function invocation `o.f()` through a containing
+      context object `const o = { f }`. `this` points to the containing context
+      object
+    - **Default binding** = standalone function invocation `f()` including
+      callback invocation. `this` == `undefined` as the global object is not
+      eligible for the default binding in the `strict mode`
+- **Lexical `this`** (`bind` alternative) = **arrow function** `(...) => { ... }`
+  discards all the traditional rules for `this` binding and instead uses the
   lexical `this` from the immediate lexical enclosing scope. Arrow function is a
-  syntactic replacement for `self = this` closures. The lexical `this` binding
-  of an arrow function cannot be overrided even with `new`
+  syntactic replacement for `self = this` closures. Lexical `this` binding
+  of an arrow function cannot be overrided even with the `new` operator
 
 ## `object` property and accessor descriptors
 
