@@ -1,6 +1,6 @@
 # JavaScript
 
-## Lexical scope and closures
+## Lexical scope closures and variable lookup
 
 - JS pipeline = tokenization (stateless) | lexing (stateful) => parsing (AST +
   per-scope hoisting of `var`aible and `function` declarations) => optimization
@@ -42,7 +42,7 @@
   called; `this` implicitly passes the execution context object (like dynamic
   scope) to the function
 - Binding rules for `this` (from the highest to the lowest precedence)
-    - **`new` binding** = construction call of a funciton with the `new`
+    - `new` **binding** = construction call of a funciton with the `new`
       operator `new f()`. `this` points to a brand new object, which is
       automatically returned from the function (unless the function returns
       another object). The `new` operator ignores `this` hard binding with
@@ -63,17 +63,17 @@
   syntactic replacement for `self = this` closures. Lexical `this` binding
   of an arrow function cannot be overrided even with the `new` operator
 
-## `object` property and accessor descriptors
+## `object` property descriptor and accessor descriptor
 
-- Type vs object
+- **Type** vs `object`
     ```js
     const s = "a" // string type, immutable value, automatic coercion to object
     console.log(typeof s, s instanceof String) // string, false
     const s2 = new String("a") // String object, allows operations
     console.log(typeof s2, s2 instanceof String) // object, true
     ```
-- Object = container of named references to properties (values and functions),
-  however functions never belong to objects. Syntactic property access `o.p` vs
+- `object` = container for named references to properties (values and functions),
+  functions never belong to objects. Syntactic property access `o.p` vs
   programmatic key access `o["p"]`
     ```js
     const o = { a: 1 }
@@ -82,40 +82,40 @@
     delete o.a
     console.log(o) // { }
     ```
-- Property descriptor vs accessor descriptor
+- **Property descriptor** vs **accessor descriptor**
     ```js
     const o = { }
     Object.defineProperty( // property descriptor
       o, "a", { value: 1, writable: true, enumerable: true, configurable: true }
     )
     o.a = 2
-    console.log(o) // 2
+    console.log(o.a) // 2
 
     const o = { }
     Object.defineProperty(o, "a", { // accessor descriptor
-      set: function(val) { this._a = val },
+      set: function(v) { this._a = v },
       get: function() { return this._a * 2 }
     })
     o.a = 1
     console.log(o.a) // 2
 
     const o = { // object literal setter and getter
-      set a(val) { this._a = val },
+      set a(v) { this._a = v },
       get a() { return this._a * 2 }
     }
     o.a = 1
     console.log(o.a) // 2
     ```
 - `[[Get]]` own property lookup => prototype chain lookup => return `undefined`
-- `[[Put]]` accessor descriptor (`set`, `get`) => property descriptor
-  (`writable`) => prototype chain lookup => assign value directly to the object
+- `[[Put]]` accessor descriptor (`set`) => property descriptor (`writable`) =>
+  prototype chain lookup => assign value directly to the object
 - Object immutability `Object.preventExtensions()`, `Object.seal()`,
   `Object.freeze()`
 
 ## Iteration (`[Symbol.iterator]`)
 
-- Iteration over arrays (indexing) and objects (properties). Ordered, sequential
-  pull-based consumption of data. Custom iterator
+- **Custom iterator** = iterates over arrays (indexing) and objects
+ (properties). Ordered, sequential, pull-based consumption of data
   `{ [Symbol.iterator]: function () { return { next() {...} } } }` + `for/of`
     ```js
     const a = [1, 2]
@@ -137,22 +137,21 @@
     })
     for (const e of o) { console.log(e) } // 1, 2
     ```
-- `Symbol.iterator` interface `{ next(x), [return(x), throw(e)] }` =>
-  `{ value, donce }`
-- Iterable interface `o[Symbol.iterator]` => `{ next() }`
+- **Iterable interface** `o[Symbol.iterator]` =>
+  `{ function next() { return(x) | throw(e) } }` => `{ value, done }`
     ```js
     function iterator(n) { // iterator configuration
       let i = 0; // iterator state
-      const next = _ => ({ value: i < n ? i : undefined, done: ++i > n })
-      // iterable + iterator
+      const next = () => ({ value: i < n ? i : undefined, done: ++i > n })
+      // iterable object + iterator function
       return { [Symbol.iterator]() { return this }, next }
     }
-    for (const i of iterator(5)) { console.log(i) }
+    for (const i of iterator(3)) { console.log(i) } // 0, 1, 2
     ```
-- Array destructuring `[a, b]` and the `...` spread operator can consume an
-  iterator
+- Array destructuring `[a, b] = it` and the spread operator `f(...it)` can
+  consume an iterator
 
-## Object `prototype` for property lookup
+## Object `prototype` and property lookup
 
 - Prototype chain = every object has an `o.prototype` link to another object
   ending at `Object.prototype` (kind of global scope for variables)
