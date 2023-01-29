@@ -153,8 +153,8 @@
 
 ## Object `prototype` and property lookup
 
-- Prototype chain = every object has an `o.prototype` link to another object
-  ending at `Object.prototype` (kind of global scope for variables)
+- **Prototype chain** = every object has an `o.[[Prototype]]` link to another
+  object ending at `Object.prototype` (kind of global scope for variables)
     ```js
     const o = { a: 1 }
     // new object o2.[[Prototype]] = o (prototype chain)
@@ -163,10 +163,10 @@
     console.log(o2.a) // 1
     for (const p in o2) { console.log(p, o2[p]) } // a, 1
     ```
-- All `function`s get by default a public, non-enumerable property `prototype`
-  pointing to an object => each object created via `new F()` operator is linked
-  to the `F.prototype` effectively delegating access to `F.prototype`'s
-  properties (prototypal inheritance = objects are linked to other objects)
+- **Prototypal inheritance** = all functions get by default a public,
+  non-enumerable property `F.prototype` pointing to an object; each object
+  created via `new F()` operator is linked to the `F.prototype` effectively
+  delegating access to `F.prototype` properties
     ```js
     function F() { this.a = 1 } // constructor
     F.prototype.b = function() { return 2 } // method
@@ -177,18 +177,19 @@
     G.prototype = Object.create(F.prototype)
     // Prototypal inheritance Option 2. Update G.prototype
     Object.setPrototypeOf(G.prototype, F.prototype)
-    G.prototype.d =
-      function() { return F.prototype.b.call(this) + 2 } // call parent method
+    G.prototype.d = function() {
+      return F.prototype.b.call(this) + 2 // call parent method
+    }
     const o2 = new G()
     console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
     ```
-- Purely flat data storage `o = Object.create(null)` without `prototype`
-  delegation
-- Behavior delegation via `prototype` links / chain (objects are linked to other
-  objects forming a network of peers, not a vertical hierarchy as with classes)
-- Mutual delegation of two objects to each other forming cycle is disallowed
-- ES6 class = syntax sugar built on top of prototypal inheritance and behavior
-  delegation
+- Purely flat data storage without `prototype` delegation
+  `o = Object.create(null)`
+- **Prototypal behavior delegation** = objects are linked to other objects
+  forming a network of peers, not a vertical hierarchy as with classes
+- Mutual delegation of two objects to each other forming a cycle is disallowed
+- **ES6 class** = syntactic sugar on top of prototypal inheritance and
+  prototypal behavior delegation
     ```js
     class F {
       constructor() { this.a = 1 } // constructor + property
@@ -196,14 +197,14 @@
     }
     const o = new F()
     console.log(o.a, o.b()) // 1, 2
-    class G extends F { // prototypal ihheritance
-      constructor() { super(); this.c = 3 }// call parent constructor
+    class G extends F { // prototypal inheritance
+      constructor() { super(); this.c = 3 } // call parent constructor
       d() { return super.b() + 2 } // call parent method
     }
     const o2 = new G()
     console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
     ```
-- Function chaining
+- Function chaining via `return this`
     ```js
     function N(x) { this.a = x }
     N.prototype.add = function add(x) { this.a += x; return this }
@@ -212,14 +213,14 @@
 
 ## Types
 
-- Types are related to values, not variables (which may store any value)
-- `let x; typeof x === "undefined"` vs `typeof <undeclared> === "undefined"`
+- Types are related to values, not to variables, which may store values of
+  different types over time
 - `function` is a `[[Call]]`able `object`
-- The type of value determines whether the value will be assigned by copy
-  (primitives `boolean`, `number`, `string`, `symbol`) or by reference
-  (`object`s, `array`, `function`, automatically boxed values)
-- `symbol` special unique primitive type used for collision-free internal
-  properies on objects
+- The type of value determines whether the value will be **assigned by copy**
+  (primitives `boolean`, `number`, `string`, `symbol`) or **assigned by
+  reference** (`object`, `array`, `function`, automatically boxed values)
+- `symbol` special unique primitive type used for **collision-free internal
+  properies** on objects
     ```js
     const sym = Symbol("a")
     const o = { [sym]: 1 }
@@ -229,24 +230,22 @@
 ## Coercion
 
 - Coercion always results in one of the scalar primitive types
-- `null == undefined // true`
 - Both `==` (implicit coercion) and `===` (no coercion) compare two `object`s by
   reference (not by value) `{ a: 1 } ==(=) { a: 1 } // false`
-- Use `===` (to avoid coercion) instead of `==` with `true`, `false`, `0`, `""`,
-  `[]`
+- Use `===` (no coercion) instead of `==` with `true`, `false`, `0`, `""`, `[]`
 
 ## JS grammar
 
-- Assignment expression returns assigned value `a = 1 // 1`
-- `continue <label>` continues an outer loop `label: for(...)`
-- `break <label>` breaks out of an inner loop or a block `label: { ... }`
+- **Assignment expression** returns the assigned value `a = 1 // 1`
+- `continue <label>` continues a labeled outer loop `label: while/for(...)`
+- `break <label>` breaks out of an inner loop or a labeled block `label: { ... }`
 - `let a = b || <default value>` vs `a && a.b()` guarded operation + short
   circuiting
-- `=`, `?:` right-associative
+- Right-associative: `=`, `?:`
 
-## Async
+## Callbacks
 
-- Single-threaded event loop (sequential execution on every tick)
+- **Single-threaded event loop** (sequential execution on every tick)
     ```js
     let events = [] // queue, FIFO
     while(true) {
@@ -257,12 +256,13 @@
       }
     }
     ```
-- Concurrency = split 2 or more tasks into atomic steps, schedule steps from all
-  tasks to the event loop (interleave steps from different tasks), execute steps
-  in the event loop in order to progress simultaneously on all tasks
-- Callbacks = strict separation between now (current code) and later (callback).
-  Non-linear definition of a sequential control flow and error handling, trust
-  issues due to control delegation (inversion of control, continuation)
+- **Concurrency** = split 2 or more tasks into atomic steps, schedule steps from
+  all tasks to the event loop (interleave steps from different tasks), execute
+  steps in the event loop in order to progress simultaneously on all tasks
+- **Callbacks** = strict separation between now (current code) and later
+  (callback). Non-linear definition of a sequential control flow and error
+  handling, trust issues due to control delegation (inversion of control,
+  continuation)
     ```js
     function timeoutify(fun, timeout) {
       let id = setTimeout(() => {
@@ -282,14 +282,21 @@
     const tf = timeoutify(f, 500)
     setTimeout(() => tf(1), 400) // 1
     ```
-- Trustable and composiable promises = composable, time consistent, future,
-  eventual value placeholder (proxy) that behaves the same across now and later
-  (by making both of them
-  always async later). Async flow control completion event (promise object) to
-  subscribe to (separation of consumers from producer) possibly multiple
-  consumers. Solves the trust issues of callbacks by inverting callback control
-  delegation. Once a promise is settled, the resolved value or rejected reason
-  becomes immutable
+
+## Promises
+
+- **Promises** = placeholder/proxy for a future eventual value (trustable,
+  composable, time consistent) that is guaranteed to be async (both now and
+  later always are async)
+    ```js
+    Promise.resolve(1).then(console.log) // next tick
+    console.log(2) // 2, 1
+    ```
+- **Promises** = async flow control (multiple consumers subscribe to a
+  completion event of a producer) that separates consumers from a producer
+- Once a promise is settled, the `resolve()`d value or `reject()`ed reason
+  becomes immutable. Repeated calls to `resolve()` and `reject()` are ignored.
+  Promise must be `return`ed to form a valid promise chain
     ```js
     function timeoutPromise(timeout) {
       return new Promise((_, reject) =>
@@ -302,22 +309,16 @@
       )
     }
     Promise.race([f(1, 400), timeoutPromise(500)])
-      .then(console.log).catch(console.error)
+      .then(console.log).catch(console.error) // 1
     ```
-- Promises are guaranteed to be async. Promises don't get rid of callbacks, they
-  just let the caller control callbacks locally via `Promise.then(cb)` instead
-  of passing callabcks to a third party code as in case of callbacks only
-  approach. Repeated calls to `resolve` and `reject` are ignored. Promise must
-  be `return`ed to form a valid promise chain
-    ```js
-    Promise.resolve(1).then(console.log)
-    console.log(2) // 2, 1
-    ```
-- `Promise.resolve(x)` normilizes values and misbehaving thenable to trustable
+- Promises solve the trust issues of callbacks by inverting the callback control
+  delegation. Promises don't get rid of callbacks, they just let the caller
+  control callbacks locally via `p.then(cb)` instead of passing callabcks to a
+  third party code as in case of callbacks only approach
+- `Promise.resolve(x)` normilizes values and misbehaving thenables to trustable
   and compliant Promises
-- `p.then()` automatically creates a new Promise in a chain resolved with the
-  `return`ed value or the unwrapped `return`ed Promise or rejected with the
-  `throw`n error
+- `p.then()` automatically creates a new Promise in a chain either resolved with
+  a value or rejected with an error/reason of the unwrapped Promise
     ```js
     Promise.resolve(1)
       .then(x => x + 1)
@@ -334,24 +335,25 @@
       .then(console.log) // oh, 2 (back to normal)
     ```
 - `Promise.all([])` a gate that resolves with the array of results of all
-  concurrent, unordered Promises or rejects with the first rejected Promise
-- `Promise.race([])` a latch that resolves or rejects with the first settled
-  Promise (the other Promises cannot be canceled due to immutability, hense are
-  settled and just ignored)
+  concurrent, unordered resolved Promises or rejects with the first rejected
+  Promise
+- `Promise.race([])` a latch that either resolves or rejects with the first
+  settled Promise (the other Promises cannot be canceled due to immutability,
+  hense are settled and just ignored)
 - Promises API
     - `Promise.resolve(x)`, `Promise.reject(x)`
     - `p.then(success, [failure])`, `p.catch(failure)`, `p.finally(always)`
-    - `Promise.race([]) => first success / first failure`
-    - `Promise.any([]) => first success / all failure`
-    - `Promise.allSettled([]) => [all either success or failure]`
-    - `Promise.all([]) => [all success] / first failure`
-- Callback => promise
+    - `Promise.all([]) => [all success] | first failure`
+    - `Promise.allSettled([]) => [all success | failure]`
+    - `Promise.race([]) => first success | first failure`
+    - `Promise.any([]) => first success | all failures`
+- Callback => Promise
     ```js
     function f(x, cb) {
       setTimeout(_ => { if (x >= 0) { cb(null, "ok") } else { cb("oh") } }, 100)
     }
-    f(1, console.log)
-    f(-1, console.error)
+    f(1, console.log) // null, ok
+    f(-1, console.error) // oh
     function promisify(f) {
       return function(...args) {
         return new Promise((resolve, reject) => {
@@ -361,8 +363,8 @@
       }
     }
     const ff = promisify(f)
-    ff(1).then(console.log)
-    ff(-1).catch(console.error)
+    ff(1).then(console.log) // ok
+    ff(-1).catch(console.error) // oh
     ```
 - Sequential composition of promises
     ```js
@@ -376,50 +378,55 @@
 
 ## Generators
 
-- Generators = a new type of function that does not run to completion (as
+- **Generators** = a new type of function that does not run to completion (as
   regular functions do), but creates an iterator that controls execution of the
   generator, suspends maintaining the iternal state at every `yield` and resumes
-  on each iteration `it.next()`
-- `yield` is right-associative like `=` assignment
-- Generator usage: a. procude a series of vaules b. async control flow (queue of
-  tasks to perorm sequentially)
-- Two-way message passing = `const y = yield x` returns `x` before suspending
-  and receives `y` after resuming, `const { value: x }= it.next(y)` receives `x`
-  from a suspended generator and passes `y` resuming the generator
-- Generators implement cooperative (by `yield`ing control), not preemptive
-  (by extractal context switch) multitasking. Gnerator suspends itself via
-  `yield`, iterator resumes the generator via `it.next()`
+  on each iteration call `it.next()`. `yield` is right-associative like `=`
+  assignment
+- Generator use cases
+    - On demand production of series of vaules through iteration
+    - Async flow control through two-way message passing
+- **Two-way message passing**
+    - Generator `const y = yield x` yields `x` to the caller before suspending
+      and receives `y` from the caller after resuming
+    - Caller `const { value: x } = it.next(y)` receives `x` from a suspended
+      generator, resumes the generator and passes `y` into the generator
+- Generators implement **cooperative multitasking** by `yield`ing control,
+  (not preemptive multitasking by extractal context switch). Gnerator suspends
+  itself via `yield`, iterator call `it.next()` resumes the generator
     ```js
-    function* f(x) {
+    function* g(x) {
       console.log(x++)
       // yield waits for a value passed by it.next(v)
       const y = yield "a" // yield requires 2 iterations: start + resume
-      console.log(y, x) // implicit return undefined;
+      console.log(y, x) // implicitly returns undefined
     }
-    const it = f(1) // creates iterator + initiates generator
-    const { value } = it.next() // starts generator (must always be empty)
-    console.log(value)
-    const r = it.next("b") // message to generator + resumes generator 1, a, b, 2
+    const it = g(1) // creates a generator + receives an interator
+    // starts the generator (must always be empty)
+    const { value } = it.next() // 1
+    console.log(value) // a
+    // resumes the generator + passes message to the generator
+    const r = it.next("b") // b, 2
     console.log(r) // { value: undefined, done: true }
     ```
-- `it.next()` + `yield` + `it.next()`
+- Initial `it.next()` + `yield` + message `it.next(v)`
     ```js
-    function* gen() {
-      const a = yield 1
-      const b = yield 2
+    function* g() {
+      const a = yield "a"
+      const b = yield "b"
       console.log(a, b)
     }
-    const it = gen() // create controlling iterator
-    const { value: a } = it.next() // start generator
-    const { value: b } = it.next(10)
-    it.next(20) // 10, 20 (finish generator)
-    console.log(a, b) // 1, 2
+    const it = g() // creates the controlling iterator
+    const { value: a } = it.next() // starts the generator
+    const { value: b } = it.next(1)
+    it.next(2) // 1, 2 (finishes the generator)
+    console.log(a, b) // a, b
     ```
-- Early termination (via `break`, `return`, `throw`) of the `for/of`
+- **Early termination** via `break`, `return`, `throw` from the `for/of` loop
   automatically terminates generator's iterator (or manually via `it.return()`)
     ```js
     const iterator = function(n) {
-      let v = 0
+      let v = 0 // state
       return {
         [Symbol.iterator]() { return this },
         next() {
@@ -441,37 +448,40 @@
         while (true) { yield ++v }
       } finally { console.log("finally") }
     }
-    let gen = generator()
+    const gen = generator()
     for (const i of gen) {
-      if (i > 2) { const { value } = gen.return("return"); console.log(value) }
+      if (i > 2) {
+        const { value } = gen.return("return")
+        console.log(value)
+      }
       console.log(i) // 1, 2, finally, return, 3
     }
     ```
-- Generators express async flow control in sequential, sync-like form through
-  async iteration (`it.next()`) of a generator
+- Generators express **async flow control** in sequential, sync-like form
+  through async iteration (`it.next()`) of a generator
     ```js
     function f(x, cb) {
       setTimeout(_ => x === "oh" ? cb(new Error(x)) : cb(null, x), 100)
     }
     function cb(err, data) { if (err) { it.throw(err) } else { it.next(data) } }
-    function* gen() {
+    function* g() {
       try {
         const a = yield f(1, cb)
         console.log(a)
         const b = yield f("oh", cb)
       } catch (e) { console.error(e.message) }
     }
-    const it = gen()
+    const it = g()
     it.next() // 1, oh
     ```
-- Promise-yielding generators (basis for `async/await`)
+- **Promise-yielding generators** are basis for `async/await`
     ```js
     function f(x) {
       return new Promise((resolve, reject) =>
         setTimeout(_ => x === "oh" ? reject(new Error(x)) : resolve(x), 100)
       )
     }
-    function* gen() {
+    function* g() {
       try {
         const a = yield f(1)
         console.log(a)
@@ -480,12 +490,12 @@
         // console.log(b)
       } catch(e) { console.error(e.message) }
     }
-    const it = gen()
+    const it = g()
     it.next().value
       .then(a => it.next(a).value.then(b => it.next(b)))
       .catch(e => console.log(e.message)) // 1, oh
     ```
-- `yield *` delegation for composition of generators. `yield *` requires an
+- `yield *` delegation for **composition of generators**. `yield *` requires an
   iterable, it then invokes that iterable's iterator and delegates generator's
   control to that iterator until it is exhausted
     ```js
@@ -493,27 +503,21 @@
     function* b() { yield 2; yield 3 }
     for (const i of a()) { console.log(i) } // 1, 2, 3, 4
     ```
-- Error handling in generators
+- Error handling `try/catch` inside and outside of generators
     ```js
-    function* gen() {
+    function* g() {
       try {
         yield 1
       } catch (e) { console.error(e.message) } // uh
       throw new Error("oh")
     }
-    const it = gen()
+    const it = g()
     try {
       const { value: a } = it.next()
       console.log(a) // 1
       it.throw(new Error("uh"))
     } catch (e) { console.error(e.message) } // oh
     ```
-
-# Web workers
-
-- Web workder = event listener and subscriber in a separate thread that uses
-  messaging for communication and does not share any scope or resources (e. g.
-  DOM) with other workders or the main JS program (event loop)
 
 # ES6+
 
