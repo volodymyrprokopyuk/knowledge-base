@@ -220,7 +220,7 @@
   (primitives `boolean`, `number`, `string`, `symbol`) or **assigned by
   reference** (`object`, `array`, `function`, automatically boxed values)
 - `symbol` special unique primitive type used for **collision-free internal
-  properies** on objects
+  properties** on objects
     ```js
     const sym = Symbol("a")
     const o = { [sym]: 1 }
@@ -521,13 +521,13 @@
 
 # ES6+
 
-- `let` block scoped variable (vs `var` function scoped + hoisting)
-- `const` block scoped variable that must be initialized and cannot be
-  reassigned (constant reference, while the content of reference types can still
-  be modified)
-- Spread arguments `f(...[1, 2, 3])` => `f.apply(null, [1, 2, 3])`
-- Gather parameters `function f(...args) {...}` => `[args]`
-- Object / array destructuring and transformations
+- `let` **block scoped** variable (vs `var` function scoped + hoisting)
+- `const` **block scoped** variable that must be initialized and cannot be
+  reassigned (constant reference), while the content of reference types can
+  still be modified
+- **Spread arguments** `f(...[1, 2, 3])` => `f.apply(null, [1, 2, 3])`
+- **Gather parameters** `function f(...args) {...}` => `[args]`
+- **Object/array destructuring/transformation**
     ```js
     const o = { a: 1, b: 2, c: 3 }
     const a = [10, 20, 30]
@@ -542,14 +542,14 @@
     [o2.A, o2.B, o2.C] = a // array => object
     console.log(o2) // { A: 10, B: 20, C: 30 }
     ```
-- Spread gather destructuring
+- **Spread/gather destructuring**
     ```js
     const [x, ...y] = a
     console.log(x, y, [x, ...y]) // 10, [ 20, 30 ], [ 10, 20, 30 ]
     const { a, ...x } = o
     console.log(a, x, { a, ...x }) // 1 { b: 2, c: 3 } { a: 1, b: 2, c: 3 }
     ```
-- Default values destructuring vs default parameters
+- **Default values destructuring** vs default parameters
     ```js
     const [p, q, r, s = 0] = a
     console.log(p, q, r, s) // 10, 20, 30, 0
@@ -557,9 +557,9 @@
     console.log(p, s) // 1, 0
     f({ x = 10 } = { }, { y } = { y: 10 }) { ... }
     ```
-- Concise methods `{ f() { ... } }` imply anonymous function expression `{ f:
-  function() { ... } }`
-- Getter and setter
+- **Concise methods** `{ f() { ... } }` imply anonymous function expression
+  `{ f: function() { ... } }`
+- **Getter/setter**
     ```js
     const o = {
       _a: 1,
@@ -569,13 +569,13 @@
     o.a++
     console.log(o.a) // 2
     ```
-- Computed property name
+- **Computed property name**
     ```js
     const p = "a"
     const o = { [p]: 1 }
     console.log(o.a, o[p]) // 1, 1
     ```
-- Tagget template literal
+- **Tagged template literal**
     ```js
     function tag(strings, ...values) {
       return `${strings[1].trim()} ${values[0] + 1} ${strings[0]}`
@@ -583,15 +583,15 @@
     const a = 1
     console.log(tag`A ${a + 1} B`) // B 3 A
     ```
-- Arrow functions are always anonymous (no named reference for recursion or
-  event binding / unbinding) function expressions (there is no function
-  declarations) + parameters destructuring, default values and spread / gather
+- **Arrow functions** are always anonymous (no named reference for recursion or
+  event binding/unbinding) function expressions (there is no arrow function
+  declaration) + parameters destructuring, default values, and spread/gather
   operator
-- Inside arrow function the `this` binding is not dynamic, but is instead
-  lexical (arrow function is a nicer alternative to `const self = this` or
-  `f.bind(this)`)
-- `for (index; condition; increment)`, `for property in object`,
-  `for element of iterator`
+- Inside an arrow function `this` is lexical (not dynamic). Arrow function is a
+  nicer alternative to `const self = this` or `f.bind(this)`
+- Array indexing `for (index; condition; increment)`
+- Oject properties `for property in object`
+- Iterator `for element of iterator`
 - `RegExp` sticky `y` flag restricts the pattern to match just at the position
   of the `lastIndex` which is set to the next character beyond the end of the
   previous match (`y` flag implies a virtual anchor at the beginning of the
@@ -613,35 +613,37 @@
     console.log(s1, s2, s1 === s2, new Number(1) === new Number(1))
     // Singleton { a: 1 }, Singleton { a: 1 }, true, false
     ```
-- Promise-yielding generator `*function() { yield } => Promise`
-    - Async function `async function() { await } => Promise`
+- **Promise-yielding generator** `*function() { yield Promise } => iterator` is
+  the basis for an **async function** `async function() { await Promise } =>
+  Promise`
 
 # Modules
 
-- Modules = one module per file, module has static API resolved at compile time
-  with immutable bindings (read-only reference, one-way live link, not copy) and
-  blocking import, module is a singleton, there is no global scope in modules,
-  circular imports are supported
-- Export
-    - Named exports `export var | const | let | function | class | { a, b as B }`
-      not `export`ed object are private to the module
-    - Single default export `export default { a, b}` or `export { a as default
-      }` per module (not mutually exclusive with named exports) rewards with
-      simpler `import` syntax
-    - Reexport from another module `export * | { a, b as B } from "another"`
+- **Modules** = module has static API resolved at compile time with immutable
+  bindings (read-only reference, one-way live link, not a copy). One module per
+  file, module is a singleton, there is no global scope in modules, circular
+  imports are supported
+- Export (not `export`ed object are private to the module)
+    - **Named exports** `export var | const | let | function | class | { a, b as
+      B }`
+    - **Single default export** `export default { a, b }` or `export { a as
+      default }` not mutually exclusive with named exports that rewards with a
+      simpler `import m` syntax
+    - **Re-export** from another module `export * | { a, b as B } from "module"`
 - Import (all imported bindings are immutable and hoisted)
-    - Named import `import { a, b as B } from "module"` binds to top-level
+    - **Named import** `import { a, b as B } from "module"` binds to top-level
       identifiers in the current scope
-    - Default import `import m | { default as m } from "module"`
-    - Wildcard import to a single namespace `import * as ns from "module"`
+    - **Default import** `import m | { default as m } from "module"`
+    - **Wildcard import** to a single namespace `import * as ns from "module"`
 
 # Classes
 
-- Class = a macro that populates the `constructor` function `prototype` with
-  methods and establishes `prototype` through `extends`
+- **Class** = a macro that populates a `constructor` function, a `prototype`
+  with methods and defines a `prototype` chain through `extends`
     ```js
     class A {
       constructor(a) { this._a = a }
+      // property getter and setter
       get a() { return this._a }
       set a(v) { this._a = v }
     }
@@ -660,52 +662,37 @@
 
 # Metaprogramming
 
-- `function.name`
-    ```js
-    function f() { }
-    const g = function() { }
-    console.log(f.name, g.name) // f, g
-    ```
-- `new.target`
-    ```js
-    function F() { console.log(new.target) }
-    const f = new F() // function F
-    class C {
-      constructor() { console.log(new.target) }
-    }
-    const c = new C() // class C
-    ```
 - `Proxy` + `Reflect` intercepts at the proxy, extends in the proxy and forwards
   to the target object `get`, `set`, `delete`, `apply`, `construct` operations
   among others
-    - Proxy first design pattern
-        ```js
-         const o = { a: 1 }
-         const handlers = {
-           get(target, key, context) {
-             if (Reflect.has(target, key)) {
-               console.log("get key", key)
-               // forward operation from context (proxy) to target (object)
-               return Reflect.get(target, key, context)
-             } else {
-               throw new Error(`${key} does not exist`)
-             }
-           }
+- **Proxy first** design pattern
+    ```js
+     const o = { a: 1 }
+     const handlers = {
+       get(target, key, context) {
+         if (Reflect.has(target, key)) {
+           console.log("get key", key)
+           // forward operation from context (proxy) to target (object)
+           return Reflect.get(target, key, context)
+         } else {
+           throw new Error(`${key} does not exist`)
          }
-         const p = new Proxy(o, handlers)
-         console.log(p.a) // get key a, 1
-        ```
-    - Proxy last design pattern
-        ```js
-        const o = { a: 1 }
-        const handlers = {
-          get(target, key, context) { throw new Error(`${key} does not exits`) }
-        }
-        const p = new Proxy(o, handlers)
-        Object.setPrototypeOf(o, p)
-        console.log(o.a, o.b) // 1, Error
-        ```
-- TCO
+       }
+     }
+     const p = new Proxy(o, handlers)
+     console.log(p.a) // get key a, 1
+    ```
+- **Proxy last** design pattern
+    ```js
+    const o = { a: 1 }
+    const handlers = {
+      get(target, key, context) { throw new Error(`${key} does not exits`) }
+    }
+    const p = new Proxy(o, handlers)
+    Object.setPrototypeOf(o, p)
+    console.log(o.a, o.b) // 1, Error
+    ```
+- **Tail-call optimization** (TCO)
     ```js
     function rmap(a, f = e => e, r = []) {
       if (a.length > 1) {
@@ -718,7 +705,7 @@
     const a = new Array(9999)
     console.log(rmap(a.fill(0), e => e + 1)) // Maximum call stack size exceeded
     ```
-- Trampoline (recursion => loop)
+- **Trampoline** converts recursion => loop
     ```js
     function trampoline(f) { // factors out recursion into loop
       // stack depth remains constant (stack frames are reused)
@@ -739,12 +726,3 @@
     const a = new Array(9999)
     console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
     ```
-
-## Functions
-
-- Number of function parameters `fn.length` vs number of function arguments
-  `arguments.length`
-- Named parameters (object destructuring) `function f({ a, b }) { ... }` call
-  `f({ a: 1, b: 2 })`
-- Fat arrow `=>` functions are always anonymous, however their names can be
-  inferred
