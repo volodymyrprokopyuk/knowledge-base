@@ -726,3 +726,27 @@
     const a = new Array(9999)
     console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
     ```
+
+# Node.js
+
+- Modern OSes provide async, non-blocking IO syscalls through the **Sync Event
+  Demultiplexer** (SED) e. g. `epoll` on Linux. SED watches (sync) for a set of
+  async operations to complete and allows multiple async operations to be
+  processed in a single thread (event demultiplexing)
+- **Reactor pattern** = executes (async) a handler (callback) for each async
+  operation (non-blocking IO)
+    - App requests async operations [resource (file), opeartion (read), handler
+      (cb)] at SED (non-blocking)
+    - SED watches requested async operations for completion (blocking)
+    - SED enqueues [event (operation), handler (cb)] to event queue (EQ)
+    - Single-threaded event loop (EL) reads EQ and executes handlers (app
+      callbacks) to completion (no race conditions). App callbacks request more
+      async operations at SED
+    - EL blocks again at SED for new async operations to complete
+- **libuv** = cross-platform SED + reactor (event loop + event queue) =
+  cross-platform low-level IO engine of Node.js
+    - High resolution clock and timers
+    - Async FS, TCP/UDP, DNS
+    - Async thread pool and synchronization, child processes and signal
+      handling, IPC via shared UNIX domain sockets
+- **Node.js** = libuv (SED + reactor) + V8 (JavaScript runtime) + modules
