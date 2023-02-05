@@ -619,22 +619,29 @@
 
 # Modules
 
-- **Modules** = module has static API resolved at compile time with immutable
-  bindings (read-only reference, one-way live link, not a copy). One module per
-  file, module is a singleton, there is no global scope in modules, circular
-  imports are supported
+- **Modules** = static, resolved at compile time with read-only, one-way live
+  bindings (not copies) to exported values. One module per file, module is a
+  cached singleton, there is no global scope inside a module (`this` is
+  `undefined`), circular imports are correctly handled regardless of import
+  order
+- Module identifier (constant string) = relative path `../module.js`, absolute
+  path `file:///module.js`, core modules or `node_modules` `module` or
+  `core/module`, module URL `https://module.js`
 - Export (not `export`ed object are private to the module)
     - **Named exports** `export var | const | let | function | class | { a, b as
-      B }`
-    - **Single default export** `export default { a, b }` or `export { a as
-      default }` not mutually exclusive with named exports that rewards with a
-      simpler `import m` syntax
+      B }` of named object defined in the module
+    - **Default export** `export default { a, b }` or `export { a as default }`
+      not mutually exclusive with named exports `import def, { named } from
+      "module"` that rewards with a simpler `import def` syntax. Default export
+      is considered unnamed (internally `default` name is used) and can be
+      imported under any name
     - **Re-export** from another module `export * | { a, b as B } from "module"`
 - Import (all imported bindings are immutable and hoisted)
     - **Named import** `import { a, b as B } from "module"` binds to top-level
       identifiers in the current scope
     - **Default import** `import m | { default as m } from "module"`
     - **Wildcard import** to a single namespace `import * as ns from "module"`
+- **Dynamic async import** = `import(module) => Promise` at runtime
 
 # Classes
 
@@ -729,6 +736,8 @@
 
 # Node.js
 
+## Reactor pattern
+
 - Modern OSes provide async, non-blocking IO syscalls through the **Sync Event
   Demultiplexer** (SED) e. g. `epoll` on Linux. SED watches (sync) for a set of
   async operations to complete and allows multiple async operations to be
@@ -736,9 +745,9 @@
 - **Reactor pattern** = executes (async) a handler (callback) for each async
   operation (non-blocking IO)
     - App requests async operations [resource (file), opeartion (read), handler
-      (cb)] at SED (non-blocking)
+      (callbback)] at SED (non-blocking)
     - SED watches requested async operations for completion (blocking)
-    - SED enqueues [event (operation), handler (cb)] to event queue (EQ)
+    - SED enqueues [event (operation), handler (callback)] to event queue (EQ)
     - Single-threaded event loop (EL) reads EQ and executes handlers (app
       callbacks) to completion (no race conditions). App callbacks request more
       async operations at SED
@@ -750,3 +759,15 @@
     - Async thread pool and synchronization, child processes and signal
       handling, IPC via shared UNIX domain sockets
 - **Node.js** = libuv (SED + reactor) + V8 (JavaScript runtime) + modules
+
+## Callback patter
+
+- **Callback** (Continuation-Passing Stype, CPS) = first-class function (to pass
+  a callback) + closure (to retain the contenxt) that is passed as an argument
+  to an async function (which returns immediately) and is executed on completion
+  of a requested async operation. Async result/error is propagated through a
+  chain of nested callbacks (instead of directly `return`ing a resutl to a
+  caller in sync programming)
+- Sync call (discouraged) blocks the event loop and puts on hold all concurrent
+  processing slowing down the whole application
+- Avoid mixing sync/async behavior under the same inferface
