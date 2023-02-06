@@ -741,33 +741,74 @@
 - Modern OSes provide async, non-blocking IO syscalls through the **Sync Event
   Demultiplexer** (SED) e. g. `epoll` on Linux. SED watches (sync) for a set of
   async operations to complete and allows multiple async operations to be
-  processed in a single thread (event demultiplexing)
-- **Reactor pattern** = executes (async) a handler (callback) for each async
+  processed in a single thread (events demultiplexing)
+- **Reactor pattern** = executes (async) a handler (app callback) for each async
   operation (non-blocking IO)
     - App requests async operations [resource (file), opeartion (read), handler
       (callbback)] at SED (non-blocking)
     - SED watches requested async operations for completion (blocking)
-    - SED enqueues [event (operation), handler (callback)] to event queue (EQ)
-    - Single-threaded event loop (EL) reads EQ and executes handlers (app
+    - SED enqueues [event (operation), handler (callback)] to the event queue
+      (EQ)
+    - Single-threaded event loop (EL) reads the EQ and executes handlers (app
       callbacks) to completion (no race conditions). App callbacks request more
       async operations at SED
-    - EL blocks again at SED for new async operations to complete
-- **libuv** = cross-platform SED + reactor (event loop + event queue) =
-  cross-platform low-level IO engine of Node.js
+    - EL blocks again (next EL cycle) at SED for new async operations to
+      complete
+- **libuv** = SED + reactor (event loop + event queue) = cross-platform
+  low-level IO engine of Node.js
     - High resolution clock and timers
     - Async FS, TCP/UDP, DNS
-    - Async thread pool and synchronization, child processes and signal
-      handling, IPC via shared UNIX domain sockets
+    - Async thread pool and synchronization
+    - Async child processes and signals handling
+    - Async IPC via shared UNIX domain sockets
 - **Node.js** = libuv (SED + reactor) + V8 (JavaScript runtime) + modules
 
-## Callback patter
+## Callback pattern
 
 - **Callback** (Continuation-Passing Stype, CPS) = first-class function (to pass
-  a callback) + closure (to retain the contenxt) that is passed as an argument
-  to an async function (which returns immediately) and is executed on completion
-  of a requested async operation. Async result/error is propagated through a
-  chain of nested callbacks (instead of directly `return`ing a resutl to a
-  caller in sync programming)
+  a callback) + closure (to retain the caller contenxt) that is passed to an
+  async function (which returns immediately) and is executed on completion of
+  the requested async operation
+- Callback communicates **async result once** and has trust issues (tight
+  coupling = callback is passed to the async function for execution). Callback
+  is expected to be invoked exactly once either with result or error
+- Async result/error is propagated through a chain of nested `callbacks(error,
+  data | cb)` that accept `error | null` first, then the `result` or the next
+  `callback` that comes always last. Never `return` a result or `throw` an error
+  from a callback
 - Sync call (discouraged) blocks the event loop and puts on hold all concurrent
   processing slowing down the whole application
-- Avoid mixing sync/async behavior under the same inferface
+- Avoid mixing sync/async calback behavior under the same inferface. To convert
+  sync call to async use
+    - Mictrotask `process.nextTick()` is executed just after the current
+      operaiton, before other pending tasks
+    - Immediate task `setImmediate()` is executed after all other pending tasks
+      in the same cycle of the event loop
+    - Regular task `setTimeout()` is executed on the next cycle of the event
+      loop
+- Uncaught error thrown from an async callback propagates to the stack of the
+  event loop (not to the next callback, not to the stack of the caller that
+  triggered the async operation), `process.on(unchaughtException, err)` is
+  emitted and process exits with a non-zero exit code
+
+## Observer pattern
+
+- **Observer** = object/subject notifies its observers on its state changes
+- `EventEmitter` = registers multiple observing `listeners(args, ...)` for
+  specific event types `ee.on|once(event, listener)`, `ee.emit(event, args,
+  ...)`, `ee.removeListener(event, listener)` unsubscribe listeners when they
+  are no longer needed to avoid memory leaks due to captured context in listener
+  closures
+- `EventEmitter` continuously notifies **multiple observers on different types
+  of recurrent events** and does not have trust issues (loose coupling =
+  callback is controlled by the caller). En event can be fired multiple times or
+  not fired at all. Combining `EventEmitter` with a callabck interface is an
+  elegant and flexible solution
+- Async result/error is proparaged through `emit` events. Never `return` a
+  result or `throw` an error from the `EventEmitter`. Always register a listener
+  for the `error` event
+- Never mix sync and async events in the same `EventEmitter`. Sync event
+  listeners must be registered before the status change. Async events allow
+  registering listeners even after the status change but within the current
+  cycle of the event loop (because events are guaranteed to fire in the next
+  cycle of the event loop)
