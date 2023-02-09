@@ -751,7 +751,8 @@
       (EQ)
     - Single-threaded event loop (EL) reads the EQ and executes handlers (app
       callbacks) to completion (no race conditions). App callbacks request more
-      async operations at SED
+      async operations at SED (when a task requests a new async operations it
+      gives control back to the event loop)
     - EL blocks again (next EL cycle) at SED for new async operations to
       complete
 - **libuv** = SED + reactor (event loop + event queue) = cross-platform
@@ -762,13 +763,18 @@
     - Async child processes and signals handling
     - Async IPC via shared UNIX domain sockets
 - **Node.js** = libuv (SED + reactor) + V8 (JavaScript runtime) + modules
+- In Node.js only async, non-blocking IO operations are **executed in parallel**
+  by the libuv internal IO threads. Sync code inside callbacks (until next async
+  operation) is **executed concurrently** to completion without race conditions
+  by the single-threaded event loop
 
 ## Callback pattern
 
-- **Callback** (Continuation-Passing Stype, CPS) = first-class function (to pass
-  a callback) + closure (to retain the caller contenxt) that is passed to an
-  async function (which returns immediately) and is executed on completion of
-  the requested async operation
+- **Callback** (Continuation-Passing Stype, CPS = control is passed explicitly
+  in the form foa continuation/callback, `return`/`throw` => `callback(error,
+  resutl)`) = first-class function (to pass a callback) + closure (to retain the
+  caller contenxt) that is passed to an async function (which returns
+  immediately) and is executed on completion of the requested async operation
 - Callback communicates **async result once** and has trust issues (tight
   coupling = callback is passed to the async function for execution). Callback
   is expected to be invoked exactly once either with result or error
@@ -790,6 +796,83 @@
   event loop (not to the next callback, not to the stack of the caller that
   triggered the async operation), `process.on(unchaughtException, err)` is
   emitted and process exits with a non-zero exit code
+- **Callback hell** = deeply nested code as a result of in-place nested
+  anonymous callbacks that unnecessary consume memory because of closures
+    - Do not abuse in-place nested anonymous callbacks
+    - Early return principle = favor `return/continue/break` over nested
+      `if/else`
+    - Create named callbacks with clearly defined interface (no unnecessary
+      closures)
+- **Sequential iterator** (recursion) = applies an async operation to each
+  element of an array one element at a time
+    ```js
+    function asyncTask(x, cb) {
+      setTimeout(() => {
+        if (x === -1) { return cb("oh") }
+        console.log(x); cb(null)
+      }, 500)
+    }
+    function asyncIterate(task, arr, cb) {
+      let index = 0
+      function iterate() {
+        if (index === arr.length) {
+          return process.nextTick(() => cb(null)) // always async
+        }
+        // Recurse for the next interation after completion of the previous one
+        task(arr[index++], iterate)
+      }
+      iterate()
+    }
+    asyncIterate(asyncTask, [], console.log) // null
+    asyncIterate(asyncTask, [1, 2, 3], console.log) // 1, 2, 3, null
+    ```
+- **Parallel execution** (loop for all tasks) = executes tasks in parallel
+  (unlimited) until all complete or first error
+    ```js
+    function parallel(tasks, cb) {
+      let completed = 0
+      let failed = false
+      function done(error) {
+        if (error) { failed = true; return cb(error) }
+        if (++completed === tasks.length && !failed) { return cb(null) }
+      }
+      for (const task of tasks) { task(done) }
+    }
+    // 1, 3, 2, null
+    parallel([1, 2, 3].map(i => (done) => asyncTask(i, done)), console.log)
+    // 1, oh, 3
+    parallel([1, -1, 3].map(i => (done) => asyncTask(i, done)), console.log)
+    ```
+- **Limited parallel execution** (loop until limit) = executes at most N tasks
+  in parallel until all complete or first error
+    ```js
+    function parallelLimit(tasks, limit, cb) {
+      let completed = 0
+      let failed = false
+      let index = 0
+      let running = 0 // Queue can be used instead
+      function done (error) {
+        --running
+        if (error) { failed = true; return cb(error) }
+        if (++completed === tasks.length && !failed) { return cb(null) }
+        if (running < limit && !failed) { parallel() }
+      }
+      function parallel() {
+        while (index < tasks.length && running < limit) {
+          const task = tasks[index++]
+          task(done)
+          ++running
+        }
+      }
+      parallel()
+    }
+    parallelLimit(
+      [1, 2, 3, 4, 5].map(i => (done) => asyncTask(i, done)), 2, console.log
+    ) // 1, 2 | 3, 4 | 5, null
+    parallelLimit(
+      [1, 2, 3, -1, 5].map(i => (done) => asyncTask(i, done)), 2, console.log
+    ) // 1, 2 | 3, oh | 5, null
+    ```
 
 ## Observer pattern
 
@@ -802,7 +885,7 @@
 - `EventEmitter` continuously notifies **multiple observers on different types
   of recurrent events** and does not have trust issues (loose coupling =
   callback is controlled by the caller). En event can be fired multiple times or
-  not fired at all. Combining `EventEmitter` with a callabck interface is an
+  not fired at all. Combining `EventEmitter` with a callback interface is an
   elegant and flexible solution
 - Async result/error is proparaged through `emit` events. Never `return` a
   result or `throw` an error from the `EventEmitter`. Always register a listener
