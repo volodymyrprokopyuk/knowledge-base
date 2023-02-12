@@ -287,16 +287,21 @@
 
 - **Promises** = placeholder/proxy for a future eventual value (trustable,
   composable, time consistent) that is guaranteed to be async (both now and
-  later always are async)
+  later always are async). `resolve` and `reject` callabcks are guaranteed to
+  be invoked async at most once and exclusively (even if a Promise is resolved
+  sync with a value, even if `then()` is called on already settled Promise)
     ```js
     Promise.resolve(1).then(console.log) // next tick
     console.log(2) // 2, 1
     ```
 - **Promises** = async flow control (multiple consumers subscribe to a
   completion event of a producer) that separates consumers from a producer
-- Once a promise is settled, the `resolve()`d value or `reject()`ed reason
-  becomes immutable. Repeated calls to `resolve()` and `reject()` are ignored.
-  Promise must be `return`ed to form a valid promise chain
+- Thrown error in either `resolve` or `reject` callbacks is automatically
+  propagated through the chain of Promises as a rejection (`throw` is usable
+  with Promises)
+- Once a pending promise is settled, the `resolve()`d value or `reject()`ed
+  reason becomes immutable. Repeated calls to `resolve()` and `reject()` are
+  ignored. Promise must be `return`ed to form a valid promise chain
     ```js
     function timeoutPromise(timeout) {
       return new Promise((_, reject) =>
@@ -317,8 +322,9 @@
   third party code as in case of callbacks only approach
 - `Promise.resolve(x)` normilizes values and misbehaving thenables to trustable
   and compliant Promises
-- `p.then()` automatically creates a new Promise in a chain either resolved with
-  a value or rejected with an error/reason of the unwrapped Promise
+- `p.then()` automatically and synchronously creates a new Promise in a chain
+  either resolved with a value or rejected with an error/reason of the
+  unwrapped Promise
     ```js
     Promise.resolve(1)
       .then(x => x + 1)
@@ -341,6 +347,7 @@
   settled Promise (the other Promises cannot be canceled due to immutability,
   hense are settled and just ignored)
 - Promises API
+    - `new Promise((resolve, reject) => {...})`
     - `Promise.resolve(x)`, `Promise.reject(x)`
     - `p.then(success, [failure])`, `p.catch(failure)`, `p.finally(always)`
     - `Promise.all([]) => [all success] | first failure`
@@ -803,16 +810,16 @@
       `if/else`
     - Create named callbacks with clearly defined interface (no unnecessary
       closures)
-- **Sequential iterator** (recursion) = applies an async operation to each
+- **Sequential iteration** (recursion) = applies an async operation to each
   element of an array one element at a time
     ```js
-    function asyncTask(x, cb) {
+    function cbTask(x, cb) {
       setTimeout(() => {
         if (x === -1) { return cb("oh") }
         console.log(x); cb(null)
       }, 500)
     }
-    function asyncIterate(task, arr, cb) {
+    function cbIterate(task, arr, cb) {
       let index = 0
       function iterate() {
         if (index === arr.length) {
@@ -823,13 +830,13 @@
       }
       iterate()
     }
-    asyncIterate(asyncTask, [], console.log) // null
-    asyncIterate(asyncTask, [1, 2, 3], console.log) // 1, 2, 3, null
+    asyncIterate(cbTask, [], console.log) // null
+    asyncIterate(cbTask, [1, 2, 3], console.log) // 1, 2, 3, null
     ```
 - **Parallel execution** (loop for all tasks) = executes tasks in parallel
   (unlimited) until all complete or first error
     ```js
-    function parallel(tasks, cb) {
+    function cbParallel(tasks, cb) {
       let completed = 0
       let failed = false
       function done(error) {
@@ -839,14 +846,14 @@
       for (const task of tasks) { task(done) }
     }
     // 1, 3, 2, null
-    parallel([1, 2, 3].map(i => (done) => asyncTask(i, done)), console.log)
+    cbParallel([1, 2, 3].map(i => (done) => cbTask(i, done)), console.log)
     // 1, oh, 3
-    parallel([1, -1, 3].map(i => (done) => asyncTask(i, done)), console.log)
+    cbParallel([1, -1, 3].map(i => (done) => cbTask(i, done)), console.log)
     ```
 - **Limited parallel execution** (loop until limit) = executes at most N tasks
   in parallel until all complete or first error
     ```js
-    function parallelLimit(tasks, limit, cb) {
+    function cbParallelLimit(tasks, limit, cb) {
       let completed = 0
       let failed = false
       let index = 0
@@ -866,11 +873,11 @@
       }
       parallel()
     }
-    parallelLimit(
-      [1, 2, 3, 4, 5].map(i => (done) => asyncTask(i, done)), 2, console.log
+    cbParallelLimit(
+      [1, 2, 3, 4, 5].map(i => (done) => cbTask(i, done)), 2, console.log
     ) // 1, 2 | 3, 4 | 5, null
-    parallelLimit(
-      [1, 2, 3, -1, 5].map(i => (done) => asyncTask(i, done)), 2, console.log
+    cbParallelLimit(
+      [1, 2, 3, -1, 5].map(i => (done) => cbTask(i, done)), 2, console.log
     ) // 1, 2 | 3, oh | 5, null
     ```
 
@@ -895,3 +902,171 @@
   registering listeners even after the status change but within the current
   cycle of the event loop (because events are guaranteed to fire in the next
   cycle of the event loop)
+
+## Promise pattern
+
+- `promisify` = converts a callback-based function into a Promise-returning
+  function
+    ```js
+    function promisify(f) {
+      return (...args) => {
+        return new Promise((resolve, reject) => {
+          const argsCb = [...args, (error, result) => {
+            if (error) { return reject(error) }
+            resolve(result)
+          }]
+          f(...argsCb)
+        })
+      }
+    }
+    const taskP = promisify(ctTask)
+    taskP(1).then(console.log) // 1, undefined
+    taskP(-1).catch(console.error) // oh
+    ```
+- **Sequential iteration** (dynamic promise chaining in a loop)
+    ```js
+    function promiseIterate(task, arr) {
+      let p = Promise.resolve()
+      for (const e of arr) { p = p.then(() => task(e)) }
+      return p
+    }
+    promiseIterate(taskP, []).then(console.log) // undefined
+    promiseIterate(taskP, [1, 2, 3]).then(console.log) // 1, 2, 3, undefined
+    ```
+- **Parallel execution** (loop for all tasks)
+    ```js
+    function promiseParallel(tasks) {
+      let completed = 0
+      return new Promise((resolve, reject) => {
+        function done() {
+          if (++completed === tasks.length) { resolve() }
+        }
+        for (const task of tasks) { task().then(done, reject) }
+      })
+    }
+    promiseParallel([1, 2, 3].map(i => () => taskP(i)))
+      .then(console.log) // 1, 2, 3, undefined
+    promiseParallel([1, -1, 3].map(i => () => taskP(i)))
+      .then(console.log, console.error) // 1, oh, 3
+    ```
+- **Limited parallel execution** (loop until limit)
+    ```js
+    function promiseParallelLimit(tasks, limit) {
+      let completed = 0
+      let index = 0
+      let running = 0
+      return new Promise((resolve, reject) => {
+        function done() {
+          --running
+          if (++completed === tasks.length) { resolve() }
+          if (running < limit) { parallel() }
+        }
+        function parallel() {
+          while (index < tasks.length && running < limit) {
+            const task = tasks[index++]
+            task().then(done, reject)
+            ++running
+          }
+        }
+        parallel()
+      })
+    }
+    promiseParallelLimit(
+      [1, 2, 3, 4, 5].map(i => () => taskP(i)), 2
+    ).then(console.log) // 1, 2 | 3, 4 | undefined
+    promiseParallelLimit(
+      [1, 2, 3, -1, 5].map(i => () => taskP(i)), 2
+    ).then(console.log, console.error) // 1, 2 | 3, oh | 5
+    ```
+
+## Async/await pattern
+
+- `async` function always returns a Promise immediately and synchronously.
+  `try/catch/throw` inside an `async` function works for both sync and async
+  code. Use `return await` to prevent error on the caller side and `catch`
+  errors locally
+    ```js
+    async function localError() {
+      try { return await taskP(-1) }
+      catch (error) { console.error(`Local: ${error}`) }
+    }
+    localError().catch(error => console.error(`Caller: ${error}`)) // Local: oh
+    ```
+- On each `await` expression that always returns a Promise, an `async` function
+  is put on hold, its state is saved and the control is retuned to the event
+  loop (generator). When the Promise that has been `await`ed settles, the
+  control is given back to the `async` function
+- **Sequential iteration**
+    ```js
+    async function asyncIterate(task, arr) {
+      for (const e of arr) { await task(e) }
+    }
+    await asyncIterate(taskP, [1, 2, 3]) // 1, 2, 3
+    ```
+- **Parallel execution** (await loop)
+    ```js
+    async function asyncParallel(tasks) {
+      const promises = tasks.map(task => task())
+      // Problem: unnecesary wait for all promosises in the array
+      // preceding the rejected promise. Solution: use Promise.all()
+      for (const promise of promises) { await promise }
+    }
+    await asyncParallel([1, 2, 3].map(i => () => taskP(i))) // 1, 2, 3
+    try {
+      await asyncParallel([1, -1, 3].map(i => () => taskP(i))) // 1, oh, 3
+    } catch (error) { console.error(error) }
+    ```
+- **Limited parallel execution**
+    ```js
+    async function asyncParallelLimit(tasks, limit) {
+      let completed = 0
+      let index = 0
+      let running = 0
+      let promises = []
+      function parallel() {
+        while (index < tasks.length && running < limit) {
+          const task = tasks[index++]
+          promises.push(task())
+          ++running
+        }
+      }
+      parallel()
+      while (completed !== tasks.length) {
+        if (promises.length !== 0) {
+          await promises.shift()
+          ++completed, --running
+          parallel()
+        }
+      }
+    }
+    asyncParallelLimit(
+      [1, 2, 3, 4, 5].map(i => () => taskP(i)), 2
+    ) // 1, 2 | 3, 4 | 5
+    try {
+      await asyncParallelLimit(
+        [1, 2, 3, -1, 5].map(i => () => taskP(i)), 2
+      ) // 1, 2 | 3, oh | 5
+    } catch (error) { console.error(error) }
+    ```
+- **Infinite recursive promise chain** = creates memory leaks
+    ```js
+    // Problem: recursive, memory leak vs lost rejection
+    async function leakingRecursion(i = 0) {
+      await taskP(i)
+      // Memory leak: hain of dependent Promises that never resolve
+      return leakingRecursion(i + 1)
+      // No memory leak (GC collected Promises), but lost rejection
+      leakingRecursion(i + 1)
+    }
+    leakingRecursion() // 0, 1, 2, ...
+    // Solution: loop with await
+    async function nonLeakingLoop() {
+      let i = 0
+      while (true) {
+        await taskP(i++) // No memory leak + correct error handling
+      }
+    }
+    nonLeakingLoop() // 0, 1, 2, ...
+    ```
+
+## Stream pattern
