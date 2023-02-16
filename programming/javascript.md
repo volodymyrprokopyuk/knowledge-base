@@ -1070,3 +1070,87 @@
     ```
 
 ## Stream pattern
+
+- **Streaming** (parallel pipeline vs sequential buffering) = staged parallel
+  processing of data in chunks as soon as it arrives with no delays due to
+  buffering (reactive, modular, composable, constant memory)
+- `Stream` extends `EventEmitter`
+    - Binary mode (data processing)
+    - Object mode (function composition)
+- `Readable` (source of data) = async iterator (`for await`)
+    - Non-flowing mode (default) = `on(readable) + .read()`/`.pause()` pulls
+      data in a controlled way
+        ```js
+        function nonFlowingReadable() {
+          process.stdin
+            .on("readable", () => { // new data is available
+              let chunk // read() pulls data in a loop from an internal buffer
+              // Flexible control over data consumption
+              while ((chunk = process.stdin.read()) !== null) { // read() is sync
+                  console.log(chunk.toString())
+              }
+            })
+            .on("end", () => { console.log("done") }) // end of stream
+        }
+        ```
+    - Flowing mode = `on(data)`/`.resume()` pushes data as soon as it arrives
+        ```js
+        function flowingReadable() {
+          process.stdin
+            // on(data) or resume() switches to the flowing mode that pushes data
+            // .pause() switches back to the non-flowing mode (default)
+            .on("data", chunk => console.log(chunk.toString()))
+            .on("end", () => { console.log("done") })
+        }
+        ```
+    - Implementing Readable
+        ```js
+        class RandomReadable extends Readable {
+          #reads = 0
+          async _read(size) {
+            const chunk = await randomBytes(10)
+            // push() => false for backpressure when the internal buffer is full
+            // on(drain) resume pushing
+            this.push(chunk) // push data to the internal buffer
+            if (++this.#reads === 3) { this.push(null) } // end of stream
+          }
+        }
+        async function randomReadable() {
+            const rr = new RandomReadable()
+            for await (const chunk of rr) {
+              console.log(chunk.toString("hex"))
+            }
+        }
+        ```
+- `Writable` (sink of data)
+    ```js
+    function serverWritable() {
+      const server = createServer(async (req, res) => {
+        res.writeHead(200, { "Content-Type": "text/plain" })
+        const body = await randomBytes(10)
+        // write() => false for backpressure when the internal buffer is full
+        // on(drain) resume writing
+        res.write(body)
+        res.end("\n\n")
+        res.on("finish", () => console.log("done"))
+      })
+      const port = 9876
+      server.listen(port, () => console.log("Listening on port ${port}"))
+    }
+    ```
+- `Duplex` = `Readable` (source of data) + `Writable` (sink of data) where
+  written and read data is not related
+- `Transform` (data transformation) = `Duplex` where written and read data is
+  related through a transformation (`map`, `filter`, `reduce`)
+- `PassThrough` = `Transform` without transformation for observability,
+  instrumentation, late piping, `Readable` to `Writable` change of interface,
+  and lazy streams to delay through a proxy expensive resource initialization
+  until actual stream consumption
+- `readable.pipe(writableDest) => writableDest` switches `Readable` into the
+  flowing mode, controls backpressure automatically, returns `Writable`
+  destination for chaining (it must be `Duplex`, `Transform`, or `PassThrough`).
+  Errors are not propagated automatically through the pipeline. `on(error)`
+  handlers must be registered for every step
+- `pipeline(straeam, ..., cb)` automatically registers `on(error)` and
+  `on(close)` handlares for each stream to correctly destroy streams on
+  pipeline success or failure
