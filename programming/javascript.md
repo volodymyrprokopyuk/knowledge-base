@@ -759,7 +759,9 @@
     - Single-threaded event loop (EL) reads the EQ and executes handlers (app
       callbacks) to completion (no race conditions). App callbacks request more
       async operations at SED (when a task requests a new async operations it
-      gives control back to the event loop)
+      gives control back to the event loop; invoking an async operation always
+      unwinds the stack back to the event loop, leaving it free to handle other
+      requests, IO-bound)
     - EL blocks again (next EL cycle) at SED for new async operations to
       complete
 - **libuv** = SED + reactor (event loop + event queue) = cross-platform
@@ -789,14 +791,25 @@
   data | cb)` that accept `error | null` first, then the `result` or the next
   `callback` that comes always last. Never `return` a result or `throw` an error
   from a callback
-- Sync call (discouraged) blocks the event loop and puts on hold all concurrent
-  processing slowing down the whole application
+- Sync operation (CPU-bound, discouraged) blocks the event loop and puts on hold
+  all concurrent processing blocking the whole application
+    - Interleave each step of a CPU-bound sync operation with `setImmediate()`
+      to let pending IO tasks to be processed by the event loop (not efficient
+      due to context switches, interleaved algorithm)
+    - Pool of reusable external processes `child_process.fork()` with a
+      communication channel `process/worker.send().on()` leaves the event loop
+      unblocked (efficient: reusable processes run to completion, unmodified
+      algorithm)
+    - `new Worker()` threads with communication chanels
+      `parentPort/worker.postMessage().on()`, per-thread own event loop and V8
+      instance (small memory footprint, fast startup time, safe: no
+      syncronization, no resource sharing)
 - Avoid mixing sync/async calback behavior under the same inferface. To convert
   sync call to async use
     - Mictrotask `process.nextTick()` is executed just after the current
-      operaiton, before other pending tasks
-    - Immediate task `setImmediate()` is executed after all other pending tasks
-      in the same cycle of the event loop
+      operaiton, before other pending IO tasks
+    - Immediate task `setImmediate()` is executed after all other pending IO
+      tasks in the same cycle of the event loop
     - Regular task `setTimeout()` is executed on the next cycle of the event
       loop
 - Uncaught error thrown from an async callback propagates to the stack of the
@@ -1075,7 +1088,7 @@
   processing of data in chunks as soon as it arrives with no delays due to
   buffering (reactive, modular, composable, constant memory)
 - `Stream` extends `EventEmitter`
-    - Binary mode (data processing)
+    - Binary mode (IO processing)
     - Object mode (function composition)
 - `Readable` (source of data) = async iterator (`for await`)
     - Non-flowing mode (default) = `on(readable) + .read()`/`.pause()` pulls
@@ -1149,8 +1162,108 @@
 - `readable.pipe(writableDest) => writableDest` switches `Readable` into the
   flowing mode, controls backpressure automatically, returns `Writable`
   destination for chaining (it must be `Duplex`, `Transform`, or `PassThrough`).
-  Errors are not propagated automatically through the pipeline. `on(error)`
-  handlers must be registered for every step
-- `pipeline(straeam, ..., cb)` automatically registers `on(error)` and
-  `on(close)` handlares for each stream to correctly destroy streams on
+  Errors are not propagated automatically through a `pipe()`. `on(error)`
+  handlers must be attached for every step
+- `pipeline(straeam, ..., cb)` automatically attaches `on(error)` and
+  `on(close)` handlares for each stream to correctly destroys streams on
   pipeline success or failure
+- Both `pipe()` and `pipeline()` return only the last stream (not the combined
+  stream)
+- **Sequential iteration** = `Stream` always processes async operations in
+  sequence one at a time e. g. `on(data)`
+    ```js
+    // Sequential iteration
+    function streamIterate(task, arr) {
+      const taskTr = new Transform({
+        objectMode: true,
+        async transform(chunk, encoding, cb) {
+          try { await task(chunk); cb() }
+          catch (error) { cb(error) }
+        }
+      })
+      return new Promise((resolve, reject) => {
+        // Sequential interation
+        Readable.from(arr).pipe(taskTr)
+          .on("error", reject)
+          .on("finish", resolve)
+      })
+    }
+    try {
+      await streamIterate(taskP, [1, 2, 3]) // 1, 2, 3
+      await streamIterate(taskP, [1, -1, 3]) // 1, oh
+    } catch (error) { console.error(error) }
+    ```
+- **Parallel execution**
+    ```js
+    function streamParallel(tasks) {
+      let completed = 0
+      let done = null
+      let fail = null
+      const taskTr = new Transform({
+        objectMode: true,
+        transform(task, encoding, cb) {
+          // Start all tasks in parallel
+          task().catch(fail) // Global reject on first failure
+            .finally(() => {
+              // flush() stram only when all tasks are actually done
+              if (++completed === tasks.length) { done() }
+            })
+          cb() // all tasks are done immediately
+        },
+        flush(cb) { done = cb }
+      })
+      return new Promise((resolve, reject) => {
+        fail = reject
+        Readable.from(tasks).pipe(taskTr)
+          .on("error", reject)
+          .on("finish", resolve)
+      })
+    }
+    try {
+      await streamParallel([1, 2, 3].map(i => () => taskP(i))) // 1, 2, 3
+      await streamParallel([1, -1, 3].map(i => () => taskP(i))) // 1, oh, 3
+    } catch(error) { console.error(error) }
+    ```
+- **Limited parallel execution**
+    ```js
+    function streamParallelLimit(tasks, limit) {
+      let completed = 0
+      let running = 0
+      let done = null
+      let fail = null
+      let resume = null
+      const taskTr = new Transform({
+        objectMode: true,
+        transform(task, encoding, cb) {
+          task().catch(fail)
+            .finally(() => {
+              if (++completed === tasks.length) { return done() }
+              --running
+              // Resume the stream when a task is completed
+              if (resume) { const r = resume; resume = null; r() }
+            })
+          if (++running < limit) { cb() }
+          else { resume = cb } // Suspend the stream until a task is completed
+        },
+        flush(cb) { done = cb }
+      })
+      return new Promise((resolve, reject) => {
+        fail = reject
+        Readable.from(tasks).pipe(taskTr)
+          .on("error", reject)
+          .on("finish", resolve)
+      })
+    }
+    try {
+      // 1, 2 | 3, 4 | 5
+      await streamParallelLimit([1, 2, 3, 4, 5].map(i => () => taskP(i)), 2)
+      // 1, 2 | 3, oh | 5
+      await streamParallelLimit([1, 2, 3, -1, 5].map(i => () => taskP(i)), 2)
+    } catch(error) { console.error(error) }
+    ```
+- **Composition of streams** = creates a new combined stream (first `Writable`
+  and last `Readable`)
+- **Fork of a stream** = pipes a single `Readable` stream into multiple
+  `Writable` streams with automatic backpressure of the slowest branch of the
+  fork
+- **Merge of streams** = pipes multiple `Readable` into a single `Writable`
