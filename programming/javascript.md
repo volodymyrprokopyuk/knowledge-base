@@ -115,8 +115,9 @@
 ## Iteration (`[Symbol.iterator]`)
 
 - **Custom iterator** = iterates over arrays (indexing) and objects
- (properties). Ordered, sequential, pull-based consumption of data
-  `{ [Symbol.iterator]: function () { return { next() {...} } } }` + `for/of`
+  (properties). Ordered, sequential, pull-based consumption of data
+  `iterator = { next() => { value, done } }` closure over iterator state +
+  `for/of`
     ```js
     const a = [1, 2]
     for (let i = 0; i < a.length; ++i) { console.log(a[i]) } // 1, 2
@@ -137,8 +138,8 @@
     })
     for (const e of o) { console.log(e) } // 1, 2
     ```
-- **Iterable interface** `o[Symbol.iterator]` =>
-  `{ function next() { return(x) | throw(e) } }` => `{ value, done }`
+- **Iterable interface**
+  `iteratble = { [Symbol.iterator]() { return { next() } } }`
     ```js
     function iterator(n) { // iterator configuration
       let i = 0; // iterator state
