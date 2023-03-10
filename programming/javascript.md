@@ -139,7 +139,8 @@
     for (const e of o) { console.log(e) } // 1, 2
     ```
 - **Iterable interface**
-  `iteratble = { [Symbol.iterator]() { return { next() } } }`
+  `iteratble = { [Symbol.iterator]() { return { next() } } }` returns an
+  iterator
     ```js
     function iterator(n) { // iterator configuration
       let i = 0; // iterator state
