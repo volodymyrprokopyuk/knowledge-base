@@ -436,109 +436,139 @@
 
 # Async JavaScript
 
-## Callbacks
+## Callback
 
-- **Single-threaded event loop** (sequential execution on every tick)
+- **Single-threaded event loop** = sequential execution **run to completion**
+  on every tick
     ```js
-    let events = [] // queue, FIFO
+    const events = [] // queue (FIFO)
     while(true) {
-      if (events.length) { // tick
-        let event = events.shift()
+      if (events.length > 0) { // tick
+        const event = events.shift()
         try { event() } // atomic unit of work run to completion
-        catch (e) { console.log(e) }
+        catch (e) { console.error(e) }
       }
     }
     ```
-- **Concurrency** = split 2 or more tasks into atomic steps, schedule steps from
-  all tasks to the event loop (interleave steps from different tasks), execute
-  steps in the event loop in order to progress simultaneously on all tasks
-- **Callbacks** = strict separation between now (current code) and later
-  (callback). Non-linear definition of a sequential control flow and error
-  handling, trust issues due to control delegation (inversion of control,
-  continuation)
+- **Concurrency** = split two or more compound tasks into atomic steps, schedule
+  steps from all tasks to the event loop (interleave steps from different
+  tasks), execute steps in the event loop in order to progress simultaneously on
+  all tasks
+- **Callback** = strict separation between now (the current code) and later
+  (callback, control delegation). Non-linear definition of a sequential control
+  flow and error handling, **trust issues due to control delegation** and to
+  **inversion of control** (continuations). A thrown error is not automatically
+  propagated through a chain of callbacks (`throw` is not usable with callbacks)
     ```js
-    function timeoutify(fun, timeout) {
+    function timeoutify(f, timeout) {
       let id = setTimeout(() => {
-        id = null
-        fun(new Error("timeout"))
+        id = null; f(new Error("timeout"))
       }, timeout)
-      return (...a) => {
-        if (id) {
-          clearTimeout(id)
-          fun(null, ...a)
-        }
+      return (...args) => {
+        if (id) { clearTimeout(id); f(null, ...args) }
       }
     }
-    function f(e, d) {
-      if (e) { console.error(e) } else { console.log(d) }
+    function f(e, v) { e ? console.error(e) : console.log(v) }
+    const tf = timeoutify(f, 200)
+    setTimeout(() => tf(1), 100) // 1
+    ```
+- Callback testing
+    ```js
+    export function f(v, done) {
+      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
     }
-    const tf = timeoutify(f, 500)
-    setTimeout(() => tf(1), 400) // 1
+    f(true, console.log) // null, true, control delegation = trust issue
+    f(false, console.error) // oh
+    describe("f", () => {
+      test("success", () => new Promise(done =>
+        f(true, (e, v) => { expect(v).toBe(true); done() })
+      ))
+      test("failure", () => new Promise(done =>
+        f(false, (e, v) => { expect(e.message).toBe("oh"); done() })
+      ))
+    })
     ```
 
-## Promises
+## Promise
 
-- **Promises** = placeholder/proxy for a future eventual value (trustable,
-  composable, time consistent) that is guaranteed to be async (both now and
-  later always are async). `resolve` and `reject` callabcks are guaranteed to
-  be invoked async at most once and exclusively (even if a Promise is resolved
-  sync with a value, even if `then()` is called on already settled Promise)
+- **Promise** = a placeholder/proxy for a **future eventual value** (trustable,
+  composable, time consistent, always async) that is **guaranteed to be async**
+  (both now and later are always async). `resolve` and `reject` callabcks are
+  guaranteed to be invoked **async at most once and exclusively** (even if a
+  Promise is resolved sync with a value, even if `then()` is called on an
+  already settled Promise)
     ```js
     Promise.resolve(1).then(console.log) // next tick
     console.log(2) // 2, 1
     ```
-- **Promises** = async flow control (multiple consumers subscribe to a
-  completion event of a producer) that separates consumers from a producer
-- Thrown error in either `resolve` or `reject` callbacks is automatically
-  propagated through the chain of Promises as a rejection (`throw` is usable
+- **Promise** = **async composable flow control** (multiple consumers subscribe
+  to a completion event of a producer) that separates consumers from a producer
+- **Thrown error** in either `resolve` or `reject` callback is **automatically
+  propagated** through a chain of Promises as a rejection (`throw` is usable
   with Promises)
-- Once a pending promise is settled, the `resolve()`d value or `reject()`ed
-  reason becomes immutable. Repeated calls to `resolve()` and `reject()` are
-  ignored. Promise must be `return`ed to form a valid promise chain
+- Once a pending promise is settled, a `resolve()`d value or a `reject()`ed
+  error becomes immutable. Repeated calls to `resolve()` and `reject()` are
+  ignored. A promise must be `return`ed to form a valid promise chain
     ```js
-    function timeoutPromise(timeout) {
+    function timeout(timeout) {
       return new Promise((_, reject) =>
         setTimeout(() => reject("timeout"), timeout)
       )
     }
     function f(x, timeout) {
-      return new Promise((resolve) =>
+      return new Promise(resolve =>
         setTimeout(() => resolve(x), timeout)
       )
     }
-    Promise.race([f(1, 400), timeoutPromise(500)])
+    Promise.race([f(1, 400), timeout(500)])
       .then(console.log).catch(console.error) // 1
     ```
-- Promises solve the trust issues of callbacks by inverting the callback control
-  delegation. Promises don't get rid of callbacks, they just let the caller
-  control callbacks locally via `p.then(cb)` instead of passing callabcks to a
-  third party code as in case of callbacks only approach
+- **Promises solve the trust issues** of callbacks by **inverting the callback
+  control delegation**. Promises don't get rid of callbacks, but they **let the
+  caller to control callbacks locally** via `p.then(cb)` instead of passing
+  callabcks to a third party code as in case of callbacks only approach
 - `Promise.resolve(x)` normilizes values and misbehaving thenables to trustable
   and compliant Promises
-- `p.then()` automatically and synchronously creates a new Promise in a chain
-  either resolved with a value or rejected with an error/reason of the
-  unwrapped Promise
+- `p.then()` automatically and synchronously **creates a new Promise in a
+  chain** either resolved with a value or rejected with an error
     ```js
     Promise.resolve(1)
       .then(x => x + 1)
-      .then(x => new Promise(resolve => setTimeout(_ => resolve(x * 2), 100)))
+      .then(x => new Promise(resolve => setTimeout(() => resolve(x * 2), 100)))
       .then(console.log) // 4
     ```
 - `p.catch()`ed rejection restores the Promise chain back to normal
     ```js
     Promise.resolve(1)
       // default rejection handler: e => { throw e } for incoming errors
-      .then(_ => { throw new Error("oh") })
+      .then(() => { throw new Error("oh") })
       // default resolution handler: x => { return x } for incoming values
       .catch(e => { console.error(e.message); return 2 }) // for outgoing errors
       .then(console.log) // oh, 2 (back to normal)
     ```
-- `Promise.all([])` a gate that resolves with the array of results of all
-  concurrent, unordered resolved Promises or rejects with the first rejected
-  Promise
-- `Promise.race([])` a latch that either resolves or rejects with the first
-  settled Promise (the other Promises cannot be canceled due to immutability,
-  hense are settled and just ignored)
+- Promise testing
+    ```js
+    export function f(v) {
+      return new Promise((resolve, reject) =>
+        setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
+      )
+    }
+    f(true).then(console.log) // true, caller controls, no trust issues
+    f(false).catch(console.error) // oh
+    describe("f", () => {
+      test("success", () =>
+        f(true).then(v => expect(v).toBe(true))
+      )
+      test("failure", () =>
+        f(false).catch(e => expect(e.message).toBe("oh"))
+      )
+    })
+    ```
+- `Promise.all([Promise])` a gate that resolves with an array of all
+  concurrently resolved Promises or rejects with the first rejected Promise
+- `Promise.race([Promise])` a latch that either resolves or rejects with the
+  first settled Promise (the other Promises cannot be canceled due to
+  immutability, hense are settled and just ignored)
 - Promises API
     - `new Promise((resolve, reject) => {...})`
     - `Promise.resolve(x)`, `Promise.reject(x)`
@@ -547,28 +577,29 @@
     - `Promise.allSettled([]) => [all success | failure]`
     - `Promise.race([]) => first success | first failure`
     - `Promise.any([]) => first success | all failures`
-- Callback => Promise
+- Callback => Promise = converts a callback-based function into a
+  `Promise`-returning function
     ```js
-    function f(x, cb) {
-      setTimeout(_ => { if (x >= 0) { cb(null, "ok") } else { cb("oh") } }, 100)
+    function f(v, done) {
+      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
     }
-    f(1, console.log) // null, ok
-    f(-1, console.error) // oh
     function promisify(f) {
       return function(...args) {
         return new Promise((resolve, reject) => {
-          f.apply(null, args.concat(
-            function(e, x) { if (e) { reject(e) } else { resolve(x) } }))
+          args = [...args, (e, v) => e ? reject(e) : resolve(v)]
+          f(...args)
         })
       }
     }
     const ff = promisify(f)
-    ff(1).then(console.log) // ok
-    ff(-1).catch(console.error) // oh
+    ff(true).then(console.log) // true
+    ff(false).catch(console.error) // oh
     ```
 - Sequential composition of promises
     ```js
-    const f = x => new Promise((resolve) => setTimeout(_ => resolve(x + 1), 100))
+    function f(v) { return new Promise(
+      resolve => setTimeout(() => resolve(v + 1), 100)
+    )}
     const p = [f, f].reduce((p, f) => p.then(f), Promise.resolve(1))
     p.then(console.log) // 3
     let r = 1
@@ -578,21 +609,22 @@
 
 ## Generators
 
-- **Generators** = a new type of function that does not run to completion (as
-  regular functions do), but creates an iterator that controls execution of the
-  generator, suspends maintaining the iternal state at every `yield` and resumes
-  on each iteration call `it.next()`. `yield` is right-associative like `=`
-  assignment
+- **Generators** = a new type of function that **does not run to completion**
+  (as a regular function does), but **creates an iterator that controls
+  execution of a generator**, **suspends maintaining an iternal state** at
+  every `yield` and resumes on each iteration call to `it.next()`. `yield` is
+  right-associative like `=` and `?:`
 - Generator use cases
-    - On demand production of series of vaules through iteration
-    - Async flow control through two-way message passing
+    - On demand production of series of vaules through iteration maintaining an
+      internal state
+    - Async flow control through a two-way message passing
 - **Two-way message passing**
     - Generator `const y = yield x` yields `x` to the caller before suspending
       and receives `y` from the caller after resuming
     - Caller `const { value: x } = it.next(y)` receives `x` from a suspended
       generator, resumes the generator and passes `y` into the generator
-- Generators implement **cooperative multitasking** by `yield`ing control,
-  (not preemptive multitasking by extractal context switch). Gnerator suspends
+- Generator implements the **cooperative multitasking** by `yield`ing control,
+  (not preemptive multitasking by external context switch). Gnerator suspends
   itself via `yield`, iterator call `it.next()` resumes the generator
     ```js
     function* g(x) {
@@ -616,107 +648,93 @@
       const b = yield "b"
       console.log(a, b)
     }
-    const it = g() // creates the controlling iterator
-    const { value: a } = it.next() // starts the generator
+    const it = g() // creates a controlling iterator
+    const { value: a } = it.next() // starts the generator, must always be empty
     const { value: b } = it.next(1)
     it.next(2) // 1, 2 (finishes the generator)
     console.log(a, b) // a, b
     ```
 - **Early termination** via `break`, `return`, `throw` from the `for/of` loop
-  automatically terminates generator's iterator (or manually via `it.return()`)
+  automatically terminates generator's iterator (or manually via `it.return()`
+  or `it.throw()`)
     ```js
-    const iterator = function(n) {
-      let v = 0 // state
-      return {
-        [Symbol.iterator]() { return this },
-        next() {
-          return v < n ? { value: ++v, done: false } :
-          { value: undefined, done: true } }
-      }
+    function* g(n) {
+      let i = 0
+      while (i < n) { yield i++ }
     }
-    for (const i of iterator(3)) { console.log(i) } // 1, 2, 3
+    for (const el of g(3)) { console.log(el) } // 0, 1, 2
 
-    const generator = function*(n) {
+    const infinite = function*() {
       let v = 0
-      while (v < n) { yield ++v }
+      try { while (true) { yield v++ } }
+      finally { console.log("finally") }
     }
-    for (const i of generator(3)) { console.log(i) } // 1, 2, 3
-
-    const generator = function*() {
-      let v = 0
-      try {
-        while (true) { yield ++v }
-      } finally { console.log("finally") }
-    }
-    const gen = generator()
-    for (const i of gen) {
-      if (i > 2) {
-        const { value } = gen.return("return")
+    const inf = infinite()
+    for (const i of inf) {
+      if (i > 1) {
+        const { value } = inf.return("return")
         console.log(value)
       }
-      console.log(i) // 1, 2, finally, return, 3
+      console.log(i) // 0, 1, finally, return, 2
     }
     ```
-- Generators express **async flow control** in sequential, sync-like form
+- Generator expresses **async flow control** in sequential, sync-like form
   through async iteration (`it.next()`) of a generator
     ```js
-    function f(x, cb) {
-      setTimeout(_ => x === "oh" ? cb(new Error(x)) : cb(null, x), 100)
+    function f(v, done) {
+      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
     }
-    function cb(err, data) { if (err) { it.throw(err) } else { it.next(data) } }
+    function done(e, v) { if (e) { gen.throw(e) } else { gen.next(v) } }
     function* g() {
       try {
-        const a = yield f(1, cb)
+        const a = yield f(true, done)
         console.log(a)
-        const b = yield f("oh", cb)
+        const _ = yield f(false, done)
       } catch (e) { console.error(e.message) }
     }
-    const it = g()
-    it.next() // 1, oh
+    const gen = g()
+    gen.next() // true, oh
     ```
-- **Promise-yielding generators** are basis for `async/await`
+- **Promise-yielding generator** is a basis for `async/await`
     ```js
-    function f(x) {
+    function f(v) {
       return new Promise((resolve, reject) =>
-        setTimeout(_ => x === "oh" ? reject(new Error(x)) : resolve(x), 100)
+        setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
       )
     }
     function* g() {
       try {
-        const a = yield f(1)
+        const a = yield f(true)
         console.log(a)
-        const b = yield f("oh")
-        // const b = yield f(2)
-        // console.log(b)
-      } catch(e) { console.error(e.message) }
+        const _ = yield f(false)
+      } catch (e) { console.error(e.message) }
     }
-    const it = g()
-    it.next().value
-      .then(a => it.next(a).value.then(b => it.next(b)))
-      .catch(e => console.log(e.message)) // 1, oh
+    const gen = g()
+    gen.next().value.then(x => gen.next(x).value.then(y => gen.next(y)))
+      .catch(e => console.log(e.message)) // true, oh
     ```
-- `yield *` delegation for **composition of generators**. `yield *` requires an
-  iterable, it then invokes that iterable's iterator and delegates generator's
-  control to that iterator until it is exhausted
+- `yield*` delegation for **composition of generators**. `yield*` requires an
+  iterable `[Symbol.iterator]`, it then invokes that iterable's iterator
+  `it.next()` and delegates generator's control to that iterator until it is
+  exhausted
     ```js
-    function* a() { yield 1; yield* b(); yield 4 }
-    function* b() { yield 2; yield 3 }
-    for (const i of a()) { console.log(i) } // 1, 2, 3, 4
+    function* inner() { yield 2; yield 3 }
+    function* outer() { yield 1; yield* inner(); yield 4 }
+    for (const el of outer()) { console.log(el) } // 1, 2, 3, 4
     ```
-- Error handling `try/catch` inside and outside of generators
+- **Error handling** `try/catch` inside and outside of generators
     ```js
     function* g() {
-      try {
-        yield 1
-      } catch (e) { console.error(e.message) } // uh
+      try { yield 1 }
+      catch (e) { console.error("inside", e.message) } // inside uh
       throw new Error("oh")
     }
-    const it = g()
+    const gen = g()
     try {
-      const { value: a } = it.next()
-      console.log(a) // 1
-      it.throw(new Error("uh"))
-    } catch (e) { console.error(e.message) } // oh
+      const { value } = gen.next()
+      console.log(value) // 1, inside uh, outside oh
+      gen.throw(new Error("uh"))
+    } catch (e) { console.error("outside", e.message) } // outside oh
     ```
 
 # Node.js
@@ -745,35 +763,38 @@
 - **libuv** = SED + reactor (event loop + event queue) = cross-platform
   low-level IO engine of Node.js
     - High resolution clock and timers
-    - Async FS, TCP/UDP, DNS
     - Async thread pool and synchronization
-    - Async child processes and signals handling
+    - Async child processes and signal handling
+    - Async FS, TCP/UDP, DNS
     - Async IPC via shared UNIX domain sockets
-- **Node.js** = libuv (SED + reactor) + V8 (JavaScript runtime) + modules
+- **Node.js** (async IO operations in parallel by libuv threads, sync callback
+  code to completion in the event loop) = libuv (SED + reactor) + V8 (JavaScript
+  runtime) + modules
 - In Node.js only async, non-blocking IO operations are **executed in parallel**
-  by the libuv internal IO threads. Sync code inside callbacks (until next async
-  operation) is **executed concurrently** to completion without race conditions
-  by the single-threaded event loop
+  by the **libuv internal IO threads**. Sync code inside callbacks (until next
+  async operation) is **executed concurrently** to completion without race
+  conditions by the single-threaded event loop
 
 ## Callback pattern
 
 - **Callback** (Continuation-Passing Stype, CPS = control is passed explicitly
-  in the form foa continuation/callback, `return`/`throw` => `callback(error,
-  resutl)`) = first-class function (to pass a callback) + closure (to retain the
-  caller contenxt) that is passed to an async function (which returns
-  immediately) and is executed on completion of the requested async operation
-- Callback communicates **async result once** and has trust issues (tight
-  coupling = callback is passed to the async function for execution). Callback
-  is expected to be invoked exactly once either with result or error
-- Async result/error is propagated through a chain of nested `callbacks(error,
-  data | cb)` that accept `error | null` first, then the `result` or the next
-  `callback` that comes always last. Never `return` a result or `throw` an error
-  from a callback
+  in the form fo a continuation/callback, `return`/`throw` => `callback(error,
+  result)`) = **first-class function** (to pass a callback) + **closure** (to
+  retain the caller contenxt) that is passed to an async function (which
+  **returns immediately**) and **is executed on completion** of the requested
+  async operation
+- Callback communicates an async result once and has **trust issues** (tight
+  coupling = callback is passed to an async function for execution). Callback
+  **is expected to be invoked exactly** once either with result or error
+- Async result/error is propagated through a chain of nested `callbacks(error |
+  null, data | cb)` that accept an `error | null` **first**, then a `result |
+  callback` that comes always **last**. Never `return` a result or `throw` an
+  error from a callback (`return` and `throw` are unusable from a callback)
 - Sync operation (CPU-bound, discouraged) blocks the event loop and puts on hold
   all concurrent processing blocking the whole application
     - Interleave each step of a CPU-bound sync operation with `setImmediate()`
       to let pending IO tasks to be processed by the event loop (not efficient
-      due to context switches, interleaved algorithm)
+      due to context switching, more complex interleaving algorithm)
     - Pool of reusable external processes `child_process.fork()` with a
       communication channel `process/worker.send().on()` leaves the event loop
       unblocked (efficient: reusable processes run to completion, unmodified
@@ -782,282 +803,240 @@
       `parentPort/worker.postMessage().on()`, per-thread own event loop and V8
       instance (small memory footprint, fast startup time, safe: no
       syncronization, no resource sharing)
-- Avoid mixing sync/async calback behavior under the same inferface. To convert
+- Avoid mixing sync/async callback behavior under the same inferface. To convert
   sync call to async use
     - Mictrotask `process.nextTick()` is executed just after the current
       operaiton, before other pending IO tasks
     - Immediate task `setImmediate()` is executed after all other pending IO
       tasks in the same cycle of the event loop
-    - Regular task `setTimeout()` is executed on the next cycle of the event
+    - Regular task `setTimeout()` is executed in the next cycle of the event
       loop
 - Uncaught error thrown from an async callback propagates to the stack of the
   event loop (not to the next callback, not to the stack of the caller that
   triggered the async operation), `process.on(unchaughtException, err)` is
   emitted and process exits with a non-zero exit code
-- **Callback hell** = deeply nested code as a result of in-place nested
-  anonymous callbacks that unnecessary consume memory because of closures
+- **Callback hell** = deeply nested code as a result of **in-place nested
+  anonymous callbacks** that unnecessary consume memory because of closures
     - Do not abuse in-place nested anonymous callbacks
     - Early return principle = favor `return/continue/break` over nested
       `if/else`
-    - Create named callbacks with clearly defined interface (no unnecessary
-      closures)
-- **Sequential iteration** (recursion) = applies an async operation to each
-  element of an array one element at a time
+    - **Create named callbacks** with clearly defined interface (and without
+      unnecessary closures)
+- **Sequential iteration** (recursion) = executes async tasks in sequence one
+  task at a time until all complete or the first error
     ```js
-    function cbTask(x, cb) {
-      setTimeout(() => {
-        if (x === -1) { return cb("oh") }
-        console.log(x); cb(null)
-      }, 500)
+    function task(v, done) {
+      setTimeout(
+        () => v ? (console.log(v), done(null, v)) : done(new Error("oh")), 500
+      )
     }
-    function cbIterate(task, arr, cb) {
-      let index = 0
-      function iterate() {
-        if (index === arr.length) {
-          return process.nextTick(() => cb(null)) // always async
-        }
-        // Recurse for the next interation after completion of the previous one
-        task(arr[index++], iterate)
+    function sequence(tasks, done) {
+      let i = 0
+      function next(err) {
+        if (err) { return done(err.message) }
+        i < tasks.length ? tasks[i++](next) : process.nextTick(() => done(null))
       }
-      iterate()
+      next()
     }
-    asyncIterate(cbTask, [], console.log) // null
-    asyncIterate(cbTask, [1, 2, 3], console.log) // 1, 2, 3, null
+    const tasks = [1, 2, 3].map(el => done => task(el, done)) // 1, 2, 3, null
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done)) // 1, 2, oh
+    sequence(tasks, console.log)
+    sequence([], console.log) // null
     ```
-- **Parallel execution** (loop for all tasks) = executes tasks in parallel
-  (unlimited) until all complete or first error
+- **Parallel execution** (sync loop through all tasks) = executes tasks in
+  parallel (unlimited) until all complete or the first error
     ```js
-    function cbParallel(tasks, cb) {
+    function parallel(tasks, done) {
       let completed = 0
-      let failed = false
-      function done(error) {
-        if (error) { failed = true; return cb(error) }
-        if (++completed === tasks.length && !failed) { return cb(null) }
+      function check(err) {
+        if (err) { return done(err.message) }
+        if (++completed === tasks.length) { return done(null) }
       }
-      for (const task of tasks) { task(done) }
+      if (tasks.length === 0) { return process.nextTick(() => done(null)) }
+      for (const task of tasks) { task(check) }
     }
-    // 1, 3, 2, null
-    cbParallel([1, 2, 3].map(i => (done) => cbTask(i, done)), console.log)
-    // 1, oh, 3
-    cbParallel([1, -1, 3].map(i => (done) => cbTask(i, done)), console.log)
+    const tasks = [1, 2, 3].map(el => done => task(el, done)) // 1, 2, 3, null
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done)) // 1, 2, oh, 3
+    parallel(tasks, console.log)
+    parallel([], console.log) // null
     ```
-- **Limited parallel execution** (loop until limit) = executes at most N tasks
-  in parallel until all complete or first error
+- **Limited parallel execution** (sync loop until a limit) = executes at most N
+  tasks in parallel until all complete or the first error
     ```js
-    function cbParallelLimit(tasks, limit, cb) {
-      let completed = 0
-      let failed = false
-      let index = 0
-      let running = 0 // Queue can be used instead
-      function done (error) {
-        --running
-        if (error) { failed = true; return cb(error) }
-        if (++completed === tasks.length && !failed) { return cb(null) }
-        if (running < limit && !failed) { parallel() }
+    function parallelLimit(tasks, limit, done) {
+      let i = 0, running = 0, completed = 0
+      function check(err) {
+        if (err) { return done(err.message) }
+        if (++completed === tasks.length) { return done(null) }
+        if (--running < limit) { parallel() }
       }
       function parallel() {
-        while (index < tasks.length && running < limit) {
-          const task = tasks[index++]
-          task(done)
-          ++running
+        while (i < tasks.length && running < limit) {
+          tasks[i++](check); ++running
         }
       }
+      if (tasks.length === 0) { return process.nextTick(() => done(null)) }
       parallel()
     }
-    cbParallelLimit(
-      [1, 2, 3, 4, 5].map(i => (done) => cbTask(i, done)), 2, console.log
-    ) // 1, 2 | 3, 4 | 5, null
-    cbParallelLimit(
-      [1, 2, 3, -1, 5].map(i => (done) => cbTask(i, done)), 2, console.log
-    ) // 1, 2 | 3, oh | 5, null
+    // 1, 2 | 3, 4 | 5, null
+    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
+    // 1, 2 | 3, oh | 4
+    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
+    parallelLimit(tasks, 2, console.log)
+    parallelLimit([], 2, console.log) // null
     ```
 
 ## Observer pattern
 
-- **Observer** = object/subject notifies its observers on its state changes
+- **Observer** = an object/subject notifies its observers on its state changes
 - `EventEmitter` = registers multiple observing `listeners(args, ...)` for
   specific event types `ee.on|once(event, listener)`, `ee.emit(event, args,
   ...)`, `ee.removeListener(event, listener)` unsubscribe listeners when they
   are no longer needed to avoid memory leaks due to captured context in listener
   closures
 - `EventEmitter` continuously notifies **multiple observers on different types
-  of recurrent events** and does not have trust issues (loose coupling =
+  of recurrent events** and **does not have trust issues** (loose coupling =
   callback is controlled by the caller). En event can be fired multiple times or
-  not fired at all. Combining `EventEmitter` with a callback interface is an
+  not fired at all. Events are **guaranteed to fire async** in the next cycle of
+  the event loop. Combining `EventEmitter` with the **callback** interface is an
   elegant and flexible solution
 - Async result/error is proparaged through `emit` events. Never `return` a
-  result or `throw` an error from the `EventEmitter`. Always register a listener
-  for the `error` event
-- Never mix sync and async events in the same `EventEmitter`. Sync event
-  listeners must be registered before the status change. Async events allow
-  registering listeners even after the status change but within the current
-  cycle of the event loop (because events are guaranteed to fire in the next
-  cycle of the event loop)
+  result or `throw` an error from an `EventEmitter` (`return` and `throw` are
+  unusaable with `EventEmitter`). Always register a listener for the `error`
+  event
 
 ## Promise pattern
 
-- `promisify` = converts a callback-based function into a Promise-returning
-  function
+- **Sequential iteration** (dynamic promise chain in a sync loop)
     ```js
-    function promisify(f) {
-      return (...args) => {
-        return new Promise((resolve, reject) => {
-          const argsCb = [...args, (error, result) => {
-            if (error) { return reject(error) }
-            resolve(result)
-          }]
-          f(...argsCb)
-        })
-      }
+    function task(v) {
+      return new Promise((resolve, reject) =>
+        setTimeout(
+          () => v ? (console.log(v), resolve()) : reject(new Error("oh")), 500
+        )
+      )
     }
-    const taskP = promisify(ctTask)
-    taskP(1).then(console.log) // 1, undefined
-    taskP(-1).catch(console.error) // oh
-    ```
-- **Sequential iteration** (dynamic promise chaining in a loop)
-    ```js
-    function promiseIterate(task, arr) {
+    function sequence(tasks) {
       let p = Promise.resolve()
-      for (const e of arr) { p = p.then(() => task(e)) }
+      for (const task of tasks) { p = p.then(task) }
       return p
     }
-    promiseIterate(taskP, []).then(console.log) // undefined
-    promiseIterate(taskP, [1, 2, 3]).then(console.log) // 1, 2, 3, undefined
+    // 1, 2, 3, undefined
+    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    // 1, 2, oh
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
+    sequence(tasks).then(console.log, console.error)
+    sequence([]).then(console.log, console.error) // undefined
     ```
-- **Parallel execution** (loop for all tasks)
+- **Parallel execution** (sync loop for all tasks)
     ```js
-    function promiseParallel(tasks) {
+    function parallel(tasks) {
       let completed = 0
       return new Promise((resolve, reject) => {
-        function done() {
-          if (++completed === tasks.length) { resolve() }
+        function check() {
+          if (++completed === tasks.length) { return resolve() }
         }
-        for (const task of tasks) { task().then(done, reject) }
+        if (tasks.length === 0) { return resolve() }
+        for (const task of tasks) { task().then(check, reject) }
       })
     }
-    promiseParallel([1, 2, 3].map(i => () => taskP(i)))
-      .then(console.log) // 1, 2, 3, undefined
-    promiseParallel([1, -1, 3].map(i => () => taskP(i)))
-      .then(console.log, console.error) // 1, oh, 3
+    // 1, 2, 3, undefined
+    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    // 1, 2, oh, 3
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
+    parallel(tasks).then(console.log, console.error)
+    parallel([]).then(console.log, console.error) // undefined
     ```
-- **Limited parallel execution** (loop until limit)
+- **Limited parallel execution** (sync loop until limit)
     ```js
-    function promiseParallelLimit(tasks, limit) {
-      let completed = 0
-      let index = 0
-      let running = 0
+    function parallelLimit(tasks, limit) {
       return new Promise((resolve, reject) => {
-        function done() {
-          --running
-          if (++completed === tasks.length) { resolve() }
-          if (running < limit) { parallel() }
+        let i = 0, running = 0, completed = 0
+        function check() {
+          if (++completed === tasks.length) { return resolve() }
+          if (--running < limit) { parallel() }
         }
         function parallel() {
-          while (index < tasks.length && running < limit) {
-            const task = tasks[index++]
-            task().then(done, reject)
-            ++running
+          while (i < tasks.length && running < limit) {
+            tasks[i++]().then(check, reject); ++running
           }
         }
+        if (tasks.length === 0) { return resolve() }
         parallel()
       })
     }
-    promiseParallelLimit(
-      [1, 2, 3, 4, 5].map(i => () => taskP(i)), 2
-    ).then(console.log) // 1, 2 | 3, 4 | undefined
-    promiseParallelLimit(
-      [1, 2, 3, -1, 5].map(i => () => taskP(i)), 2
-    ).then(console.log, console.error) // 1, 2 | 3, oh | 5
+    // 1, 2 | 3, 4 | 5, undefined
+    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
+    // 1, 2, | 3, oh | 4
+    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
+    parallelLimit(tasks, 2).then(console.log, console.error)
+    parallelLimit([]).then(console.log, console.error) // undefined
     ```
 
 ## Async/await pattern
 
-- `async` function always returns a Promise immediately and synchronously.
+- `async` function **always returns a Promise** immediately and synchronously.
   `try/catch/throw` inside an `async` function works for both sync and async
-  code. Use `return await` to prevent error on the caller side and `catch`
+  code. Use `return await` to prevent errors on the caller side and `catch`
   errors locally
     ```js
     async function localError() {
-      try { return await taskP(-1) }
-      catch (error) { console.error(`Local: ${error}`) }
+      try { return task(false) } // Caller oh
+      try { return await task(false) } // Local oh
+      catch (e) { console.error("Local", e.message) }
     }
-    localError().catch(error => console.error(`Caller: ${error}`)) // Local: oh
+    localError().catch(e => console.error("Caller", e.message))
     ```
-- On each `await` expression that always returns a Promise, an `async` function
-  is put on hold, its state is saved and the control is retuned to the event
-  loop (generator). When the Promise that has been `await`ed settles, the
-  control is given back to the `async` function
-- **Sequential iteration**
+- `async` function is a `Promise`-`yield`ing generator that on each `await`
+  expression `yield`s a Promise and suspends the generator, its internal state
+  is saved and the control is retuned to the event loop. When the Promise that
+  has been `await`ed settles, the control is given back to the `async` function
+  and the generator is resumed
+- `Promise` abstraction and `async/await` syntax is used to manage async
+  operations in a sync-like manner. However, if async operations are unrelated,
+  `await` introduces unnecessary blocking. Do not use `await` inside a loop, use
+  `Promise.all()` instead
     ```js
-    async function asyncIterate(task, arr) {
-      for (const e of arr) { await task(e) }
+    console.log(await task(1), await task(2)) // sequence, slow
+    console.log(await Promise.all([task(1), task(2)])) // parallel, fast
+    ```
+- **Sequential iteration** (sync loop with await)
+    ```js
+    async function sequence(tasks) {
+      for (const task of tasks) { await task() }
     }
-    await asyncIterate(taskP, [1, 2, 3]) // 1, 2, 3
+    // 1, 2, 3, undefined
+    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    // 1, 2, oh
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
+    try {
+      console.log(await sequence(tasks))
+      console.log(await sequence([])) // undefined
+    } catch (e) { console.error(e.message) }
     ```
 - **Parallel execution** (await loop)
     ```js
-    async function asyncParallel(tasks) {
-      const promises = tasks.map(task => task())
-      // Problem: unnecesary wait for all promosises in the array
-      // preceding the rejected promise. Solution: use Promise.all()
-      for (const promise of promises) { await promise }
-    }
-    await asyncParallel([1, 2, 3].map(i => () => taskP(i))) // 1, 2, 3
+    // Use the prallel() from the Promise pattern above
+    // 1, 2, 3, undefined
+    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    // 1, 2, oh, 3
+    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
     try {
-      await asyncParallel([1, -1, 3].map(i => () => taskP(i))) // 1, oh, 3
-    } catch (error) { console.error(error) }
+      console.log(await parallel(tasks))
+      console.log(await parallel([])) // undefined
+    } catch (e) { console.error(e.message) }
     ```
 - **Limited parallel execution**
     ```js
-    async function asyncParallelLimit(tasks, limit) {
-      let completed = 0
-      let index = 0
-      let running = 0
-      let promises = []
-      function parallel() {
-        while (index < tasks.length && running < limit) {
-          const task = tasks[index++]
-          promises.push(task())
-          ++running
-        }
-      }
-      parallel()
-      while (completed !== tasks.length) {
-        if (promises.length !== 0) {
-          await promises.shift()
-          ++completed, --running
-          parallel()
-        }
-      }
-    }
-    asyncParallelLimit(
-      [1, 2, 3, 4, 5].map(i => () => taskP(i)), 2
-    ) // 1, 2 | 3, 4 | 5
+    // Use the parallelLimit() from the Promise pattern above
+    // 1, 2 | 3, 4 | 5, undefined
+    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
+    // 1, 2, | 3, oh | 4
+    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
     try {
-      await asyncParallelLimit(
-        [1, 2, 3, -1, 5].map(i => () => taskP(i)), 2
-      ) // 1, 2 | 3, oh | 5
-    } catch (error) { console.error(error) }
-    ```
-- **Infinite recursive promise chain** = creates memory leaks
-    ```js
-    // Problem: recursive, memory leak vs lost rejection
-    async function leakingRecursion(i = 0) {
-      await taskP(i)
-      // Memory leak: hain of dependent Promises that never resolve
-      return leakingRecursion(i + 1)
-      // No memory leak (GC collected Promises), but lost rejection
-      leakingRecursion(i + 1)
-    }
-    leakingRecursion() // 0, 1, 2, ...
-    // Solution: loop with await
-    async function nonLeakingLoop() {
-      let i = 0
-      while (true) {
-        await taskP(i++) // No memory leak + correct error handling
-      }
-    }
-    nonLeakingLoop() // 0, 1, 2, ...
+      console.log(await parallelLimit(tasks, 2))
+      console.log(await parallelLimit([], 2)) // undefined
+    } catch (e) { console.error(e.message) }
     ```
 
 ## Stream pattern
