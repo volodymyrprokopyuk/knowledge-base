@@ -800,8 +800,9 @@
       unblocked (efficient: reusable processes run to completion, unmodified
       algorithm)
     - `new Worker()` threads with communication chanels
-      `parentPort/worker.postMessage().on()`, per-thread own event loop and V8
-      instance (small memory footprint, fast startup time, safe: no
+      `parentPort/worker.postMessage().on()` for multi-threaded execution of
+      CPU-bound tasks outside of the event loop, per-thread own event loop and
+      V8 instance (small memory footprint, fast startup time, safe: no
       syncronization, no resource sharing)
 - Avoid mixing sync/async callback behavior under the same inferface. To convert
   sync call to async use
@@ -888,18 +889,29 @@
 
 ## Observer pattern
 
-- **Observer** = an object/subject notifies its observers on its state changes
-- `EventEmitter` = registers multiple observing `listeners(args, ...)` for
-  specific event types `ee.on|once(event, listener)`, `ee.emit(event, args,
-  ...)`, `ee.removeListener(event, listener)` unsubscribe listeners when they
-  are no longer needed to avoid memory leaks due to captured context in listener
-  closures
+- **Observer** = an `EventEmitter` notifies its observers/listeners on its state
+  changes
+- `EventEmitter` = registers multiple `function listener(event, ...args)` for
+  specific event types `ee.on|once(event, listener)`. Synchronously
+  `ee.emit(event, ...args)` for all registered listeners.
+  `ee.removeListener(event, listener)` unsubscribes listeners when they are no
+  longer needed to avoid memory leaks due to captured context in listener
+  closures. If `ee.on(error, ...args)` is not registered an `Error` is thrown
+    ```js
+    import { EventEmitter } from "node:events"
+    class EE extends EventEmitter { }
+    const ee = new EE()
+    ee.on("error", err => console.error(err.message))
+    ee.on("ev", function() { this.emit("error", new Error("oh")) })
+    ee.on("ev", v => console.log(v))
+    setTimeout(() => ee.emit("ev", 1), 500) // oh, 1
+    ```
 - `EventEmitter` continuously notifies **multiple observers on different types
   of recurrent events** and **does not have trust issues** (loose coupling =
-  callback is controlled by the caller). En event can be fired multiple times or
-  not fired at all. Events are **guaranteed to fire async** in the next cycle of
-  the event loop. Combining `EventEmitter` with the **callback** interface is an
-  elegant and flexible solution
+  callback is controlled by the caller). Events are **guaranteed to fire async**
+  in the next cycle of the event loop, however, `ee.emit()` is called sync for
+  all registered listeners. Combining `EventEmitter` with the **callback**
+  interface is an elegant and flexible solution
 - Async result/error is proparaged through `emit` events. Never `return` a
   result or `throw` an error from an `EventEmitter` (`return` and `throw` are
   unusaable with `EventEmitter`). Always register a listener for the `error`
@@ -1041,58 +1053,53 @@
 
 ## Stream pattern
 
-- **Streaming** (parallel pipeline vs sequential buffering) = staged parallel
-  processing of data in chunks as soon as it arrives with no delays due to
-  buffering (reactive, modular, composable, constant memory)
+- **Streaming** (parallel staged pipeline vs sequential buffering) = staged
+  parallel processing of data in chunks as soon as it arrives with no delays
+  because of buffering (reactive, modular, composable, constant memory)
 - `Stream` extends `EventEmitter`
-    - Binary mode (IO processing)
-    - Object mode (function composition)
-- `Readable` (source of data) = async iterator (`for await`)
-    - Non-flowing mode (default) = `on(readable) + .read()`/`.pause()` pulls
-      data in a controlled way
+    - **Binary mode** (IO processing)
+    - **Object mode** (function composition)
+- `Readable` (source of data) = async iterable (`for await`) with backpressure
+    (`this.push(chunk)` returns `false` when an internall buffer is full).
+    `on(drain)` resume pusing data
+    ```js
+    import { randomBytes } from "node:crypto"
+    import { Readable } from "node:stream"
+    function random(size) {
+      return new Promise((resolve, reject) =>
+        randomBytes(size, (err, buf) => err ? reject(err) : resolve(buf))
+      )
+    }
+    class RandomReadable extends Readable {
+      #reads = 0
+      async _read(size) {
+        const chunk = await random(4)
+        this.push(chunk) // push data to an internal buffer
+        if (++this.#reads > 4) { this.push(null) } // end of a stream
+      }
+    }
+    for await (const chunk of new RandomReadable()) { // async iterable
+      console.log(chunk.toString("hex"))
+    }
+    ```
+    - **Non-flowing mode** (default, pull) = `on(readable) + .read()`/`.pause()`
+    pulls data in a controlled way (flexible control over data consumption)
         ```js
-        function nonFlowingReadable() {
-          process.stdin
-            .on("readable", () => { // new data is available
-              let chunk // read() pulls data in a loop from an internal buffer
-              // Flexible control over data consumption
-              while ((chunk = process.stdin.read()) !== null) { // read() is sync
-                  console.log(chunk.toString())
-              }
-            })
-            .on("end", () => { console.log("done") }) // end of stream
-        }
+        const rr = new RandomReadable()
+        rr.on("readable", () => {  // new data is available
+          let chunk // .read() is sync
+          while (chunk = rr.read()) { console.log(chunk.toString("hex")) }
+        }).on("end", () => console.log("done"))
         ```
-    - Flowing mode = `on(data)`/`.resume()` pushes data as soon as it arrives
+    - **Flowing mode** (push) = `on(data)`/`.resume()` pushes data as soon as it
+      arrives. `.on(data)/.resume()` switches to the flowing mode that pushes
+      data. `.pause()` switches back to the non-floeing mode (default)
         ```js
-        function flowingReadable() {
-          process.stdin
-            // on(data) or resume() switches to the flowing mode that pushes data
-            // .pause() switches back to the non-flowing mode (default)
-            .on("data", chunk => console.log(chunk.toString()))
-            .on("end", () => { console.log("done") })
-        }
+        const rr = new RandomReadable()
+        rr.on("data", chunk => console.log(chunk.toString("hex")))
+          .on("end", () => console.log("done"))
         ```
-    - Implementing Readable
-        ```js
-        class RandomReadable extends Readable {
-          #reads = 0
-          async _read(size) {
-            const chunk = await randomBytes(10)
-            // push() => false for backpressure when the internal buffer is full
-            // on(drain) resume pushing
-            this.push(chunk) // push data to the internal buffer
-            if (++this.#reads === 3) { this.push(null) } // end of stream
-          }
-        }
-        async function randomReadable() {
-            const rr = new RandomReadable()
-            for await (const chunk of rr) {
-              console.log(chunk.toString("hex"))
-            }
-        }
-        ```
-- `Writable` (sink of data)
+- `Writable` (sink for data)
     ```js
     function serverWritable() {
       const server = createServer(async (req, res) => {
