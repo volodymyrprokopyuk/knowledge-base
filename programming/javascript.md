@@ -1053,15 +1053,166 @@
 
 ## Stream pattern
 
-- **Streaming** (parallel staged pipeline vs sequential buffering) = staged
-  parallel processing of data in chunks as soon as it arrives with no delays
-  because of buffering (reactive, modular, composable, constant memory)
+- `Writable` = standard abstraction of a **data sink** to an underlying resource
+  with **backpressure** when `.write(chunk) => false` stop writing until the
+  `.on(drain)` to resume writing
+    ```js
+    import { Writable } from "node:stream"
+    import { finished } from "node:stream/promises"
+    class Sink extends Writable {
+      _construct(done) { // allocates resources
+        this.buffer = []; done(null)
+      }
+      _write(chunk, encoding, done) { // if error done(new Error("oh"))
+        setTimeout(() => { this.buffer.push(chunk); done(null) }, 100)
+      }
+      _final(done) { // flushes buffered data before a Writable end
+        this.buffer = this.buffer.join(""); done(null)
+      }
+      _destroy(err, done) { // disposes resources
+        this.buffer += "."; done(err)
+      }
+    }
+    const sink = new Sink()
+    sink.write("a"); sink.write("b"); sink.end("c")
+    await finished(sink)
+    console.log(sink.buffer) // abc.
+    ```
+- `Readable` = standard abstraction of a **data source** from an underlying
+  resource with **backpressure** when `this.push(chunk) => false` stop reading
+  from the underlying resource. The `_read(size)` will be called later to read
+  more data from the underlying resource
+    ```js
+    import { Readable } from "node:stream"
+    class Source extends Readable {
+      constructor(source, { encoding = "utf8", ...opts } = { }) {
+        super({ encoding, ...opts })
+        this.source = source; this.i = 0
+      }
+      _construct(done) { // allocates resources
+        this.source = this.source.split(" "); done(null)
+      }
+      _read(size) {
+        setTimeout(() => // if error this.destroy(new Error("oh"))
+          this.i < this.source.length ? this.push(this.source[this.i++]) :
+            this.push(null), 100 // end of a Readable
+        )
+      }
+      _destroy(err, done) { // disposes resources
+        this.source = null; done(err)
+      }
+    }
+    ```
+- **Async interator** `for await ... of` to consume a Readable
+    ```js
+    const source = new Source("a b c")
+    for await (const chunk of source) { console.log(chunk) } // a b c
+    ```
+- **Flowing mode** (push) = pushes data as soon as they are available.
+  The flowing mode is activated by `.on(data)`, `.resume()`, `.pipe(writable)`
+    ```js
+    const source = new Source("a b c")
+    source.on("data", chunk => console.log(chunk))
+    source.on("end", () => console.log(".")) // a b c .
+    ```
+- **Paused mode** (pull) = allows control control on data consumption. The
+  paused mode is activated by `.on(readable)`, `.pause()`, `.unpipe(writable)`
+    ```js
+    const source = new Source("a b c")
+    source.on("readable", () => {
+      let chunk
+      while(chunk = source.read()) { console.log(chunk) }
+    })
+    source.on("end", () => console.log(".")) // a b c .
+    ```
+- **Piping** = `readable.pipe(duplex | writable)` creates a stream chain,
+  switches a Readable to the flowing mode, returns the last stream for chaining,
+  multiple Writables can be attached to the same Readable
+    ```js
+    const source = new Source("a b c"),
+          sink = new Sink(), sink2 = new Sink()
+    source.pipe(sink); source.pipe(sink2)
+    await finished(sink); await finished(sink2)
+    console.log(sink.buffer, sink2.buffer) // abc. abc.
+    ```
+- `Duplex` = **independent** Readable `_read(size)` and Writable `_write(chunk,
+  encoding, done)`, `_final(done)` for stream chaining through `.pipe(duplex |
+  writable)` or `pipeline(readable, ...transform, writable)`
+- `Transform` = a Readable **dependent** on Writable that follows a pattern
+  Writable => Transform => Readable
+    ```js
+    import { Transform } from "node:stream"
+    class Double extends Transform {
+      _transform(chunk, encoding, done) { // Writable side
+        setTimeout(() => { // if error done(new Error("oh"))
+          const trans = String(chunk).split("").map(ch => ch + ch).join("")
+          this.push(trans); done(null) // Readable side
+        }, 100)
+      }
+      _flush(done) { this.push("-"); done(null) } // before a Readable end
+    }
+    class Upcase extends Transform {
+      _transform(chunk, encoding, done) {
+        setTimeout(() => {
+          this.push(String(chunk).toUpperCase()); done(null)
+        }, 100)
+      }
+      _flush(done) { this.push("_"); done(null) }
+    }
+    const source = new Source("a b c"), upcase = new Upcase(),
+          double = new Double(), sink = new Sink()
+    await finished(source.pipe(double).pipe(upcase).pipe(sink))
+    console.log(sink.buffer) // AABBCC-_.
+    ```
+- `pipeline(readable, ...transform, writable)` = combines streams in a
+  **non-composable** end-to-end pipeline that follows a pattern Readable =>
+  Writable, automatically handles backpressure and destruction of streams on an
+  error or in the end
+    ```js
+    import { pipeline } from "node:stream/promises"
+    const source = new Source("a b c"), upcase = new Upcase(),
+          double = new Double(), sink = new Sink()
+    await pipeline(source, double, upcase, sink)
+    console.log(sink.buffer) // AABBCC-_.
+    ```
+- `compose(...streams)` = combines streams in a new **composable** Duplex stream
+  that follows a pattern Writable => Readable using the `pipeline()`
+    ```js
+    import { compose } from "node:stream"
+    const source = new Source("a b c"), upcase = new Upcase(),
+          double = new Double(), sink = new Sink()
+    await pipeline(source, compose(double, upcase), sink)
+    console.log(sink.buffer) // AABBCC-_.
+    ```
+- **Async iterator** `for await ... of` `next() => Promise()` and
+  **async generator** `async function* ...` `yield Promise()` form a basis for
+  **language-level construction of streams**
+    ```js
+    async function* upcase(values) {
+      for await (const value of values) {
+        yield new Promise(resolve =>
+          setTimeout(() => resolve(value.toUpperCase()), 100)
+        )
+      }
+    }
+    const source = new Source("a b c"), sink = new Sink()
+    await pipeline(source, upcase, sink)
+    console.log(sink.buffer) // ABC.
+    ```
+
+
+- **Streaming** (parallel staged pipeline) = staged parallel processing of data
+  in chunks as soon as it arrives with internal buffering (reactive, modular,
+  composable, constant memory). `Stream` is an abstraction on top of a data
+  source `Readable`, a data transformation `Transform`, and a data sink
+  `Writable`
 - `Stream` extends `EventEmitter`
-    - **Binary mode** (IO processing)
+    - **Binary mode** `Buffer` or string (IO processing)
     - **Object mode** (function composition)
-- `Readable` (source of data) = async iterable (`for await`) with backpressure
-    (`this.push(chunk)` returns `false` when an internall buffer is full).
-    `on(drain)` resume pusing data
+- `Readable` (source of data) = `Readable` will start generating data only when
+  data consumption beings. Async iterable (`for await`) with backpressure
+  (`this.push(chunk)` returns `false` when an internall buffer is full),
+  `on(drain)` resume pushing data
     ```js
     import { randomBytes } from "node:crypto"
     import { Readable } from "node:stream"
@@ -1072,18 +1223,20 @@
     }
     class RandomReadable extends Readable {
       #reads = 0
-      async _read(size) {
+      async _read(size) { // called autimatically by a Readable
         const chunk = await random(4)
         this.push(chunk) // push data to an internal buffer
-        if (++this.#reads > 4) { this.push(null) } // end of a stream
+        if (++this.#reads > 4) { this.push(null) } // end of a Readable
       }
     }
-    for await (const chunk of new RandomReadable()) { // async iterable
+    // async iterable to fully consume a Readable
+    for await (const chunk of new RandomReadable()) {
       console.log(chunk.toString("hex"))
     }
     ```
-    - **Non-flowing mode** (default, pull) = `on(readable) + .read()`/`.pause()`
-    pulls data in a controlled way (flexible control over data consumption)
+    - **Paused mode** (default, pull) = pulls data in a controlled way (flexible
+      control over data consumption) by using `.on(readable) + .read()`.
+      `.on(readable)`, `.pause()` and `.unpipe()` switch to the paused mode
         ```js
         const rr = new RandomReadable()
         rr.on("readable", () => {  // new data is available
@@ -1091,29 +1244,35 @@
           while (chunk = rr.read()) { console.log(chunk.toString("hex")) }
         }).on("end", () => console.log("done"))
         ```
-    - **Flowing mode** (push) = `on(data)`/`.resume()` pushes data as soon as it
-      arrives. `.on(data)/.resume()` switches to the flowing mode that pushes
-      data. `.pause()` switches back to the non-floeing mode (default)
+    - **Flowing mode** (push) = pushes data as soon as it arrives through
+      `.on(data)`. `.on(data)`, `.resume()`, and `.pipe(writable)` switch to the
+      flowing mode.
         ```js
         const rr = new RandomReadable()
         rr.on("data", chunk => console.log(chunk.toString("hex")))
           .on("end", () => console.log("done"))
         ```
-- `Writable` (sink for data)
+- `Writable` (sink for data) = `.write(chunk)` returns `false` for backpressure
+  when an internal buffer is full, `on(drain)` resume writing data, `.end()` end
+  of a Writable
     ```js
-    function serverWritable() {
-      const server = createServer(async (req, res) => {
-        res.writeHead(200, { "Content-Type": "text/plain" })
-        const body = await randomBytes(10)
-        // write() => false for backpressure when the internal buffer is full
-        // on(drain) resume writing
-        res.write(body)
-        res.end("\n\n")
-        res.on("finish", () => console.log("done"))
-      })
-      const port = 9876
-      server.listen(port, () => console.log("Listening on port ${port}"))
+    import { Writable } from "node:stream"
+    import { finished } from "node:stream/promises"
+    class Sink extends Writable {
+      // allocate resources
+      _construct(done) { this.buffer = []; done(null) }
+      _write(chunk, enc, done) {
+        setTimeout(() => { this.buffer.push(chunk); done(null) }, 100)
+      }
+      // flush buffered data before a stream end
+      _final(done) { this.buffer = this.buffer.join(""); done(null) }
+      // deallocate resource
+      _destroy(err, done) { this.buffer += "."; done(err) }
     }
+    const sink = new Sink()
+    sink.write("a"); sink.write("b"); sink.end("c")
+    await finished(sink)
+    console.log(sink.buffer) // abc.
     ```
 - `Duplex` = `Readable` (source of data) + `Writable` (sink of data) where
   written and read data is not related
@@ -1128,9 +1287,29 @@
   destination for chaining (it must be `Duplex`, `Transform`, or `PassThrough`).
   Errors are not propagated automatically through a `pipe()`. `on(error)`
   handlers must be attached for every step
-- `pipeline(straeam, ..., cb)` automatically attaches `on(error)` and
-  `on(close)` handlares for each stream to correctly destroys streams on
+- `await pipeline(...straeams)` automatically attaches `.on(error)` and
+  `.on(close)` handlers for each stream and correctly destroys streams on
   pipeline success or failure
+    ```js
+    import { createReadStream, createWriteStream } from "node:fs"
+    import { pipeline } from "node:stream/promises"
+    function upcase(str) {
+      return new Promise(resolve =>
+        setTimeout(() => resolve(str.toUpperCase()), 100)
+      )
+    }
+    async function* upcaseTransform(source) {
+      source.setEncoding("utf8")
+      for await (const chunk of source) {
+        yield await upcase(chunk)
+      }
+    }
+    await pipeline(
+      createReadStream("./graph.js"),
+      upcaseTransform, // async generator
+      createWriteStream("./out.txt")
+    )
+    ```
 - Both `pipe()` and `pipeline()` return only the last stream (not the combined
   stream)
 - **Sequential iteration** = `Stream` always processes async operations in
