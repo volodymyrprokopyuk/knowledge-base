@@ -1053,8 +1053,17 @@
 
 ## Stream pattern
 
+- **Streaming** = parallel staged processing of data in chunks as soon as it
+  arrives with internal buffering (reactive, modular, composable, constant
+  memory). `Stream` is an abstraction on top of a data source `Readable`, a data
+  transformation `Transform`, and a data sink `Writable`. `Stream` extends
+  `EventEmitter`
+    - **Binary mode** `Buffer` or string with an encoding for IO processing
+    - **Object mode** JavaScript object/array for function composition
 - `Writable` = standard abstraction of a **data sink** to an underlying resource
-  with **backpressure** when `.write(chunk) => false` stop writing until the
+  with **backpressure** when `.write(chunk) => false` stop writing until the. A
+  Writable will notify when an underlying resource is overwhelmed or ready for
+  writing
   `.on(drain)` to resume writing
     ```js
     import { Writable } from "node:stream"
@@ -1081,7 +1090,8 @@
 - `Readable` = standard abstraction of a **data source** from an underlying
   resource with **backpressure** when `this.push(chunk) => false` stop reading
   from the underlying resource. The `_read(size)` will be called later to read
-  more data from the underlying resource
+  more data from the underlying resource. A Readable will start reading from the
+  underlying resource only when data consumption begins
     ```js
     import { Readable } from "node:stream"
     class Source extends Readable {
@@ -1108,15 +1118,15 @@
     const source = new Source("a b c")
     for await (const chunk of source) { console.log(chunk) } // a b c
     ```
-- **Flowing mode** (push) = pushes data as soon as they are available.
-  The flowing mode is activated by `.on(data)`, `.resume()`, `.pipe(writable)`
+- **Flowing mode** (push) = pushes data as soon as it arriaves. The flowing mode
+  is activated by `.on(data)`, `.resume()`, `.pipe(writable)`
     ```js
     const source = new Source("a b c")
     source.on("data", chunk => console.log(chunk))
     source.on("end", () => console.log(".")) // a b c .
     ```
-- **Paused mode** (pull) = allows control control on data consumption. The
-  paused mode is activated by `.on(readable)`, `.pause()`, `.unpipe(writable)`
+- **Paused mode** (pull) = pulls data in a controlled way. The paused mode is
+  activated by `.on(readable)`, `.pause()`, `.unpipe(writable)`
     ```js
     const source = new Source("a b c")
     source.on("readable", () => {
@@ -1136,10 +1146,15 @@
     console.log(sink.buffer, sink2.buffer) // abc. abc.
     ```
 - `Duplex` = **independent** Readable `_read(size)` and Writable `_write(chunk,
-  encoding, done)`, `_final(done)` for stream chaining through `.pipe(duplex |
-  writable)` or `pipeline(readable, ...transform, writable)`
-- `Transform` = a Readable **dependent** on Writable that follows a pattern
-  Writable => Transform => Readable
+  encoding, done)`, `_final(done)` for stream chaining through
+  `readable.pipe(duplex | writable)` or `pipeline(readable, ...transform,
+  writable)`
+- `Transform` = a Readable **dependent** on Writable through a transformation
+  that follows a pattern Writable => Transform => Readable.
+  `readable.pipe(duplex | writable)` returns the last stream for stream
+  chaining, controls backpressure automatically. Errors are not propagated
+  automatically through a `pipe()`, `on(error)` handlers must be attached to
+  every step
     ```js
     import { Transform } from "node:stream"
     class Double extends Transform {
@@ -1166,8 +1181,8 @@
     ```
 - `pipeline(readable, ...transform, writable)` = combines streams in a
   **non-composable** end-to-end pipeline that follows a pattern Readable =>
-  Writable, automatically handles backpressure and destruction of streams on an
-  error or in the end
+  Writable, automatically handles backpressure, errors, and destruction of
+  streams on the pipeline success or failure
     ```js
     import { pipeline } from "node:stream/promises"
     const source = new Source("a b c"), upcase = new Upcase(),
@@ -1199,214 +1214,3 @@
     await pipeline(source, upcase, sink)
     console.log(sink.buffer) // ABC.
     ```
-
-
-- **Streaming** (parallel staged pipeline) = staged parallel processing of data
-  in chunks as soon as it arrives with internal buffering (reactive, modular,
-  composable, constant memory). `Stream` is an abstraction on top of a data
-  source `Readable`, a data transformation `Transform`, and a data sink
-  `Writable`
-- `Stream` extends `EventEmitter`
-    - **Binary mode** `Buffer` or string (IO processing)
-    - **Object mode** (function composition)
-- `Readable` (source of data) = `Readable` will start generating data only when
-  data consumption beings. Async iterable (`for await`) with backpressure
-  (`this.push(chunk)` returns `false` when an internall buffer is full),
-  `on(drain)` resume pushing data
-    ```js
-    import { randomBytes } from "node:crypto"
-    import { Readable } from "node:stream"
-    function random(size) {
-      return new Promise((resolve, reject) =>
-        randomBytes(size, (err, buf) => err ? reject(err) : resolve(buf))
-      )
-    }
-    class RandomReadable extends Readable {
-      #reads = 0
-      async _read(size) { // called autimatically by a Readable
-        const chunk = await random(4)
-        this.push(chunk) // push data to an internal buffer
-        if (++this.#reads > 4) { this.push(null) } // end of a Readable
-      }
-    }
-    // async iterable to fully consume a Readable
-    for await (const chunk of new RandomReadable()) {
-      console.log(chunk.toString("hex"))
-    }
-    ```
-    - **Paused mode** (default, pull) = pulls data in a controlled way (flexible
-      control over data consumption) by using `.on(readable) + .read()`.
-      `.on(readable)`, `.pause()` and `.unpipe()` switch to the paused mode
-        ```js
-        const rr = new RandomReadable()
-        rr.on("readable", () => {  // new data is available
-          let chunk // .read() is sync
-          while (chunk = rr.read()) { console.log(chunk.toString("hex")) }
-        }).on("end", () => console.log("done"))
-        ```
-    - **Flowing mode** (push) = pushes data as soon as it arrives through
-      `.on(data)`. `.on(data)`, `.resume()`, and `.pipe(writable)` switch to the
-      flowing mode.
-        ```js
-        const rr = new RandomReadable()
-        rr.on("data", chunk => console.log(chunk.toString("hex")))
-          .on("end", () => console.log("done"))
-        ```
-- `Writable` (sink for data) = `.write(chunk)` returns `false` for backpressure
-  when an internal buffer is full, `on(drain)` resume writing data, `.end()` end
-  of a Writable
-    ```js
-    import { Writable } from "node:stream"
-    import { finished } from "node:stream/promises"
-    class Sink extends Writable {
-      // allocate resources
-      _construct(done) { this.buffer = []; done(null) }
-      _write(chunk, enc, done) {
-        setTimeout(() => { this.buffer.push(chunk); done(null) }, 100)
-      }
-      // flush buffered data before a stream end
-      _final(done) { this.buffer = this.buffer.join(""); done(null) }
-      // deallocate resource
-      _destroy(err, done) { this.buffer += "."; done(err) }
-    }
-    const sink = new Sink()
-    sink.write("a"); sink.write("b"); sink.end("c")
-    await finished(sink)
-    console.log(sink.buffer) // abc.
-    ```
-- `Duplex` = `Readable` (source of data) + `Writable` (sink of data) where
-  written and read data is not related
-- `Transform` (data transformation) = `Duplex` where written and read data is
-  related through a transformation (`map`, `filter`, `reduce`)
-- `PassThrough` = `Transform` without transformation for observability,
-  instrumentation, late piping, `Readable` to `Writable` change of interface,
-  and lazy streams to delay through a proxy expensive resource initialization
-  until actual stream consumption
-- `readable.pipe(writableDest) => writableDest` switches `Readable` into the
-  flowing mode, controls backpressure automatically, returns `Writable`
-  destination for chaining (it must be `Duplex`, `Transform`, or `PassThrough`).
-  Errors are not propagated automatically through a `pipe()`. `on(error)`
-  handlers must be attached for every step
-- `await pipeline(...straeams)` automatically attaches `.on(error)` and
-  `.on(close)` handlers for each stream and correctly destroys streams on
-  pipeline success or failure
-    ```js
-    import { createReadStream, createWriteStream } from "node:fs"
-    import { pipeline } from "node:stream/promises"
-    function upcase(str) {
-      return new Promise(resolve =>
-        setTimeout(() => resolve(str.toUpperCase()), 100)
-      )
-    }
-    async function* upcaseTransform(source) {
-      source.setEncoding("utf8")
-      for await (const chunk of source) {
-        yield await upcase(chunk)
-      }
-    }
-    await pipeline(
-      createReadStream("./graph.js"),
-      upcaseTransform, // async generator
-      createWriteStream("./out.txt")
-    )
-    ```
-- Both `pipe()` and `pipeline()` return only the last stream (not the combined
-  stream)
-- **Sequential iteration** = `Stream` always processes async operations in
-  sequence one at a time e. g. `on(data)`
-    ```js
-    // Sequential iteration
-    function streamIterate(task, arr) {
-      const taskTr = new Transform({
-        objectMode: true,
-        async transform(chunk, encoding, cb) {
-          try { await task(chunk); cb() }
-          catch (error) { cb(error) }
-        }
-      })
-      return new Promise((resolve, reject) => {
-        // Sequential interation
-        Readable.from(arr).pipe(taskTr)
-          .on("error", reject)
-          .on("finish", resolve)
-      })
-    }
-    try {
-      await streamIterate(taskP, [1, 2, 3]) // 1, 2, 3
-      await streamIterate(taskP, [1, -1, 3]) // 1, oh
-    } catch (error) { console.error(error) }
-    ```
-- **Parallel execution**
-    ```js
-    function streamParallel(tasks) {
-      let completed = 0
-      let done = null
-      let fail = null
-      const taskTr = new Transform({
-        objectMode: true,
-        transform(task, encoding, cb) {
-          // Start all tasks in parallel
-          task().catch(fail) // Global reject on first failure
-            .finally(() => {
-              // flush() stram only when all tasks are actually done
-              if (++completed === tasks.length) { done() }
-            })
-          cb() // all tasks are done immediately
-        },
-        flush(cb) { done = cb }
-      })
-      return new Promise((resolve, reject) => {
-        fail = reject
-        Readable.from(tasks).pipe(taskTr)
-          .on("error", reject)
-          .on("finish", resolve)
-      })
-    }
-    try {
-      await streamParallel([1, 2, 3].map(i => () => taskP(i))) // 1, 2, 3
-      await streamParallel([1, -1, 3].map(i => () => taskP(i))) // 1, oh, 3
-    } catch(error) { console.error(error) }
-    ```
-- **Limited parallel execution**
-    ```js
-    function streamParallelLimit(tasks, limit) {
-      let completed = 0
-      let running = 0
-      let done = null
-      let fail = null
-      let resume = null
-      const taskTr = new Transform({
-        objectMode: true,
-        transform(task, encoding, cb) {
-          task().catch(fail)
-            .finally(() => {
-              if (++completed === tasks.length) { return done() }
-              --running
-              // Resume the stream when a task is completed
-              if (resume) { const r = resume; resume = null; r() }
-            })
-          if (++running < limit) { cb() }
-          else { resume = cb } // Suspend the stream until a task is completed
-        },
-        flush(cb) { done = cb }
-      })
-      return new Promise((resolve, reject) => {
-        fail = reject
-        Readable.from(tasks).pipe(taskTr)
-          .on("error", reject)
-          .on("finish", resolve)
-      })
-    }
-    try {
-      // 1, 2 | 3, 4 | 5
-      await streamParallelLimit([1, 2, 3, 4, 5].map(i => () => taskP(i)), 2)
-      // 1, 2 | 3, oh | 5
-      await streamParallelLimit([1, 2, 3, -1, 5].map(i => () => taskP(i)), 2)
-    } catch(error) { console.error(error) }
-    ```
-- **Composition of streams** = creates a new combined stream (first `Writable`
-  and last `Readable`)
-- **Fork of a stream** = pipes a single `Readable` stream into multiple
-  `Writable` streams with automatic backpressure of the slowest branch of the
-  fork
-- **Merge of streams** = pipes multiple `Readable` into a single `Writable`
