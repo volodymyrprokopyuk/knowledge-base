@@ -57,14 +57,10 @@
       to let pending IO tasks to be processed by the event loop (not efficient
       due to context switching, more complex interleaving algorithm)
     - Pool of reusable external processes `child_process.fork()` with a
-      communication channel `process/worker.send().on()` leaves the event loop
-      unblocked (efficient: reusable processes run to completion, unmodified
-      algorithm)
-    - `new Worker()` threads with communication chanels
-      `parentPort/worker.postMessage().on()` for multi-threaded execution of
-      CPU-bound tasks outside of the event loop, per-thread own event loop and
-      V8 instance (small memory footprint, fast startup time, safe: no
-      syncronization, no resource sharing)
+      communication channel `process/worker.send().on(message)` leaves the event
+      loop unblocked (efficient: reusable processes run to completion,
+      unmodified algorithm)
+    - `new Worker(module, opts)` see below
 - Avoid mixing sync/async callback behavior under the same inferface. To convert
   sync call to async use
     - **Next tick queue** `process.nextTick()` is executed just after the
@@ -546,6 +542,72 @@
       child.on("message", msg => { // receive a message from a child
         console.log("par", msg)
         child.kill("SIGUSR2") // send a signar to a child
+      })
+    }
+    ```
+
+## Worker thread
+
+- `new Worker(module, opts)` creats an independnet dedicated thread for
+  CPU-bound tasks executed in paralle with the main thread event loop. A
+  Worker has an async bidirectional communication chanel with its parent
+  `parentPort/worker.postMessage()/.on(message)`, per-thread own event loop,
+  and V8 instance (small memory footprint, fast startup time, safe: no
+  syncronization, no resource sharing)
+    ```js
+    import {
+      Worker, isMainThread, parentPort, workerData,
+      setEnvironmentData, getEnvironmentData
+    } from "node:worker_threads"
+    const [node, file] = process.argv
+    if (isMainThread) { // main thread
+      // parameterize a worker before creation of a worker
+      setEnvironmentData("worker.inc", 3);
+      // provide a workload for a worker
+      const worker = new Worker(file, { workerData: [1, 2, 3] })
+      worker.on("error", error => console.error("main", error))
+      worker.on("exit", exitCode => console.log("main", exitCode))
+      // receive a message from a worker
+      worker.on("message", msg => console.log("main", msg))
+      // send a message to a worker
+      setTimeout(() => worker.postMessage({ req: "start" }), 100)
+    } else { // worker thread
+      const inc = getEnvironmentData("worker.inc") // get a clone of parameters
+      console.log("work", workerData, inc)
+      // receive a clone of a message from a parent
+      parentPort.on("message", msg => {
+        console.log("work", msg)
+        // process a clone of a workload and send a message to a parent
+        parentPort.postMessage(workerData.map(el => el + inc))
+        parentPort.close() // close an async bidirectional channel
+      })
+    }
+    ```
+- A custom `MessageChannel` can be created on either thread for separation of
+  concerns and one of the `MessagePort`s can be passed to the other thread over
+  the default channel
+    ```js
+    import { Worker, isMainThread, parentPort, MessageChannel }
+    from "node:worker_threads"
+    const [node, file] = process.argv
+    if (isMainThread) {
+      const worker = new Worker(file)
+      worker.on("error", error => console.error("main", error))
+      worker.on("exit", exitCode => console.log("main", exitCode))
+      // create a new dedicate channel for separation of concerns
+      const newChannel = new MessageChannel()
+      // send a new channel to a worker
+      worker.postMessage({ port: newChannel.port1 }, [newChannel.port1])
+      // receive a message from a worker on a new channel
+      newChannel.port2.on("message", msg => console.log("main", msg))
+    } else {
+      let newPort
+      parentPort.once("message", msg => {
+        // receive a new channel from a parent
+        ({ port: newPort } = msg)
+        // send a message to a parent over a new channel
+        newPort.postMessage({ worker: "hi" })
+        newPort.close()
       })
     }
     ```
