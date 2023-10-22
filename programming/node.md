@@ -35,6 +35,47 @@
   by the **libuv internal IO threads**. Sync code inside callbacks (until next
   async operation) is **executed concurrently** to completion without race
   conditions by the single-threaded event loop
+- Node.js scales well (high throughput) when serving **large number of clients**
+  with a **small number of threads** (the main thread running the event loop,
+  libuv aync IO threads, CPU-intensive Worker threads). Node.js scales well when
+  processing **small async IO tasks** and **small CPU-intensive tasks**.
+  **Partition big tasks** into smaller subtasks to be processed concurrently and
+  **minimize variation** of tasks to give feair amount of time to every client.
+  Alternatively offload CPU-intensive tasks to **Worker threads** paying
+  communication **cost of serialization and decerialization**. IO threads are
+  blocked waiting for async IO operations to complete. Worker threads are
+  executed in parllel on CPU cores
+    ```js
+    // large blocking task
+    function sumFirstN(n) {
+      let sum = 0
+      for (let i = 1; i <= n; ++i) { sum += i }
+      return sum
+    }
+    // partitioned small tasks (callback)
+    function sumFirstN2(n, { size = 2 }, done) {
+      let sum = 0, i = 1
+      function next(m = size) {
+        while (i <= n && m-- > 0) { sum += i++ }
+        i > n ? done(null, sum) : queueMicrotask(next)
+      }
+      queueMicrotask(next)
+    }
+    // partitioned small tasks (Promise)
+    function sumFirstN3(n, { size = 2 } = { }) {
+      return new Promise(resolve => {
+        let sum = 0, i = 1
+        function next(m = size) {
+          while (i <= n && m-- > 0) { sum += i++ }
+          i > n ? resolve(sum): queueMicrotask(next)
+        }
+        next() // Promise is always async
+      })
+    }
+    console.log(sumFirstN(10)) // 55
+    sumFirstN2(10, { size: 3 }, (err, sum) => console.log(sum)) // 55
+    console.log(await sumFirstN3(10, { size: 3 })) // 55
+    ```
 
 ## Callback pattern
 
@@ -63,17 +104,33 @@
     - `new Worker(module, opts)` see below
 - Avoid mixing sync/async callback behavior under the same inferface. To convert
   sync call to async use
-    - **Next tick queue** `process.nextTick()` is executed just after the
-      current operaiton, before other pending IO tasks in the same cycle of the
-      event loop
-    - **Mictrotask queue** `queueMicrotask()` (favor over `process.nextTick`) is
-      used to execute Promise handlers `.then()`, `.catch()`, `.finally()`. The
-      microtask queue is drain immediately after the the next tick queue is
-      drained
-    - **Immediate task** `setImmediate()` is executed after all other pending IO
-      tasks in the same cycle of the event loop
-    - **Regular task** `setTimeout()` is executed in the next cycle of the event
-      loop
+    - **Next tick queue** `process.nextTick()` (managed by Node.js, not
+      cleadable) is executed just after the current operaiton, before other
+      pending IO tasks in the same cycle of the event loop
+    - **Mictrotask queue** `queueMicrotask()` (managed by V8, favor over
+      `process.nextTick()`) is used to execute Promise handlers `.then()`,
+      `.catch()`, `.finally()`. The microtask queue is drained immediately after
+      the next tick queue is drained
+        ```js
+        import { EventEmitter } from "node:events"
+        class EE extends EventEmitter {
+          constructor() {
+            super()
+            // emits before a listener is attached (does not work)
+            this.emit("ready")
+            // after a listener is attached
+            queueMicrotask(() => this.emit("ready"))
+          }
+        }
+        const ee = new EE()
+        ee.on("ready", () => console.log("ready"))
+        ```
+    - **Macrotask queue** is always the next cycle of the event loop
+        - **Immediate task** `setImmediate()` is executed as soon as possible
+          on the next cycle of the event loop, but before any timers
+          `setTimeout()` and `setInterval()`
+        - **Delayed task** `setTimeout()` is executed after a delay in one of
+          the next cycles of the event loop
 - Uncaught error thrown from an async callback propagates to the stack of the
   event loop (not to the next callback, not to the stack of the caller that
   triggered the async operation), `process.on(unchaughtException, err)` is
@@ -320,17 +377,17 @@
 ## Stream pattern
 
 - **Streaming** = parallel staged processing of data in chunks as soon as it
-  arrives with internal buffering (reactive, modular, composable, constant
-  memory). `Stream` is an abstraction on top of a data source `Readable`, a data
-  transformation `Transform`, and a data sink `Writable`. `Stream` extends
-  `EventEmitter`
+  arrives with internal buffering and **backpressure** (reactive, modular,
+  composable, **constant memory**, short GC cycles). `Stream` is an abstraction
+  on top of a data source `Readable`, a data transformation `Transform`, and a
+  data sink `Writable`. `Stream` extends `EventEmitter`
     - **Binary mode** `Buffer` or string with an encoding for IO processing
     - **Object mode** JavaScript object/array for function composition
-- `Writable` = standard abstraction of a **data sink** to an underlying resource
-  with **backpressure** when `.write(chunk) => false` stop writing until the. A
-  Writable will notify when an underlying resource is overwhelmed or ready for
-  writing
-  `.on(drain)` to resume writing
+- `Writable` = standard abstraction of a **data sink** on top of an underlying
+  resource with **backpressure** when an internal buffer has exceeded the
+  `highWaterMark` then `.write(chunk) => false` stop writing until a Writable
+  will notify when an underlying resource is ready for writing `.on(drain)` to
+  resume writing
     ```js
     import { Writable } from "node:stream"
     import { finished } from "node:stream/promises"
@@ -420,7 +477,8 @@
   `readable.pipe(duplex | writable)` returns the last stream for stream
   chaining, controls backpressure automatically. Errors are not propagated
   automatically through a `pipe()`, `on(error)` handlers must be attached to
-  every step
+  every step. Destruction of a pipeline constructed with `.pipe()` has to be
+  performed manually
     ```js
     import { Transform } from "node:stream"
     class Double extends Transform {
@@ -553,7 +611,8 @@
   Worker has an async bidirectional communication chanel with its parent
   `parentPort/worker.postMessage()/.on(message)`, per-thread own event loop,
   and V8 instance (small memory footprint, fast startup time, safe: no
-  syncronization, no resource sharing)
+  syncronization, no resource sharing). All communication over a channel between
+  a parent and a worker is serialized and deserializedk
     ```js
     import {
       Worker, isMainThread, parentPort, workerData,
