@@ -736,3 +736,87 @@
       gen.throw(new Error("uh"))
     } catch (e) { console.error("outside", e.message) } // outside oh
     ```
+
+## Testing
+
+- Assertions
+    ```js
+    import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
+    describe("assertions", () => {
+      test("assertions", () => {
+        const o = { a: 1 }, o2 = o
+        expect(1).toBe(1) // primitive values via Object.is()
+        expect(o).toBe(o2) // same object reference via Object.is()
+        expect(0.1 + 0.2).not.toBe(0.3) // rounding error
+        expect(0.1 + 0.2).toBeCloseTo(0.3, 5) // float point assertion
+        expect(typeof 1).toBe("number") // type assertion
+        expect(new Number(1) instanceof Number).toBe(true) // instance assertion
+        expect(o).not.toBe({ a: 1 }) // not the same object reference
+        expect(o).toEqual({ a: 1 }) // recursive content for object/array
+        expect(() => { throw new Error("oh") }).toThrow(/oh/) // error function
+      })
+    })
+    ```
+- Promise testing
+    ```js
+    describe("Promise", () => {
+      function task(v) {
+        return new Promise((resolve, reject) =>
+          setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 100)
+        )
+      }
+      // .resolves/.rejects unwraps a Promise value/error to apply sync assertions
+      // However, all assertions now return a Promise, hence => await expect(...)
+      test("resolve", async () => await expect(task(1)).resolves.toBe(1))
+      test("reject", async () => await expect(task(0)).rejects.toThrow("oh"))
+    })
+    ```
+- Parameterized tests
+    ```js
+    describe("each", () => {
+      test.each([
+        [1, 2, 3], [4, 5, 9]
+      ])("array sum(%i, %i) === %i", (a, b, exp) => // positional arguments
+        expect(a + b).toBe(exp)
+      )
+      test.each([
+        { a: 1, b: 2, exp: 3 }, { a: 4, b: 5, exp: 9 }
+      ])("object sum($a, $b) === $exp", ({ a, b, exp }) => // object destructuring
+        expect(a + b).toBe(exp)
+      )
+    })
+    ```
+- Test context
+    ```js
+    describe("context", () => {
+      beforeEach(ctx => ctx.n = 10) // set up a test local context
+      afterEach(ctx => delete ctx.n) // tear down a test local context
+      test("context setup", ctx => expect(ctx.n + 1).toBe(11))
+      test("context reset", ({ n }) => expect(n - 1).toBe(9))
+    })
+    ```
+- Spies and mocks
+    ```js
+    describe("spies and mocks", () => {
+      // const o = { f: function(a) { return a + 1 } }
+      const o = { f(a) { return a + 1 } }
+      // const o = { f: a => a + 1 }
+      afterEach(() => vi.restoreAllMocks())
+      test("spy on a method", () => {
+        const fSpy = vi.spyOn(o, "f")
+        expect(o.f(10)).toBe(11)
+        expect(fSpy).toHaveBeenCalledWith(10)
+        expect(fSpy).toHaveReturnedWith(11)
+        fSpy.mockImplementation(a => a + 2)
+        expect(o.f(10)).toBe(12)
+        expect(fSpy).toHaveBeenNthCalledWith(2, 10)
+        expect(fSpy).toHaveNthReturnedWith(2, 12)
+      })
+      test("mock a function", () => {
+        const fMock = vi.fn(a => a - 1)
+        expect(fMock(10)).toBe(9)
+        expect(fMock).toHaveBeenNthCalledWith(1, 10)
+        expect(fMock).toHaveNthReturnedWith(1, 9)
+      })
+    })
+    ```
