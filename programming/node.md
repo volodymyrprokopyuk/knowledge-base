@@ -2,49 +2,49 @@
 
 ## Reactor pattern
 
-- Modern OSes provide async, non-blocking IO syscalls through the **Sync Event
-  Demultiplexer** (SED) e. g. `epoll` on Linux. SED watches (sync) for a set of
-  async operations to complete and allows multiple async operations to be
+- **Sync Event Demultiplexer** (SED) = provides an OS-level syscall for async,
+  non-blocking IO operations e. g. `epoll` on Linux. SED watches sync for a set
+  of async operations to complete and allows multiple async operations to be
   processed in a single thread (events demultiplexing)
-- **Reactor pattern** = executes (async) a handler (app callback) for each async
+- **Reactor pattern** = async executes a handler (app callback) for each async
   operation (non-blocking IO)
-    - App requests async operations [resource (file), opeartion (read), handler
-      (callbback)] at SED (non-blocking)
+    - App requests async operations [resource (file), operation (read), handler
+      (callback)] at SED (non-blocking)
     - SED watches requested async operations for completion (blocking)
     - SED enqueues [event (operation), handler (callback)] to the event queue
       (EQ)
     - Single-threaded event loop (EL) reads the EQ and executes handlers (app
       callbacks) to completion (no race conditions). App callbacks request more
-      async operations at SED (when a task requests a new async operations it
-      gives control back to the event loop; invoking an async operation always
-      unwinds the stack back to the event loop, leaving it free to handle other
-      requests, IO-bound)
+      async operations at SED
+    - When a callback requests a new async operations it gives control back to
+      the event loop. Invoking an async operation always unwinds the stack back
+      to the event loop, leaving it free to handle other requests (IO-bound)
     - EL blocks again (next EL cycle) at SED for new async operations to
       complete
 - **libuv** = SED + reactor (event loop + event queue) = cross-platform
-  low-level IO engine of Node.js
+  low-level IO engine for Node.js
     - High resolution clock and timers
-    - Async thread pool and synchronization
+    - Async thread pool and communication channels
     - Async child processes and signal handling
     - Async FS, TCP/UDP, DNS
-    - Async IPC via shared UNIX domain sockets
+    - Async IPC via shared UNIX domain sockets (bidirectional channels)
 - **Node.js** (async IO operations in parallel by libuv threads, sync callback
   code to completion in the event loop) = libuv (SED + reactor) + V8 (JavaScript
   runtime) + modules
 - In Node.js only async, non-blocking IO operations are **executed in parallel**
   by the **libuv internal IO threads**. Sync code inside callbacks (until next
-  async operation) is **executed concurrently** to completion without race
-  conditions by the single-threaded event loop
+  async operation) is **executed concurrently to completion without race
+  conditions** by the **single-threaded event loop**
 - Node.js scales well (high throughput) when serving **large number of clients**
-  with a **small number of threads** (the main thread running the event loop,
-  libuv aync IO threads, CPU-intensive Worker threads). Node.js scales well when
+  with a **small number of threads**: the main thread running the event loop,
+  libuv aync IO threads, CPU-intensive Worker threads. Node.js scales well when
   processing **small async IO tasks** and **small CPU-intensive tasks**.
-  **Partition big tasks** into smaller subtasks to be processed concurrently and
-  **minimize variation** of tasks to give feair amount of time to every client.
-  Alternatively offload CPU-intensive tasks to **Worker threads** paying
-  communication **cost of serialization and decerialization**. IO threads are
+- **Partition big tasks** into smaller sub-tasks to be processed concurrently
+  and **minimize variation** of tasks to give fair amount of time to every
+  client. Alternatively offload CPU-intensive tasks to **Worker threads** paying
+  communication **cost of serialization and de-serialization**. IO threads are
   blocked waiting for async IO operations to complete. Worker threads are
-  executed in parllel on CPU cores
+  executed in parallel on CPU cores
     ```js
     // large blocking task
     function sumFirstN(n) {
@@ -59,7 +59,7 @@
         while (i <= n && m-- > 0) { sum += i++ }
         i > n ? done(null, sum) : queueMicrotask(next)
       }
-      queueMicrotask(next)
+      queueMicrotask(next) // must be async
     }
     // partitioned small tasks (Promise)
     function sumFirstN3(n, { size = 2 } = { }) {
@@ -79,70 +79,72 @@
 
 ## Callback pattern
 
-- **Callback** (Continuation-Passing Stype, CPS = control is passed explicitly
-  in the form fo a continuation/callback, `return`/`throw` => `callback(error,
-  result)`) = **first-class function** (to pass a callback) + **closure** (to
-  retain the caller contenxt) that is passed to an async function (which
-  **returns immediately**) and **is executed on completion** of the requested
-  async operation
-- Callback communicates an async result once and has **trust issues** (tight
-  coupling = callback is passed to an async function for execution). Callback
-  **is expected to be invoked exactly** once either with result or error
-- Async result/error is propagated through a chain of nested `callbacks(error |
-  null, data | cb)` that accept an `error | null` **first**, then a `result |
-  callback` that comes always **last**. Never `return` a result or `throw` an
-  error from a callback (`return` and `throw` are unusable from a callback)
-- Sync operation (CPU-bound, discouraged) blocks the event loop and puts on hold
-  all concurrent processing blocking the whole application
-    - Interleave each step of a CPU-bound sync operation with `setImmediate()`
-      to let pending IO tasks to be processed by the event loop (not efficient
-      due to context switching, more complex interleaving algorithm)
-    - Pool of reusable external processes `child_process.fork()` with a
+- **Callback** = **first-class function** (to pass a callback) + **closure** (to
+  retain the caller context) that is passed to an async function (which
+  **returns immediately**, non-blocking) and **is executed on completion** of
+  the requested async operation. A callback implements the Continuation-Passing
+  Style, CPS = control is passed explicitly in a form of a
+  continuation/callback, `return/throw` => `callback(error, result)`
+- Callback **is expected to be invoked exactly once** either with a result or an
+  error. A callback has **trust issues**: a caller passes callback code to a
+  third party, an async function receives callback code from a third party
+- Async result/error is **propagated through a chain** of nested
+  `callbacks(error | null, data | cb(data))` that accept an `error | null`
+  **first**, then a `result | callback(data)` that comes always **last**. Never
+  `return` a result or `throw` an error from a callback (`return` and `throw`
+  are unusable from a callback)
+- Sync CPU-bound operations in a callback are discouraged as they block the
+  event loop and put on hold all concurrent processing blocking the whole
+  application
+    - Interleave each step of a CPU-bound sync operation with `queueMicrotask()`
+      or `setImmediate()` to let other IO tasks to be processed by the event
+      loop (not efficient due to context switching, more complex interleaving
+      algorithm)
+    - Pool of reusable external Node.js processes `child_process.fork()` with a
       communication channel `process/worker.send().on(message)` leaves the event
       loop unblocked (efficient: reusable processes run to completion,
       unmodified algorithm)
     - `new Worker(module, opts)` see below
-- Avoid mixing sync/async callback behavior under the same inferface. To convert
-  sync call to async use
-    - **Next tick queue** `process.nextTick()` (managed by Node.js, not
-      cleadable) is executed just after the current operaiton, before other
-      pending IO tasks in the same cycle of the event loop
+- Avoid mixing sync with **async callback behavior** under the same interface.
+  To convert sync callback to an async callback use
+    - **Next tick queue** `process.nextTick()` (managed by Node.js,
+      non-clearable) is executed just after the current operation, before other
+      IO tasks in **the same cycle** of the event loop
     - **Mictrotask queue** `queueMicrotask()` (managed by V8, favor over
       `process.nextTick()`) is used to execute Promise handlers `.then()`,
-      `.catch()`, `.finally()`. The microtask queue is drained immediately after
-      the next tick queue is drained
+      `.catch()`, and `.finally()`. The microtask queue is drained immediately
+      after the next tick queue is drained within **the same cycle** of the
+      event loop
         ```js
         import { EventEmitter } from "node:events"
         class EE extends EventEmitter {
           constructor() {
             super()
-            // emits before a listener is attached (does not work)
+            // emits sync before a listener is attached (does not work)
             this.emit("ready")
-            // after a listener is attached
+            // amits async after a listener is attached (works)
             queueMicrotask(() => this.emit("ready"))
           }
         }
         const ee = new EE()
         ee.on("ready", () => console.log("ready"))
         ```
-    - **Macrotask queue** is always the next cycle of the event loop
-        - **Immediate task** `setImmediate()` is executed as soon as possible
-          on the next cycle of the event loop, but before any timers
-          `setTimeout()` and `setInterval()`
+    - **Macrotask queue** is always **the next cycle** of the event loop
+        - **Immediate task** `setImmediate()` is executed as soon as possible on
+          the next cycle of the event loop, before any timers `setTimeout()` and
+          `setInterval()`
         - **Delayed task** `setTimeout()` is executed after a delay in one of
           the next cycles of the event loop
-- Uncaught error thrown from an async callback propagates to the stack of the
+- An uncaught error thrown from an async function propagates to the stack of the
   event loop (not to the next callback, not to the stack of the caller that
-  triggered the async operation), `process.on(unchaughtException, err)` is
-  emitted and process exits with a non-zero exit code
+  triggered the async operation), `process.on(unchaughtException)` is
+  emitted and the process exits with a non-zero exit code
 - **Callback hell** = deeply nested code as a result of **in-place nested
   anonymous callbacks** that unnecessary consume memory because of closures
     - Do not abuse in-place nested anonymous callbacks
-    - Early return principle = favor `return/continue/break` over nested
-      `if/else`
     - **Create named callbacks** with clearly defined interface (and without
-      unnecessary closures)
-- **Sequential iteration** (recursion) = executes async tasks in sequence one
+      unnecessary closures that consume memory)
+- **Sequential execution** (CPS) = executes async tasks in sequence one
   task at a time until all complete or the first error
     ```js
     function task(v, done) {
@@ -153,10 +155,10 @@
     function sequence(tasks, done) {
       let i = 0
       function next(err) {
-        if (err) { return done(err.message) }
-        i < tasks.length ? tasks[i++](next) : process.nextTick(() => done(null))
+        if (err) { return done(err) }
+        i < tasks.length ? tasks[i++](next) : done(null)
       }
-      next()
+      queueMicrotask(next)
     }
     const tasks = [1, 2, 3].map(el => done => task(el, done)) // 1, 2, 3, null
     const tasks = [1, 2, 0, 3].map(el => done => task(el, done)) // 1, 2, oh
@@ -168,12 +170,12 @@
     ```js
     function parallel(tasks, done) {
       let completed = 0
-      function check(err) {
-        if (err) { return done(err.message) }
+      function next(err) {
+        if (err) { return done(err) }
         if (++completed === tasks.length) { return done(null) }
       }
-      if (tasks.length === 0) { return process.nextTick(() => done(null)) }
-      for (const task of tasks) { task(check) }
+      if (tasks.length === 0) { queueMicrotask(() => done(null)) }
+      for (const task of tasks) { task(next) }
     }
     const tasks = [1, 2, 3].map(el => done => task(el, done)) // 1, 2, 3, null
     const tasks = [1, 2, 0, 3].map(el => done => task(el, done)) // 1, 2, oh, 3
@@ -183,27 +185,27 @@
 - **Limited parallel execution** (sync loop until a limit) = executes at most N
   tasks in parallel until all complete or the first error
     ```js
-    function parallelLimit(tasks, limit, done) {
-      let i = 0, running = 0, completed = 0
-      function check(err) {
-        if (err) { return done(err.message) }
+    function parallelLimit(tasks, { limit = 2 }, done) {
+      let completed = 0, running = 0, i = 0
+      function next(err) {
+        if (err) { return done(err) }
         if (++completed === tasks.length) { return done(null) }
         if (--running < limit) { parallel() }
       }
       function parallel() {
         while (i < tasks.length && running < limit) {
-          tasks[i++](check); ++running
+          tasks[i++](next); ++running
         }
       }
-      if (tasks.length === 0) { return process.nextTick(() => done(null)) }
+      if (tasks.length === 0) { queueMicrotask(() => done(null)) }
       parallel()
     }
     // 1, 2 | 3, 4 | 5, null
     const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
     // 1, 2 | 3, oh | 4
     const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
-    parallelLimit(tasks, 2, console.log)
-    parallelLimit([], 2, console.log) // null
+    parallelLimit(tasks, { limit: 2 }, console.log)
+    parallelLimit([], { }, console.log) // null
     ```
 
 ## Observer pattern
