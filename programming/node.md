@@ -210,36 +210,39 @@
 
 ## Observer pattern
 
-- **Observer** = an `EventEmitter` notifies its observers/listeners on its state
-  changes
+- **Observer** = `EventEmitter` continuously notifies **multiple
+  observers/listeners** on its state changes through different types of
+  recurrent events. `EventEmitter` **does not have trust issues** = a callback
+  is controlled by a caller
+- Events are **guaranteed to fire async** in the next cycle of the event loop.
+  However, `ee.emit()` is called sync for all registered listeners. Combining
+  `EventEmitter` with the callback interface is an elegant and flexible solution
 - `EventEmitter` = registers multiple `function listener(event, ...args)` for
   specific event types `ee.on|once(event, listener)`. Synchronously
   `ee.emit(event, ...args)` for all registered listeners.
-  `ee.removeListener(event, listener)` unsubscribes listeners when they are no
+  `ee.removeListener(event, listener)` unsubscribes a listeners when it is no
   longer needed to avoid memory leaks due to captured context in listener
-  closures. If `ee.on(error, ...args)` is not registered an `Error` is thrown
+  closures. If `ee.on(error, ...args)` is not registered an `Error` is thrown.
+  Always register a listener for the `error` event
+- Async result/error is propagated through `emit` events. Never `return` a
+  result or `throw` an error from an `EventEmitter` (`return` and `throw` are
+  unusable with `EventEmitter`)
     ```js
     import { EventEmitter } from "node:events"
     class EE extends EventEmitter { }
     const ee = new EE()
     ee.on("error", err => console.error(err.message))
-    ee.on("ev", function() { this.emit("error", new Error("oh")) })
-    ee.on("ev", v => console.log(v))
-    setTimeout(() => ee.emit("ev", 1), 500) // oh, 1
+    ee.on("start", console.log)
+    ee.on("start", function () { this.emit("error", new Error("oh")) })
+    setTimeout(() => ee.emit("start", 1), 500) // 1, oh
     ```
-- `EventEmitter` continuously notifies **multiple observers on different types
-  of recurrent events** and **does not have trust issues** (loose coupling =
-  callback is controlled by the caller). Events are **guaranteed to fire async**
-  in the next cycle of the event loop, however, `ee.emit()` is called sync for
-  all registered listeners. Combining `EventEmitter` with the **callback**
-  interface is an elegant and flexible solution
-- Async result/error is proparaged through `emit` events. Never `return` a
-  result or `throw` an error from an `EventEmitter` (`return` and `throw` are
-  unusaable with `EventEmitter`). Always register a listener for the `error`
-  event
 
 ## Promise pattern
 
+- Sync code has an **ever-growing** list of `.on(uncaughtExeption)`. Promise
+  code has a **growing-and-shrinking** list of `.on(unhandledRegection)` as a
+  rejection can be handled later when a rejected promise gets a rejection
+  handler
 - **Sequential iteration** (dynamic promise chain in a sync loop)
     ```js
     function task(v) {
@@ -255,43 +258,43 @@
       return p
     }
     // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 3].map(el => () => task(el))
     // 1, 2, oh
-    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 0, 3].map(el => () => task(el))
     sequence(tasks).then(console.log, console.error)
     sequence([]).then(console.log, console.error) // undefined
     ```
 - **Parallel execution** (sync loop for all tasks)
     ```js
     function parallel(tasks) {
-      let completed = 0
-      return new Promise((resolve, reject) => {
-        function check() {
+      return new Promise ((resolve, reject) => {
+        let completed = 0
+        function next() {
           if (++completed === tasks.length) { return resolve() }
         }
         if (tasks.length === 0) { return resolve() }
-        for (const task of tasks) { task().then(check, reject) }
+        for (const task of tasks) { task().then(next, reject) }
       })
     }
     // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 3].map(el => () => task(el))
     // 1, 2, oh, 3
-    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 0, 3].map(el => () => task(el))
     parallel(tasks).then(console.log, console.error)
     parallel([]).then(console.log, console.error) // undefined
     ```
-- **Limited parallel execution** (sync loop until limit)
+- **Limited parallel execution** (sync loop until a limit)
     ```js
-    function parallelLimit(tasks, limit) {
+    function parallelLimit(tasks, limit = 2) {
       return new Promise((resolve, reject) => {
-        let i = 0, running = 0, completed = 0
-        function check() {
+        let completed = 0, running = 0, i = 0
+        function next() {
           if (++completed === tasks.length) { return resolve() }
           if (--running < limit) { parallel() }
         }
         function parallel() {
           while (i < tasks.length && running < limit) {
-            tasks[i++]().then(check, reject); ++running
+            tasks[i++]().then(next, reject); ++running
           }
         }
         if (tasks.length === 0) { return resolve() }
@@ -299,16 +302,12 @@
       })
     }
     // 1, 2 | 3, 4 | 5, undefined
-    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
+    const tasks = [1, 2, 3, 4, 5].map(el => () => task(el))
     // 1, 2, | 3, oh | 4
-    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
+    const tasks = [1, 2, 3, 0, 4].map(el => () => task(el))
     parallelLimit(tasks, 2).then(console.log, console.error)
     parallelLimit([]).then(console.log, console.error) // undefined
     ```
-- Sync code has an **ever-growing** list of `.on(uncaughtExeption)`. Promise
-  code has a **growing-and-shrinking** list of `.on(unhandledRegection)` as a
-  rejection can be handled later when a rejected promise gets a rejection
-  handler
 
 ## Async/await pattern
 
