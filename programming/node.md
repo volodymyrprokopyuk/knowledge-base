@@ -312,26 +312,26 @@
 ## Async/await pattern
 
 - `async` function **always returns a Promise** immediately and synchronously.
-  `try/catch/throw` inside an `async` function works for both sync and async
-  code. Use `return await` to prevent errors on the caller side and `catch`
-  errors locally
+  `try/catch/throw` inside an `async` function/generator work for both sync and
+  async code. Use `return await` or `yield await` to prevent errors on the
+  caller side and `catch` errors locally within an async function/generator
     ```js
     async function localError() {
       try { return task(false) } // Caller oh
       try { return await task(false) } // Local oh
-      catch (e) { console.error("Local", e.message) }
+      catch (err) { console.error("Local", err.message) }
     }
-    localError().catch(e => console.error("Caller", e.message))
+    localError().catch(err => console.error("Caller", err.message))
     ```
 - `async` function is a `Promise`-`yield`ing generator that on each `await`
   expression `yield`s a Promise and suspends the generator, its internal state
-  is saved and the control is retuned to the event loop. When the Promise that
-  has been `await`ed settles, the control is given back to the `async` function
-  and the generator is resumed
-- `Promise` abstraction and `async/await` syntax is used to manage async
-  operations in a sync-like manner. However, if async operations are unrelated,
-  `await` introduces unnecessary blocking. Do not use `await` inside a loop, use
-  `Promise.all()` instead
+  is preserved and control is returned to the event loop. When the Promise that
+  has been `await`ed settles, control is given back to the `async` function and
+  the generator resumes
+- `Promise` **abstraction** and `async/await` **syntax** is used to manage async
+  operations in a **sync-like manner**. However, if async operations are
+  unrelated, `await` introduces unnecessary blocking. Do not use `await` inside
+  a loop, use `Promise.all()` instead
     ```js
     console.log(await task(1), await task(2)) // sequence, slow
     console.log(await Promise.all([task(1), task(2)])) // parallel, fast
@@ -342,25 +342,23 @@
       for (const task of tasks) { await task() }
     }
     // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 3].map(el => () => task(el))
     // 1, 2, oh
-    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
-    try {
-      console.log(await sequence(tasks))
-      console.log(await sequence([])) // undefined
-    } catch (e) { console.error(e.message) }
+    const tasks = [1, 2, 0, 3].map(el => () => task(el))
+    try { console.log(await sequence(tasks)) }
+    catch (err) { console.error(err.message) }
+    console.log(await sequence([])) // undefined
     ```
 - **Parallel execution** (await loop)
     ```js
     // Use the prallel() from the Promise pattern above
     // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => done => task(el, done))
+    const tasks = [1, 2, 3].map(el => () => task(el))
     // 1, 2, oh, 3
-    const tasks = [1, 2, 0, 3].map(el => done => task(el, done))
-    try {
-      console.log(await parallel(tasks))
-      console.log(await parallel([])) // undefined
-    } catch (e) { console.error(e.message) }
+    const tasks = [1, 2, 0, 3].map(el => () => task(el))
+    try { console.log(await parallel(tasks)) }
+    catch (err) { console.error(err.message) }
+    console.log(await parallel([])) // undefined
     ```
 - **Limited parallel execution**
     ```js
@@ -369,10 +367,9 @@
     const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
     // 1, 2, | 3, oh | 4
     const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
-    try {
-      console.log(await parallelLimit(tasks, 2))
-      console.log(await parallelLimit([], 2)) // undefined
-    } catch (e) { console.error(e.message) }
+    try { console.log(await parallelLimit(tasks, 2)) }
+    catch (err) { console.error(err.message) }
+    console.log(await parallelLimit([], 2)) // undefined
     ```
 
 ## Stream pattern
@@ -387,24 +384,21 @@
 - `Writable` = standard abstraction of a **data sink** on top of an underlying
   resource with **backpressure** when an internal buffer has exceeded the
   `highWaterMark` then `.write(chunk) => false` stop writing until a Writable
-  will notify when an underlying resource is ready for writing `.on(drain)` to
+  notifies when the underlying resource is ready for writing `.on(drain)` to
   resume writing
     ```js
     import { Writable } from "node:stream"
     import { finished } from "node:stream/promises"
     class Sink extends Writable {
-      _construct(done) { // allocates resources
-        this.buffer = []; done(null)
-      }
+      // allocates resources
+      _construct(done) { this.buffer = []; done(null) }
       _write(chunk, encoding, done) { // if error done(new Error("oh"))
         setTimeout(() => { this.buffer.push(chunk); done(null) }, 100)
       }
-      _final(done) { // flushes buffered data before a Writable end
-        this.buffer = this.buffer.join(""); done(null)
-      }
-      _destroy(err, done) { // disposes resources
-        this.buffer += "."; done(err)
-      }
+      // flushes buffered data before a Writable end
+      _final(done) { this.buffer = this.buffer.join(""); done(null) }
+      // disposes resources
+      _destroy(err, done) { this.buffer += "."; done(err) }
     }
     const sink = new Sink()
     sink.write("a"); sink.write("b"); sink.end("c")
