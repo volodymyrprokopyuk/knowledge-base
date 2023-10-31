@@ -407,9 +407,9 @@
     ```
 - `Readable` = standard abstraction of a **data source** from an underlying
   resource with **backpressure** when `this.push(chunk) => false` stop reading
-  from the underlying resource. The `_read(size)` will be called later to read
-  more data from the underlying resource. A Readable will start reading from the
-  underlying resource only when data consumption begins
+  from the underlying resource. The `_read(size)` will be automatically called
+  later to read more data from the underlying resource. A Readable will start
+  reading from the underlying resource only when data consumption begins
     ```js
     import { Readable } from "node:stream"
     class Source extends Readable {
@@ -417,34 +417,34 @@
         super({ encoding, ...opts })
         this.source = source; this.i = 0
       }
-      _construct(done) { // allocates resources
-        this.source = this.source.split(" "); done(null)
-      }
+      // allocates resources
+      _construct(done) { this.source = this.source.split(" "); done(null) }
       _read(size) {
         setTimeout(() => // if error this.destroy(new Error("oh"))
           this.i < this.source.length ? this.push(this.source[this.i++]) :
             this.push(null), 100 // end of a Readable
         )
       }
-      _destroy(err, done) { // disposes resources
-        this.source = null; done(err)
-      }
+      // disposes resources
+      _destroy(err, done) { this.source = null; done(err) }
     }
     ```
-- **Async interator** `for await ... of` to consume a Readable
+- **Async iterator** `for await ... of` to consume a Readable
     ```js
     const source = new Source("a b c")
     for await (const chunk of source) { console.log(chunk) } // a b c
     ```
-- **Flowing mode** (push) = pushes data as soon as it arriaves. The flowing mode
-  is activated by `.on(data)`, `.resume()`, `.pipe(writable)`
+- **Flowing mode** (push) = a Readable **producer pushes** data to a consumer
+  as soon as it is available. The flowing mode is activated by `.on(data)`,
+  `.pipe(writable)`, `.resume()`
     ```js
     const source = new Source("a b c")
     source.on("data", chunk => console.log(chunk))
     source.on("end", () => console.log(".")) // a b c .
     ```
-- **Paused mode** (pull) = pulls data in a controlled way. The paused mode is
-  activated by `.on(readable)`, `.pause()`, `.unpipe(writable)`
+- **Paused mode** (pull) = a **consumer pulls** data from a Readable producer in
+  a controlled way. The paused mode is activated by `.on(readable)`,
+  `.unpipe(writable)`, `.pause()`
     ```js
     const source = new Source("a b c")
     source.on("readable", () => {
@@ -453,9 +453,13 @@
     })
     source.on("end", () => console.log(".")) // a b c .
     ```
-- **Piping** = `readable.pipe(duplex | writable)` creates a stream chain,
-  switches a Readable to the flowing mode, returns the last stream for chaining,
-  multiple Writables can be attached to the same Readable
+- **Piping** = `readable.pipe(duplex | writable)` creates a **chain of
+  streams**, switches a Readable producer to the **flowing mode**, returns the
+  last stream in a chain. A `.pipe()` **controls backpressure automatically**.
+  Errors are not propagated automatically through a `pipe()`, `on(error)`
+  handlers must be attached to every step. Destruction of a pipeline constructed
+  with a `.pipe()` has to be performed manually by calling `.destroy()` on every
+  step. Multiple Writables can be attached to the same Readable
     ```js
     const source = new Source("a b c"),
           sink = new Sink(), sink2 = new Sink()
@@ -467,13 +471,9 @@
   encoding, done)`, `_final(done)` for stream chaining through
   `readable.pipe(duplex | writable)` or `pipeline(readable, ...transform,
   writable)`
-- `Transform` = a Readable **dependent** on Writable through a transformation
-  that follows a pattern Writable => Transform => Readable.
-  `readable.pipe(duplex | writable)` returns the last stream for stream
-  chaining, controls backpressure automatically. Errors are not propagated
-  automatically through a `pipe()`, `on(error)` handlers must be attached to
-  every step. Destruction of a pipeline constructed with `.pipe()` has to be
-  performed manually
+- `Transform` = a Readable **dependent** on a Writable through a **composable
+  transformation** that follows a pattern Writable => Transform => Readable.
+  Multiple Transforms can be chained to produce a new Transform
     ```js
     import { Transform } from "node:stream"
     class Double extends Transform {
@@ -493,15 +493,15 @@
       }
       _flush(done) { this.push("_"); done(null) }
     }
-    const source = new Source("a b c"), upcase = new Upcase(),
-          double = new Double(), sink = new Sink()
+    const source = new Source("a b c"), double = new Double(),
+          upcase = new Upcase(), sink = new Sink()
     await finished(source.pipe(double).pipe(upcase).pipe(sink))
     console.log(sink.buffer) // AABBCC-_.
     ```
 - `pipeline(readable, ...transform, writable)` = combines streams in a
   **non-composable** end-to-end pipeline that follows a pattern Readable =>
-  Writable, automatically handles backpressure, errors, and destruction of
-  streams on the pipeline success or failure
+  ...Transform => Writable, **automatically handles backpressure, error
+  propagation, and destruction of streams** on pipeline success or failure
     ```js
     import { pipeline } from "node:stream/promises"
     const source = new Source("a b c"), upcase = new Upcase(),
@@ -510,7 +510,7 @@
     console.log(sink.buffer) // AABBCC-_.
     ```
 - `compose(...streams)` = combines streams in a new **composable** Duplex stream
-  that follows a pattern Writable => Readable using the `pipeline()`
+  that follows a pattern Writable => ...Transform => Readable using `pipeline()`
     ```js
     import { compose } from "node:stream"
     const source = new Source("a b c"), upcase = new Upcase(),
@@ -519,13 +519,15 @@
     console.log(sink.buffer) // AABBCC-_.
     ```
 - **Async iterator** `for await ... of` `next() => Promise()` and
-  **async generator** `async function* ...` `yield Promise()` form a basis for
-  **language-level construction of streams**
+  **async generator** `async function* { yield Promise() }` form a basis for
+  **language-level construction of streams**. A composable stream Writable =>
+  Readable is an async generator that internally uses an async iterator to
+  consume an input Readable
     ```js
-    async function* upcase(values) {
-      for await (const value of values) {
-        yield new Promise(resolve =>
-          setTimeout(() => resolve(value.toUpperCase()), 100)
+    async function* upcase(readable) { // async generator
+      for await (const ch of readable) { // async iterator
+        yield new Promise(resolve => // async generator
+          setTimeout(() => resolve(ch.toUpperCase()), 100)
         )
       }
     }
