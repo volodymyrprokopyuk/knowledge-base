@@ -538,23 +538,24 @@
 
 ## Child process
 
-- `spawn(cmd, args, opts): ChildProcess` executes a command from a PATH. Async
-  foundation for all other tools
+- `spawn(cmd, args, opts): ChildProcess` executes a **command from a PATH**.
+  Async foundation for all tools below. `ChildProcess` extends `EventEmitter`
     ```js
     import { spawn } from "node:child_process"
     const ls = spawn("ls", ["-lah", "/usr/lib"])
-    ls.on("error", error => console.error(error))
+    ls.on("error", console.error)
     ls.on("close", exitCode => console.log(exitCode))
     ls.stdout.setEncoding("utf8")
-    ls.stdout.on("data", chunk => console.log(chunk))
-    ls.stderr.on("data", chunk => console.log(chunk))
+    ls.stdout.on("data", console.log)
+    ls.stderr.setEncoding("utf8")
+    ls.stderr.on("data", console.error)
     ```
-- `exec(cmd, opts, done): ChildProcess` executes a shell command
+- `exec(cmd, opts, done): ChildProcess` executes a **shell command**
     ```js
     import { exec } from "node:child_process"
     exec("for x in a b c; do echo $x; done", (err, stdout, stderr) => {
-      if (err) { return console.log(err, stderr) }
-      console.log(stdout, stderr) // a b c
+      if (err) { return console.log(err) }
+      console.log(stdout) // a b c
     })
     ```
     ```js
@@ -564,35 +565,35 @@
     try {
       const { stdout, stderr } =
             await execp("echo a b c | tr '[:lower:]' '[:upper:]'")
-      console.log(stdout, stderr) // A B C
+      console.log(stdout) // A B C
     } catch (err) { console.error(err) }
     ```
-- `execFile(file, args, opts, done): ChildProcess` executes a command from a
-   file without a shell
+- `execFile(file, args, opts, done): ChildProcess` executes a **command from a
+   file** without a shell
     ```js
     import { execFile } from "node:child_process"
-    execFile("/usr/bin/node", ["--version"], (err, stdout, stderr) => {
-      if (err) { return console.error(err, stderr) }
-      console.log(stdout, stderr) // v20.8.1
+    execFile("/usr/bin/bun", ["--version"], (err, stdout, stderr) => {
+      if (err) { return console.log(err) }
+      console.log(stdout) // 1.0.7
     })
     ```
-- `fork(module, args, opts): ChildProcess` forks a Node.js child process with a
-  bidirectional IPC channel
+- `fork(module, args, opts): ChildProcess` forks a **Node.js child process**
+  with a bidirectional IPC channel
     ```js
     import { fork } from "node:child_process"
-    const [node, file, args] = process.argv
+    const [_, file, args] = process.argv
     if (args === "child") { // child
       // recieve a signal and close the IPC channel with a parent
-      process.on("SIGUSR2", () => process.disconnect())
+      process.on("SIGUSR2", process.disconnect)
       process.on("message", msg => { // receive a message from a parent
         console.log("chd", msg)
         process.send({ res: "chd => par" }) // send a amessage to a parent
       })
     } else { // parent
       const child = fork(file, ["child"]) // fork a Node.js child process
-      child.on("error", error => console.error("par", error))
+      child.on("error", err => console.error("par", err))
       child.on("close", exitCode => console.log("par", exitCode))
-      // send a message to a child once a child is spawnedk
+      // send a message to a child once a child is spawned
       child.on("spawn", () => child.send({ req: "par => chd" }))
       child.on("message", msg => { // receive a message from a child
         console.log("par", msg)
@@ -603,19 +604,20 @@
 
 ## Worker thread
 
-- `new Worker(module, opts)` creats an independnet dedicated thread for
-  CPU-bound tasks executed in paralle with the main thread event loop. A
-  Worker has an async bidirectional communication chanel with its parent
-  `parentPort/worker.postMessage()/.on(message)`, per-thread own event loop,
-  and V8 instance (small memory footprint, fast startup time, safe: no
-  syncronization, no resource sharing). All communication over a channel between
-  a parent and a worker is serialized and deserializedk
+- `new Worker(module, opts)` creates an independent, dedicated **thread for
+  CPU-bound tasks** executed in parallel with the main thread event loop. A
+  Worker has an async **bidirectional communication channel** with its parent
+  `parentPort/worker.postMessage()/.on(message)`, per-thread **own event loop**,
+  and a separate V8 instance (small memory footprint, fast startup time, safe:
+  no synchronization, **no resource sharing**, no race conditions). All
+  communication over a channel between a parent and a Worker is serialized and
+  deserialized
     ```js
     import {
       Worker, isMainThread, parentPort, workerData,
       setEnvironmentData, getEnvironmentData
     } from "node:worker_threads"
-    const [node, file] = process.argv
+    const [_, file] = process.argv
     if (isMainThread) { // main thread
       // parameterize a worker before creation of a worker
       setEnvironmentData("worker.inc", 3);
@@ -640,7 +642,7 @@
     }
     ```
 - A custom `MessageChannel` can be created on either thread for separation of
-  concerns and one of the `MessagePort`s can be passed to the other thread over
+  concerns and one of the `pors1/port2`s can be passed to the other thread over
   the default channel
     ```js
     import { Worker, isMainThread, parentPort, MessageChannel }
@@ -660,7 +662,7 @@
       let newPort
       parentPort.once("message", msg => {
         // receive a new channel from a parent
-        ({ port: newPort } = msg)
+        const { port: newPort } = msg
         // send a message to a parent over a new channel
         newPort.postMessage({ worker: "hi" })
         newPort.close()
