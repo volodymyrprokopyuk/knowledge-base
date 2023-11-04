@@ -737,13 +737,17 @@
     } catch (e) { console.error("outside", e.message) } // outside oh
     ```
 
-## Testing
+## Testing (vitest)
 
+- Run tests
+    ```fish
+    pnpm exec vitest run --reporter verbose --coverage file.test.js -t 'Test'
+    ```
 - Assertions
     ```js
     import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
-    describe("assertions", () => {
-      test("assertions", () => {
+    describe("assertions", () => { // test suite, new testing context
+      test("assertions", () => { // nested local testing context
         const o = { a: 1 }, o2 = o
         expect(1).toBe(1) // primitive values via Object.is()
         expect(o).toBe(o2) // same object reference via Object.is()
@@ -767,13 +771,13 @@
       }
       // .resolves/.rejects unwraps a Promise value/error to apply sync assertions
       // However, all assertions now return a Promise, hence => await expect(...)
-      test("resolve", async () => await expect(task(1)).resolves.toBe(1))
-      test("reject", async () => await expect(task(0)).rejects.toThrow("oh"))
+      test("resolves", async () => await expect(task(1)).resolves.toBe(1))
+      test("rejectrs", async () => await expect(task(0)).rejects.toThrow(/oh/))
     })
     ```
 - Parameterized tests
     ```js
-    describe("each", () => {
+    describe("parameterized", () => {
       test.each([
         [1, 2, 3], [4, 5, 9]
       ])("array sum(%i, %i) === %i", (a, b, exp) => // positional arguments
@@ -788,7 +792,7 @@
     ```
 - Test context
     ```js
-    describe("context", () => {
+    describe("test context", () => {
       beforeEach(ctx => ctx.n = 10) // set up a test local context
       afterEach(ctx => delete ctx.n) // tear down a test local context
       test("context setup", ctx => expect(ctx.n + 1).toBe(11))
@@ -803,11 +807,11 @@
       // const o = { f: a => a + 1 }
       afterEach(() => vi.restoreAllMocks())
       test("spy on a method", () => {
-        const fSpy = vi.spyOn(o, "f")
+        const fSpy = vi.spyOn(o, "f") // spy on a default implemention
         expect(o.f(10)).toBe(11)
         expect(fSpy).toHaveBeenCalledWith(10)
         expect(fSpy).toHaveReturnedWith(11)
-        fSpy.mockImplementation(a => a + 2)
+        fSpy.mockImplementation(a => a + 2) // mock a spy implemention
         expect(o.f(10)).toBe(12)
         expect(fSpy).toHaveBeenNthCalledWith(2, 10)
         expect(fSpy).toHaveNthReturnedWith(2, 12)
