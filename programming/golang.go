@@ -1,7 +1,9 @@
 /* Primitives */
 // bool, int = int64, uint = uint64, float64
 // byte = uint8, rune = int32, string
-type Year int // attach different methods to the same underlying data
+// type alias = attach different methods to the same underlying type
+type Year int // nominal typing, block-level scope
+var year = Year(2023)
 
 /* Constants, enumerations */
 const i int = 1 // compile-time typed constant only for primitive types
@@ -13,8 +15,8 @@ const (Nextra BayanModel = iota; Omnia; Selecta; Prime; Spectrum)
 
 /* Variables */
 var i, j int = 1, 2
-var b, s, r = false, "ok", 'a' // type inference
 var i, f = 1, 1.2 // default type of literals int, float64
+var b, s, r = false, "ok", 'a' // type inference
 // default initialization to zero
 var (b bool; i int; f float64; r rune; s string)
 // in-function inferred initialization/redefinition
@@ -23,17 +25,16 @@ b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 /* Pointers */
 // call-by-value preserves immutability of original data
 // use of pointers implies mutable data
-// local data is allocated on heap when its pointer is returned from a function
 // pointer initialization & address and * dereferencing
 var i int = 1; var p *int = &i; i++; *p++ // i == 3; *p == 3
 var p *int = new(int) // p* == 0
 
 /* Strings,runes */
 var bytes = "€12.34" // string as bytes + ASCII
-pl(bytes[0], bytes[1:]) // 226 12.34
+fmt.Println(bytes[0], bytes[1:]) // 226 12.34
 var runes = []rune("€12.34") // Unicode code points
-pl(string(runes[0]), string(runes[1:])) // € 12.34
-for _, r := range runes { pl(string(r)) } // Unicode code points
+fmt.Println(string(runes[0]), string(runes[1:])) // € 12.34
+for _, r := range runes { fmt.Println(string(r)) } // Unicode code points
 
 /* Arrays */
 // allocated on stack as array size is known at compile-time
@@ -43,46 +44,46 @@ b, c := [3]int{}, [...]int{1, 2, 3} // [0 0 0], [1 2 3]
 d := [...]int{1, 2: 2, 4: 3} // [1 0 2 0 3] sparse array
 
 /* Slices */
-// slice = multiple views onto array, change, but not append
+// slice = multiple views onto an array, change, but not append
 // slice = single view per array, change and append
 var a []int // nil slice = dynamic array
-a = append(a, 1, 2) // dynamic reallocation
-var b = []int{1, 2, 3} // initialized slice
-var c = []int{1, 5: 2, 3, 9: 4} // sparse slice
-d := make([]int, 5) // zero initialized slice [0:4]
-e := make([]int, 0, 5) // empty slice with capacity
-var a = [...]int{1, 2, 3, 4, 5}
-b := a[:] // array => slice (shared memory), [i:j)
-c := make([]int, 5) // copy destination must be initialized
-copy(c, a[:]) // array => slice (two copies), [:] == [0:len(a)]
-for i, v := range c { fmt.Println(i, v) }
+a = append(a, 1, 2) // [1 2] dynamic reallocation
+b := []int{1, 2, 3} // [1 2 3] slice initialization
+c := []int{1, 2: 2, 4: 3} // [1 0 2 0 3] sparse slice
+d := make([]int, 3) // [0 0 0] zero initialized slice
+e := make([]int, 0, 3) // [] empty slice with capacity
+a := [...]int{1, 2, 3}
+var b []int = a[:] // array => slice, shared memory
+var c []int = make([]int, len(a))
+copy(c, a[:]) // array => slice, separate copies
+for i, v := range a { fmt.Println(i, v) }
 
 /* Maps */
 var a = map[string]int{} // empty map
 var b = map[string]int{"a": 1, "b": 2} // initialized map
-var c = make(map[string]int, 5) // map with capacity
+var c = make(map[string]int, 3) // map with capacity
 c["a"] = 1
 if v, ok := c["a"]; ok { fmt.Println(v) }
 for k, v := range b { fmt.Println(k, v) }
 delete(c, "a")
 
 /* Structs */
-// nominal typing, block-level scope, copy-by-value
-type Bayan struct{model string; year int}
-var a = Bayan{model: "Selecta", year: 2023}
-var b = Bayan{"Selecta", 2023} // all fields in order
-var c *Bayan = new(Bayan)
-var d *Bayan = &Bayan{}
-fmt.Println(c.model) // (*c).model => c.model
-var e = []Bayan{{model: "Selecta", year: 2023}}
-// constructor function
+// nominal typing, block-level scope
+	var a, b Bayan = Bayan{model: "Nextra", year: 2022}, Bayan{"Omnia", 2023}
+	var c, d *Bayan = new(Bayan), &Bayan{"Selecta", 2024}
+	fmt.Println(d.model) // (*d).model => d.model
+	e := []Bayan{{model: "Nextra", year: 2022}, {"Omnia", 2023}}
+// local value is allocated on heap when its pointer is returned from a function
 func NewBayan(model string, year int) *Bayan {
 	return &Bayan{model, year}
 }
 // structural typing, anonymous struct
-var e = struct{model string; year int}{"Nextra", 2023}
-type Product struct {Bayan; price float64} // embedded field
-var p = Product{Bayan: Bayan{"Selecta", 2023}, price: 2e4}
+var a Bayan = struct { model string; year int }{"Nextra", 2022}
+// struct embedding = composition
+type Product struct { Bayan; price float64 }
+p := Product{Bayan{"Nextra", 2022}, 2e4}
+// Bayan fields are directly available on Product
+fmt.Println(p.model, p.price)
 
 /* Blocks */
 // package block = definitions outside a function
@@ -92,14 +93,10 @@ var p = Product{Bayan: Bayan{"Selecta", 2023}, price: 2e4}
 // shadowing = inner block same-name definition, unaccessible outer definition
 
 /* if/else */
-// each clause has its own scope and allows for arbitrary conditions
-if i := rand.Intn(10); i < 3 { // statement-wide definitions
-	fmt.Println(i, "low")
-} else if i < 8 {
-	fmt.Println(i, "mid")
-} else {
-	fmt.Println(i, "high")
-}
+// allows for arbitrary conditions; each clause has its own scope
+if i := rand.Intn(10); i < 3 { fmt.Println(i, "low")
+} else if i < 8 { fmt.Println(i, "mid")
+} else { fmt.Println(i, "high") }
 
 /* for + break/continue [label] */
 // best for controlled iteration start, end, and step
@@ -151,7 +148,7 @@ func sum(args ...int) (sum int) {
 	return
 }
 fmt.Println(sum([]int{1, 2, 3}...))
-// function type, functions are values
+// function type, functions are values, block-level scope
 type Op func(int, int) int
 ops := map[string]Op{
 	"+": func(a, b int) int { return a + b },
@@ -169,20 +166,17 @@ defer func() {
 }() // defer must end with ()
 
 /* methods */
-// method = logic that depends on a value of a type
+// method = a function that operates on a type pointer or type value
 // method modifies a receiver => must use a pointer receiver (p *T)
 // method does not modify a receiver => can use a value receiver (v T)
-// value receiver panics on nil
-func (b *Bayan) String() string {
-	return fmt.Sprintf("Bayan(%s %d)", b.model, b.year)
-}
-b := Bayan{"Selecta", 2023}
-p := &b
-fmt.Println(b.String(), p.String()) // b.String() => (&b).String()
-bstr := b.String // method value = closure over its instance
-fmt.Println(bstr())
-bstr := (*Bayan).String // method expression => function(receiver)
-fmt.Println(bstr(&b))
+type Bayan struct { model string; year int }
+func (b *Bayan) show() { fmt.Printf("Bayan{%s %d}\n", b.model, b.year) }
+var b = Bayan{"Nextra", 2022}; var p = &b
+b.show(); p.show() // b.show() => (&b).show()
+bShow := b.show // method value = closure over its instance
+bShow()
+BShow := (*Bayan).show // method expression => function(receiver)
+BShow(&b)
 // composition = filed embedding
 // fields or methods of an embedded type are promoted to a containing type
 // methods of an embedded type are in a method set of a containing type
@@ -191,10 +185,28 @@ p := Product{Bayan{"Nextra", 2023}, 1e3}
 fmt.Println(p.model, p.String())
 
 /* interfaces */
+// interface = static type (interface type, common behavior) +
+// dynamic type (value type, concrete implementation)
 // interface = implicit type-safe structural typing when a method set of a
 // concrete type contains a method set of an interface
+// interface = the only abstract type
 // an interface can be embedded into another interface
-// accept interfaces, return structs, not interfaces
+// accept interfaces, return structs
+// polymorphism
+type View interface { show() }
+type Int int
+func (i Int) show() { fmt.Println(i) }
+type Flo float64
+func (f Flo) show() { fmt.Println(f) }
+var vs = []View{Int(1), Flo(1.2)}
+for _, v := range vs { v.show() }
+
+// assignment to interface variable
+	var i = Int(1)
+	var v1, v2 View = i, &i // copy, pointer
+	i = 2
+	pl(i); v1.show(); v2.show() // 2 1 2
+
 type Presenter interface {show()}
 // a type is decoupled from the implicit Presenter interface
 func (b Bayan) show() { fmt.Println(b) }
