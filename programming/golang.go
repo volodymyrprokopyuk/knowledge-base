@@ -29,7 +29,7 @@ b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 var i int = 1; var p *int = &i; i++; *p++ // i == 3; *p == 3
 var p *int = new(int) // p* == 0
 
-/* Strings,runes */
+/* Strings, runes */
 var bytes = "€12.34" // string as bytes + ASCII
 fmt.Println(bytes[0], bytes[1:]) // 226 12.34
 var runes = []rune("€12.34") // Unicode code points
@@ -67,7 +67,7 @@ if v, ok := c["a"]; ok { fmt.Println(v) }
 for k, v := range b { fmt.Println(k, v) }
 delete(c, "a")
 
-/* Structs */
+/* Structs, types */
 // nominal typing, block-level scope
 	var a, b Bayan = Bayan{model: "Nextra", year: 2022}, Bayan{"Omnia", 2023}
 	var c, d *Bayan = new(Bayan), &Bayan{"Selecta", 2024}
@@ -93,31 +93,33 @@ fmt.Println(p.model, p.price)
 // shadowing = inner block same-name definition, unaccessible outer definition
 
 /* if/else */
-// allows for arbitrary conditions; each clause has its own scope
+// allows for arbitrary conditions in each clause
+// each clause has its own scope
 if i := rand.Intn(10); i < 3 { fmt.Println(i, "low")
 } else if i < 8 { fmt.Println(i, "mid")
 } else { fmt.Println(i, "high") }
 
 /* for + break/continue [label] */
-// best for controlled iteration start, end, and step
-for i := 0; i < 5; i++ { fmt.Println(i) }
-i := 0 // dynamic exit conditions
-for i < 5 { fmt.Println(i); i++ }
+// best for controlled iteration defining start, end, and step
+for i := 0; i < 3; i++ { fmt.Println(i) } // 0 1 2
+i := 0 // best for dynamic exit condition
+for i < 3 { fmt.Println(i); i++ } // 0 1 2
 i = 0 // unconditional first iteration
-for { fmt.Println(i); i++; if i > 4 { break } }
+for { fmt.Println(i); i++; if i > 2 { break } } // 0 1 2
 // best for arrays, slices, strings, maps
-for _, v := range []int{1, 2, 3, 4, 5} { fmt.Println(v) }
+for _, v := range []int{1, 2, 3} { fmt.Println(v) } // 1 2 3
 
 /* switch + break [label] */
+a := []string{"one", "eleven", "thousand"}
 outer: for _, v := range a {
-	switch l := len(v); l { // equality check on a value
+	switch l := len(v); l { // equality check == in each clause
 	case 1, 2, 3: fmt.Println(v, "small")
 	case 4, 5, 6: fmt.Println(v, "medium"); break outer
 	default: fmt.Println(v, "large")
 	}
 }
 for _, v := range a {
-	switch l := len(v); { // arbitrary conditions in clauses
+	switch l := len(v); { // arbitrary conditions in clause clause
 	case l < 4: fmt.Println(v, "small")
 	case l < 7: fmt.Println(v, "medium")
 	default: fmt.Println(v, "large")
@@ -126,26 +128,22 @@ for _, v := range a {
 
 /* goto label */
 // prefer goto over flow control flags or code duplication
-for _, v := range []int{1, 2, 3, 4, 5} {
-	if v == 3 { goto print }
+for _, v := range []int{1, 2, 3} {
+	if v == 2 { goto print }
 	v *= 10
-	print: fmt.Println(v)
+	print: fmt.Println(v) // 10, 2, 30
 }
 
 /* functions */
-// function = logic that depends only on input parameters
-// call-by-value = all function arguments are copies (no need for immutability)
-// all primitive and composite types are value types
-// slice and map values are pointers
+// call-by-value = all function arguments are copies, no need for immutability
+// primitive and composite types are value types, slices and maps are pointers
 // named return values
-func quotRem(a, b int) (quot, rem int) {
-	quot, rem = a / b, a % b
-	return
+func quoteRem(a, b int) (quote, rem int) {
+	quote, rem = a / b, a % b; return
 }
 // variadic parameters
 func sum(args ...int) (sum int) {
-	for arg := range args { sum += arg }
-	return
+	for _, arg := range args { sum += arg }; return
 }
 fmt.Println(sum([]int{1, 2, 3}...))
 // function type, functions are values, block-level scope
@@ -159,75 +157,78 @@ ops := map[string]Op{
 sort.Slice(bayans, func(i, j int) bool {
 	return bayans[i].model < bayans[j].model
 })
-// defer closures are evaluated after return in reverse order
+// defer closures are evaluated after return in the reverse order
 defer f.Close()
 defer func() {
 	if err == nil { err = tx.Commit() } else { tx.Rollback() }
 }() // defer must end with ()
 
 /* methods */
-// method = a function that operates on a type pointer or type value
+// method = a function that operates on a type pointer or a type value
 // method modifies a receiver => must use a pointer receiver (p *T)
-// method does not modify a receiver => can use a value receiver (v T)
+// method does not modify a receiver => may use a value receiver (v T)
 type Bayan struct { model string; year int }
 func (b *Bayan) show() { fmt.Printf("Bayan{%s %d}\n", b.model, b.year) }
 var b = Bayan{"Nextra", 2022}; var p = &b
 b.show(); p.show() // b.show() => (&b).show()
-bShow := b.show // method value = closure over its instance
-bShow()
-BShow := (*Bayan).show // method expression => function(receiver)
-BShow(&b)
-// composition = filed embedding
-// fields or methods of an embedded type are promoted to a containing type
-// methods of an embedded type are in a method set of a containing type
-type Product struct {Bayan; price float64}
+bShow := b.show; bShow() // method value = closure over its instance
+BShow := (*Bayan).show; BShow(&b) // method expression => function(receiver)
+// composition = struct embedding
+// fields and methods of an embedded type are promoted to a containing type
+type Product struct { Bayan; price float64 }
 p := Product{Bayan{"Nextra", 2023}, 1e3}
-fmt.Println(p.model, p.String())
+fmt.Println(p.model); p.show()
 
 /* interfaces */
-// interface = static type (interface type, common behavior) +
+// interface (the only abstract type) = accept interfaces, return structs
+// static type (interface type, abstract type) +
 // dynamic type (value type, concrete implementation)
 // interface = implicit type-safe structural typing when a method set of a
 // concrete type contains a method set of an interface
-// interface = the only abstract type
-// an interface can be embedded into another interface
-// accept interfaces, return structs
-// polymorphism
+
+// empty interface accepts a value of any type
+var a interface{}
+a = Int(1); fmt.Println(a)
+a = Flo(1.2); fmt.Println(a)
+
+// assignment to an interface variable
+var i = Int(1)
+var v1, v2 View = i, &i // copy, pointer
+i = 2; fmt.Println(i); v1.show(); v2.show() // 2 1 2
+
+// process incompatible types through a uniform interface
 type View interface { show() }
 type Int int
+// a type is decoupled from the implicit interface
 func (i Int) show() { fmt.Println(i) }
 type Flo float64
 func (f Flo) show() { fmt.Println(f) }
-var vs = []View{Int(1), Flo(1.2)}
-for _, v := range vs { v.show() }
+// only a client specifies the required interface
+vs := []View{Int(1), Flo(1.2)}
+for _, v := range vs { v.show() } // 1, 1.2
 
-// assignment to interface variable
-	var i = Int(1)
-	var v1, v2 View = i, &i // copy, pointer
-	i = 2
-	pl(i); v1.show(); v2.show() // 2 1 2
+// type assertion applied to an interface at runtime v.(Type)
+// vs type conversions applied to concrete types at compile-time Type(v)
+// type assertion to access a dynamic type of an interface
+var v View = Int(1)
+if i, ok := v.(Int); ok { i.show() }
 
-type Presenter interface {show()}
-// a type is decoupled from the implicit Presenter interface
-func (b Bayan) show() { fmt.Println(b) }
-// Only a client specifies the required Presenter interface
-var p Presenter = Bayan{"Selecta", 2023}
-p.show()
-var a interface{} // empty interface can store a value of any type
-a = Bayan{"Nextra", 2023}
-// nominal type assertion applied to an interface at runtime v.(Type)
-// vs type conversions on concrete types at compile-time Type(v)
-if b, ok := a.(Bayan); ok { fmt.Println(b) } // type assertion
-switch b := a.(type) { // type switch
-case Bayan: fmt.Println(b)
-default: fmt.Println("unknown type")
+// type switch to access a dynamic type of an interface
+vs := []View{Int(1), Flo(1.2)}
+for _, v := range vs {
+	switch v.(type) {
+	case Int: fmt.Print("Int "); v.show()
+	case Flo: fmt.Print("Flo "); v.show()
+	default: fmt.Println("unknown type")
+	}
 }
+
 // a function can implement a one-method interface
-type Logger interface{ log(msg string) } // one-method interface
-type LogFunc func (string) // function type
-// function type implements the Logger interface
+type Logger interface { log(msg string) } // one-method interface
+type LogFunc func(msg string) // function type
+// function type implements a Logger interface
 func (lf LogFunc) log(msg string) { lf(msg) }
 func log(msg string) { fmt.Println(msg) } // log function
 // log function => function type => one-method interface
 var logger Logger = LogFunc(log)
-logger.log("ok")
+logger.log("ok") // ok
