@@ -1,42 +1,46 @@
 /* Primitives */
-// byte = uint8, int = int64, uint = uint64
-// bool, float64, rune = int32, string
-type Year int // attach different sets of methods to the same underlying data
+// bool, int = int64, uint = uint64, float64
+// byte = uint8, rune = int32, string
+type Year int // attach different methods to the same underlying data
 
-/* Constants */
-// no immutable definitions at run time => use copy, otherwise use pointer
-// compile-time typed constant for primitive types, not structs
-const i int = 1
-// literal values are untyped constants
-const i = 1 // untyped constant is an alias to a literal
-type Model int // enumeration = const list + iota
-const (Nextra Model = iota; Omnia; Selecta; Prime; Spectrum)
+/* Constants, enumerations */
+const i int = 1 // compile-time typed constant only for primitive types
+// no immutable definitions at runtime => use call-by-value
+// for mutable definitions at runtime => use pointers
+const i = 1 // compile-time untyped constant = named literal
+type BayanModel int // enumeration = type + typed const list + iota
+const (Nextra BayanModel = iota; Omnia; Selecta; Prime; Spectrum)
 
 /* Variables */
 var i, j int = 1, 2
-var b, s, c = false, "ok", 'a' // type inference
-// default type of literals int, float64
-var i, f = 1, 1.2
+var b, s, r = false, "ok", 'a' // type inference
+var i, f = 1, 1.2 // default type of literals int, float64
 // default initialization to zero
-var (b bool; i int; f float64; c rune; s string)
+var (b bool; i int; f float64; r rune; s string)
 // in-function inferred initialization/redefinition
-b, i, f, c, s := true, 1, 1.2, 'a', `ok`
+b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 
 /* Pointers */
-// call-by-value ensures immutability of original data
-// pointers imply mutable data
-// local data is stored on heap when its pointer is returned from a function
-// limit use of pointers to store more data on stack
-// pointer initialization and dereferencing
-var i int = 1; var p *int = &i
-i++; *p++ // i == 3; *p == 3
+// call-by-value preserves immutability of original data
+// use of pointers implies mutable data
+// local data is allocated on heap when its pointer is returned from a function
+// pointer initialization & address and * dereferencing
+var i int = 1; var p *int = &i; i++; *p++ // i == 3; *p == 3
 var p *int = new(int) // p* == 0
 
+/* Strings,runes */
+var bytes = "€12.34" // string as bytes + ASCII
+pl(bytes[0], bytes[1:]) // 226 12.34
+var runes = []rune("€12.34") // Unicode code points
+pl(string(runes[0]), string(runes[1:])) // € 12.34
+for _, r := range runes { pl(string(r)) } // Unicode code points
+
 /* Arrays */
-// allocated on stack as array size is know at compile-time
-var a [3]int // zero initialized array, copy-by-value
-var b = [3]int{1, 2, 3} // initialized array
-var c = [...]int{1, 5: 2, 3, 9: 4} // sparse array
+// allocated on stack as array size is known at compile-time
+var a [3]int // [0 0 0] automatic zero initialization
+// explicit initialization
+b, c := [3]int{}, [...]int{1, 2, 3} // [0 0 0], [1 2 3]
+d := [...]int{1, 2: 2, 4: 3} // [1 0 2 0 3] sparse array
 
 /* Slices */
 // slice = multiple views onto array, change, but not append
@@ -52,11 +56,6 @@ b := a[:] // array => slice (shared memory), [i:j)
 c := make([]int, 5) // copy destination must be initialized
 copy(c, a[:]) // array => slice (two copies), [:] == [0:len(a)]
 for i, v := range c { fmt.Println(i, v) }
-
-/* Strings and runes */
-var s = []rune("€12.34") // Unicode code points, default bytes
-fmt.Println(string(s[0]), string(s[1:]))
-for i, r := range s { fmt.Println(i, string(r)) }
 
 /* Maps */
 var a = map[string]int{} // empty map
@@ -192,8 +191,8 @@ p := Product{Bayan{"Nextra", 2023}, 1e3}
 fmt.Println(p.model, p.String())
 
 /* interfaces */
-// interface = type-safe structural typing when a method set of a concrete type
-// contains a method set of an interface
+// interface = implicit type-safe structural typing when a method set of a
+// concrete type contains a method set of an interface
 // an interface can be embedded into another interface
 // accept interfaces, return structs, not interfaces
 type Presenter interface {show()}
@@ -211,3 +210,12 @@ switch b := a.(type) { // type switch
 case Bayan: fmt.Println(b)
 default: fmt.Println("unknown type")
 }
+// a function can implement a one-method interface
+type Logger interface{ log(msg string) } // one-method interface
+type LogFunc func (string) // function type
+// function type implements the Logger interface
+func (lf LogFunc) log(msg string) { lf(msg) }
+func log(msg string) { fmt.Println(msg) } // log function
+// log function => function type => one-method interface
+var logger Logger = LogFunc(log)
+logger.log("ok")
