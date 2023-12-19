@@ -69,21 +69,24 @@ delete(c, "a")
 
 /* Structs, types */
 // nominal typing, block-level scope
-	var a, b Bayan = Bayan{model: "Nextra", year: 2022}, Bayan{"Omnia", 2023}
-	var c, d *Bayan = new(Bayan), &Bayan{"Selecta", 2024}
-	fmt.Println(d.model) // (*d).model => d.model
-	e := []Bayan{{model: "Nextra", year: 2022}, {"Omnia", 2023}}
+  var a, b Bayan = Bayan{model: "Nextra", year: 2022}, Bayan{"Omnia", 2023}
+  var c, d *Bayan = new(Bayan), &Bayan{"Selecta", 2024}
+  fmt.Println(d.model) // (*d).model => d.model
+  e := []Bayan{{model: "Nextra", year: 2022}, {"Omnia", 2023}}
+// constructor function = correct and uniform initialization of structs
+// constructor function is preferred over a struct literal
 // local value is allocated on heap when its pointer is returned from a function
-func NewBayan(model string, year int) *Bayan {
-	return &Bayan{model, year}
-}
+func NewBayan(model string, year int) *Bayan { return &Bayan{model, year} }
 // structural typing, anonymous struct
 var a Bayan = struct { model string; year int }{"Nextra", 2022}
-// struct embedding = composition
+// struct embedding = composition of concrete types
+// multiple types can be embedded into a new type
 type Product struct { Bayan; price float64 }
 p := Product{Bayan{"Nextra", 2022}, 2e4}
-// Bayan fields are directly available on Product
-fmt.Println(p.model, p.price)
+// Bayan fields are either directly available on Product through promotion
+// or indirectly accessible through a Product type
+// fields of nested embedded types are promoted to a top-level containing type
+fmt.Println(p.model, p.price, p.Bayan.year)
 
 /* Blocks */
 // package block = definitions outside a function
@@ -112,26 +115,26 @@ for _, v := range []int{1, 2, 3} { fmt.Println(v) } // 1 2 3
 /* switch + break [label] */
 a := []string{"one", "eleven", "thousand"}
 outer: for _, v := range a {
-	switch l := len(v); l { // equality check == in each clause
-	case 1, 2, 3: fmt.Println(v, "small")
-	case 4, 5, 6: fmt.Println(v, "medium"); break outer
-	default: fmt.Println(v, "large")
-	}
+  switch l := len(v); l { // equality check == in each clause
+  case 1, 2, 3: fmt.Println(v, "small")
+  case 4, 5, 6: fmt.Println(v, "medium"); break outer
+  default: fmt.Println(v, "large")
+  }
 }
 for _, v := range a {
-	switch l := len(v); { // arbitrary conditions in clause clause
-	case l < 4: fmt.Println(v, "small")
-	case l < 7: fmt.Println(v, "medium")
-	default: fmt.Println(v, "large")
-	}
+  switch l := len(v); { // arbitrary conditions in clause clause
+  case l < 4: fmt.Println(v, "small")
+  case l < 7: fmt.Println(v, "medium")
+  default: fmt.Println(v, "large")
+  }
 }
 
 /* goto label */
 // prefer goto over flow control flags or code duplication
 for _, v := range []int{1, 2, 3} {
-	if v == 2 { goto print }
-	v *= 10
-	print: fmt.Println(v) // 10, 2, 30
+  if v == 2 { goto print }
+  v *= 10
+  print: fmt.Println(v) // 10, 2, 30
 }
 
 /* functions */
@@ -139,28 +142,28 @@ for _, v := range []int{1, 2, 3} {
 // primitive and composite types are value types, slices and maps are pointers
 // named return values
 func quoteRem(a, b int) (quote, rem int) {
-	quote, rem = a / b, a % b; return
+  quote, rem = a / b, a % b; return
 }
 // variadic parameters
 func sum(args ...int) (sum int) {
-	for _, arg := range args { sum += arg }; return
+  for _, arg := range args { sum += arg }; return
 }
 fmt.Println(sum([]int{1, 2, 3}...))
 // function type, functions are values, block-level scope
 type Op func(int, int) int
 ops := map[string]Op{
-	"+": func(a, b int) int { return a + b },
-	"-": func(a, b int) int { return a - b },
+  "+": func(a, b int) int { return a + b },
+  "-": func(a, b int) int { return a - b },
 }
 // anonymous functions (function literals) are closures
 // closed on variables are evaluated every time when a closure is invoked
 sort.Slice(bayans, func(i, j int) bool {
-	return bayans[i].model < bayans[j].model
+  return bayans[i].model < bayans[j].model
 })
 // defer closures are evaluated after return in the reverse order
 defer f.Close()
 defer func() {
-	if err == nil { err = tx.Commit() } else { tx.Rollback() }
+  if err == nil { err = tx.Commit() } else { tx.Rollback() }
 }() // defer must end with ()
 
 /* methods */
@@ -173,7 +176,7 @@ var b = Bayan{"Nextra", 2022}; var p = &b
 b.show(); p.show() // b.show() => (&b).show()
 bShow := b.show; bShow() // method value = closure over its instance
 BShow := (*Bayan).show; BShow(&b) // method expression => function(receiver)
-// composition = struct embedding
+// struct embedding = composition of concrete types
 // fields and methods of an embedded type are promoted to a containing type
 type Product struct { Bayan; price float64 }
 p := Product{Bayan{"Nextra", 2023}, 1e3}
@@ -181,10 +184,11 @@ fmt.Println(p.model); p.show()
 
 /* interfaces */
 // interface (the only abstract type) = accept interfaces, return structs
-// static type (interface type, abstract type) +
-// dynamic type (value type, concrete implementation)
+// static type (interface type, abstract type) => interface{} +
+// dynamic type (value type, concrete implementation) => nil
 // interface = implicit type-safe structural typing when a method set of a
-// concrete type contains a method set of an interface
+// concrete type including promoted methods from embedded types contains a
+// method set of an interface
 
 // empty interface accepts a value of any type
 var a interface{}
@@ -216,11 +220,11 @@ if i, ok := v.(Int); ok { i.show() }
 // type switch to access a dynamic type of an interface
 vs := []View{Int(1), Flo(1.2)}
 for _, v := range vs {
-	switch v.(type) {
-	case Int: fmt.Print("Int "); v.show()
-	case Flo: fmt.Print("Flo "); v.show()
-	default: fmt.Println("unknown type")
-	}
+  switch v.(type) {
+  case Int: fmt.Print("Int "); v.show()
+  case Flo: fmt.Print("Flo "); v.show()
+  default: fmt.Println("unknown type")
+  }
 }
 
 // a function can implement a one-method interface
@@ -232,3 +236,61 @@ func log(msg string) { fmt.Println(msg) } // log function
 // log function => function type => one-method interface
 var logger Logger = LogFunc(log)
 logger.log("ok") // ok
+
+// interface embedding = composition of abstract types
+type Negate interface { View; neg() }
+func (i *Int) neg() { *i = -*i }
+func (f *Flo) neg() { *f = -*f }
+i, f := Int(1), Flo(1.2)
+var in, fn Negate = &i, &f
+// embedded View.show() is directly accessible through the Negate interface
+in.neg(); in.show(); fn.neg(); fn.show()
+
+/* errors */
+// sentinel errors = signal that processing cannot continue
+// sentinel errors are checked using == equality comparison
+type error interface { Error() string } // built-in error interface
+// always return error interface => return different error types from a function
+func quoteRem(a, b int) (quote, rem int, err error) {
+  if b == 0 { err = errors.New("divide by zero"); return }
+  quote, rem = a / b, a % b; return
+}
+if quote, rem, err := quoteRem(5, 3); err != nil { fmt.Println(err)
+} else { fmt.Println(quote, rem) }
+
+// custom error
+type Status int
+const (BadRequest Status = iota + 1; NotFound)
+type CustomErr struct { status Status; err error }
+func (ce CustomErr) Error() string {
+  switch ce.status {
+  case BadRequest: return fmt.Sprintf("400 Bad Request: %s", ce.err)
+  case NotFound: return fmt.Sprintf("404 Not Found: %s", ce.err)
+  default: return fmt.Sprintf("000 Unknown Error: %s", ce.err)
+  }
+}
+func (ce CustomErr) Unwrap() error { return ce.err }
+
+// wrap/unwrap error = build an error chain
+func wrapError() error {
+  _, err := os.Open("")
+  // create new error with a message from a previous error
+  return fmt.Errorf("New error: %v", err)
+  return fmt.Errorf("Wrap error: %w", err) // wrap a standard error
+  return CustomErr{NotFound, err} // wrap a custom error
+}
+// use defer to wrap errors at multiple returns
+func deferWrapError() (err error) {
+  defer func() {
+    if err != nil { err = fmt.Errorf("Wrap error: %w", err) }
+  }()
+  _, err = os.Open(""); return
+}
+err := wrapError(); fmt.Println(err)
+if werr := errors.Unwrap(err); werr != nil { fmt.Println(werr) }
+// check for a specific error value using == in an error chain
+if errors.Is(err, os.ErrNotExist) { fmt.Println("Not Exist")}
+// check for a specific error type using reflection in an error chain
+var ce CustomErr
+if errors.As(err, &ce) { fmt.Println("Custom Error")}
+
