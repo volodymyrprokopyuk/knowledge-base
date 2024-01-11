@@ -338,6 +338,8 @@ i, f := Int(1), Flo(1.2)
 var in, fn Negate = &i, &f
 // embedded View.show() is directly accessible through the Negate interface
 in.neg(); in.show(); fn.neg(); fn.show()
+// containing struct automatically implements all interfaces implemented by
+// embedded types
 
 /* generics */
 // type parameeters cannot be used with method arguments, only with
@@ -458,3 +460,70 @@ func init() { }
 // git tag v1.2.3 # for backward compatible versions
 // mkdir v2; git branch v2 # for backward incompatible versions
 import "scm/user/mod/v2/pkgdir" // new module import path
+
+/* concurrency */
+// goroutine (gor) = lightweight 1e4, multiplexed over OS threads, small stack
+// (can grow), fast context switching, runtime-aware scheduling (IO, GC)
+// channel (chan) = multiple gors can read from the same chan, but each value is
+// delivered to a single gor
+// share memory by communicating, do not communicate by sharing memory
+// read from a closed chan returns a zero value for a channel type
+// read/write to a nil chan blocks forever
+// unbuffered chan (blocking) = write blocks until read, read blocks until write
+// buffered chan (backpressure) = up until n non-blocking writes/reads, full
+// buffer blocks writing, empty buffer blocks reading
+// buffered chan = limits a number of gors, limits a number of queued values
+
+// business logic is unaware of concurrent execution, concurrency-free API
+func inc(val int) int { return val + 1 }
+// chan is always duplex, is a reference type (like slice and map)
+in, out := make(chan int), make(chan int)
+// return values from gor are ignored
+go func(in <-chan int, out chan<- int) {
+  // gor is sync internally
+  if val, ok := <- in; ok { // read from a channel
+    res := inc(val) // business logic
+    out <- res // write to a channel, panic if closed
+  }
+  // loop until close(ch), break or return
+  for val := range in { // read from a channel
+    res := inc(val) // business logic
+    out <- res
+  }
+}(in, out)
+in <- 1
+close(in) // a writer must close a channel, panic if already closed
+res := <- out
+fmt.Println(res) // 2
+
+// select = simultaneous random order read/write over multiple channels
+ch1, ch2 := make(chan int), make(chan int)
+go func() {
+  ch1 <- 1 // blocking write
+  v2 := <- ch2
+  fmt.Println(v2)
+}()
+ch2 <- 2 // blocking write - deadlock!
+v1 := <- ch1
+fmt.Println(v1)
+select { // no deadlock, random order of cases
+case ch2 <- 2:
+case v1 := <- ch1:
+  fmt.Println(v1) // 1
+// default: fmt.Println("non-blocking read/write")
+}
+
+// use a nil chan to disable a case in select after a chan has been closed
+for {
+  select {
+  case v, ok := <- ch:
+    if !ok { // a chan has been closed
+      ch = nil // read from nil blocks forever
+      continue
+    }
+  }
+}
+
+// mutex = is used to control access to a shared resource in a concurrent env.
+// gor + chan = implement a transformation flow for values in a concurrent env.
+// atomic operations = built in modern CPUs
