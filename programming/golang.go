@@ -110,6 +110,10 @@ p := Product{Bayan{"Nextra", 2022}, 2e4}
 // or indirectly accessible through a Product type
 // fields of nested embedded types are promoted to a top-level containing type
 fmt.Println(p.model, p.price, p.Bayan.year)
+// empty struct{}{} value occupies 0 bytes vs
+// empty interface{} type occupies 16 byes
+map[string]struct{} // set of keys
+chan struct{} // signaling channel without data
 
 /* Blocks */
 // package block = definitions outside a function
@@ -227,8 +231,10 @@ func f() (err error) {
 /* methods */
 // method = a function that operates on a type pointer or a type value
 // function(receiver, args...) => receiver.method(args...)
-// method modifies a receiver => must use a pointer receiver (p *T), large objects
-// method does not modify a receiver => may use a value receiver (v T), primitives
+// method modifies a receiver => must use a pointer receiver (p *T), large
+// objects
+// method does not modify a receiver => may use a value receiver (v T),
+// primitives. Value receiver copies a type when a method is invoked
 // value receiver = a copy of a receiver is passed to a method
 // method can be invoked through a nil pointer/receiver = valid receiver
 // mixing receiver types should be avoided
@@ -462,17 +468,29 @@ func init() { }
 import "scm/user/mod/v2/pkgdir" // new module import path
 
 /* concurrency */
-// goroutine (gor) = lightweight 1e4, multiplexed over OS threads, small stack
-// (can grow), fast context switching, runtime-aware scheduling (IO, GC)
-// channel (chan) = multiple gors can read from the same chan, but each value is
-// delivered to a single gor
+// concurrency = provides a structures to solve a problem with sequential steps
+// that may be parallelized
+// parallelism = independent execution of sequences of instructions
+// goroutine (gor) = internally sync lightweight threads 1e4 managed by the Go
+// runtime, multiplexed over OS threads, small stack (can grow), fast context
+// switching, runtime-aware scheduling (IO, GC)
+// gor = accepts parameters, return values are ignored (use channels)
+
+// channel (chan) = is a read/write pipe that connects gors. Multiple gors can
+// write to and read from the same chan, but each value is delivered to only one
+// gor
+// chan<- write-only chan, <-chan read-only chan (for vars, func params)
 // share memory by communicating, do not communicate by sharing memory
-// read from a closed chan returns a zero value for a channel type
+// read from a closed chan constantly returns a zero value for a channel type
 // read/write to a nil chan blocks forever
-// unbuffered chan (blocking) = write blocks until read, read blocks until write
-// buffered chan (backpressure) = up until n non-blocking writes/reads, full
-// buffer blocks writing, empty buffer blocks reading
-// buffered chan = limits a number of gors, limits a number of queued values
+// unbuffered chan (blocking, sync) = write blocks until read, read blocks until
+// write. Only unbuffered chan provides a strong synchronization guarantee
+ch := make(chan int)
+// buffered chan (backpressure, async) = up until n non-blocking writes/reads,
+// full buffer blocks writing, empty buffer blocks reading
+// buffered chan = limits a number of gors (worker pool), limits a number of
+// queued values (rate limiter). Buffered write is not confirmed to a sender
+ch := make(chan int, 1) // 1 is a recommended default
 
 // business logic is unaware of concurrent execution, concurrency-free API
 func inc(val int) int { return val + 1 }
@@ -496,7 +514,10 @@ close(in) // a writer must close a channel, panic if already closed
 res := <- out
 fmt.Println(res) // 2
 
-// select = simultaneous random order read/write over multiple channels
+// select = simultaneous random order wait for read/write on multiple channels
+// select = randomly repeatedly evaluates each case (simultaneously blocks on
+// multiple channels) until the first channel operation is completed, or a
+// non-blocking default clause, if present
 ch1, ch2 := make(chan int), make(chan int)
 go func() {
   ch1 <- 1 // blocking write
@@ -510,20 +531,44 @@ select { // no deadlock, random order of cases
 case ch2 <- 2:
 case v1 := <- ch1:
   fmt.Println(v1) // 1
-// default: fmt.Println("non-blocking read/write")
+// is executed only if other cases block
+default: fmt.Println("non-blocking read/write")
 }
 
 // use a nil chan to disable a case in select after a chan has been closed
 for {
   select {
-  case v, ok := <- ch:
-    if !ok { // a chan has been closed
+  case v, open := <- ch:
+    if !open { // a chan has been closed
       ch = nil // read from nil blocks forever
       continue
     }
   }
 }
 
-// mutex = is used to control access to a shared resource in a concurrent env.
-// gor + chan = implement a transformation flow for values in a concurrent env.
-// atomic operations = built in modern CPUs
+// mutex = is used to control access (synchronize critical section) to a shared
+// resource between independent gors in a parallel environment
+// chan = implements a transformation flow (orchestration, ownership
+// transfer) for values between dependent gors in a concurrent environment
+// atomic operations = built in modern CPUs (add, compare, load, store, swap)
+// data race (increment) = multiple gors access the same memory location
+// simultaneously and at least one of gors is writing. Solutions: atomic
+// operation, mutex, channel
+// race condition (assignment) = a final result depends on ordering of
+// concurrent operations. Solution: channel
+// receive from an unbuffered channel happens before a send completes
+// CPU-bound tasks = worker pool size = N CPU
+// IO-bound tasks = worker pool size = optimal number of connections to an
+// external system
+
+// context = hierarchical immutable structure (context wrapping) that is used
+// to forward meta data to deeper layers (never to return results) and
+// provides an explicit or timeout/deadline-based cancellation from upstream of
+// multiple gors working on a shared context
+
+// cond (broadcast) = a container for gors publishing and listening for events.
+// A cond uses a sync.Locker to prevent data races. A cond implements a repeated
+// message broadcast vs chan delivery to a single gor (the only event that
+// multiple gors can read is close(ch))
+// never copy sync.WaitGroup, sync.Cond, sync.Mutex, sync.RWMutex. Solution:
+// either use a pointer to a sync element or a pointer to its containing struct
