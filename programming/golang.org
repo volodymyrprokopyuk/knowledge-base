@@ -12,18 +12,19 @@
 
 | Composite reference types                          |
 |----------------------------------------------------|
-| src_go{ var arr [4]int } fixed-length array        |
+| src_go{ var arr [3]int } fixed-length array        |
 | src_go{ var slc []int } slice = dynamic array      |
 | src_go{ var htb map[string]int } map = hash table  |
 | src_go{ var ch chan int } concurrency-safe channel |
 
 - Comparable types ~a == b~ :: all primitive types, pointers, arrays, channels,
-  structs of comparable types, interfaces. Slices and maps are not comparable:
-  use custom ~Equal()~ implementation
+  structs of comparable types, interfaces. *Slices* and *maps* are /not
+  comparable/: use custom ~Equal()~ implementation
 
 *** Type alias
 
-- Type alias :: allows to attach different methods to the same underlying type
+- Type alias :: allows to attach different methods to the same underlying type.
+  A type alias implements *nominal typing*
 
 #+BEGIN_SRC go
 type Year int // type alias
@@ -39,9 +40,9 @@ fmt.Println(year) // Year 2024
 - Typed constant :: compile-time declaration only for primitive types
   src_go{ const i int = 1 }
 - Untyped constant :: compile-time named literal src_go{ const i = 1 }
-  - No immutable values at runtime: use a call-by-value copy
-  - For mutable values at runtime: use a pointer to a value
-- Enumeration :: typed list of constants using ~iota~
+  - *Immutable values* at runtime: use a /call-by-value/ copy
+  - *Mutable values* at runtime: use a /pointer/ to a value
+- Enumeration :: a typed list of constants using ~iota~
 
 #+BEGIN_SRC go
 type BayanModel int
@@ -71,8 +72,8 @@ var (
 b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 #+END_SRC
 
-- Pointer :: implies mutable data vs a call-by-value copy that preserves
-  immutability of original data
+- Pointer :: implies /mutable data/ vs a *call-by-value* copy that preserves
+  /immutability/ of original data
 
 #+BEGIN_SRC go
 var i int = 1
@@ -84,7 +85,8 @@ fmt.Println(i, *p) // 3, 3
 *** Strings and runes
 
 - String :: a length and a pointer to an immutable array of arbitrary bytes
-  - Charset Unicode code points: variable-length encoding UTF-8 (up to 4 bytes)
+  - *Charset* Unicode code points: to variable-length *encoding* UTF-8 (up to 4
+    bytes)
 
 #+BEGIN_SRC go
 s := "Добро"
@@ -96,4 +98,329 @@ for i, r := range []rune(s) {
   fmt.Printf("%d:%c ", i, r) // rune index: 0:Д 1:о 2:б 3:р 4:о
 }
 fmt.Println(string([]rune(s)[:2])) // first two runes: До
+#+END_SRC
+
+*** Arrays
+
+- Array :: a fixed-length contiguous block of memory
+
+#+BEGIN_SRC go
+// automatic zero initialization
+var a [3]int // 0, 0, 0
+// explicit initialization
+b, c := [3]int{}, [...]int{1, 2, 3} // 0, 0, 0; 1, 2, 3
+// sparse array
+d := [...]int{1, 2: 2, 4: 3} // 1, 0, 2, 0, 3
+#+END_SRC
+
+*** Slices
+
+- Slice :: a /non-comparable/ *dynamic array*. A slice contains a pointer to an
+  array, a length, and a capacity. Slices can provide /multiple views/ into a
+  single array
+  - *Full slice expression* ~slc[i:j:cap]~ limits side effects of appending by
+    reallocating the underlying array when ~len == cap~
+
+#+BEGIN_SRC go
+// nil slice
+var a []int // []
+// increments length, dynamic reallocation
+a = append(a, 1, 2) // 1, 2
+// explicit initialization
+b := []int{1, 2, 3} // 1, 2, 3
+// sparse array
+c := []int{1, 2: 2, 4: 3} // 1, 0, 2, 0, 3
+// zero initialized slice with len == 3, cap == 3
+d := make([]int, 3)
+for i, v := range []int{1, 2, 3} {
+  d[i] = v // 1, 2, 3
+}
+// empty slice with len == 0, cap == 3
+e := make([]int, 0, 3)
+for _, v := range []int{1, 2, 3} {
+  e = append(e, v) // 1, 2, 3
+}
+arr := [...]int{1, 2, 3}
+// array to slice: shared memory
+f := arr[:] // 1, 2, 3
+// array to slice: copy
+g := make([]int, len(arr))
+copy(g, arr[:]) // 1, 2, 3
+#+END_SRC
+
+*** Maps
+
+- Map :: a /non-comparable/ *hash table*. A map contains s pointer on an array
+  of buckets, a length, and a capacity.
+
+#+BEGIN_SRC go
+// nil map
+var a map[string]int
+// initialized map
+b := map[string]int{"a": 1, "b": 2}
+// empty map with len == 0, initial cap == 3
+c := make(map[string]int, 3)
+c["a"] = 1
+// key in map
+if v, in := c["a"]; in {
+  fmt.Println(v) // 1
+}
+for k, v := range b {
+  fmt.Println(k, v) // a: 1, b: 2
+}
+// delete key
+delete(c, "a")
+#+END_SRC
+
+*** Structures
+
+- Structure :: a user-defined data type that implements *nominal typing*
+
+#+BEGIN_SRC go
+type Bayan struct {
+  Model string
+  Year int
+}
+// constructor function vs struct literal
+func NewBayan(model string, year int) *Bayan {
+  // local value is allocated on the heap
+  // when its value is returned from a function
+  return &Bayan{model, year}
+}
+// explicit field names
+a := Bayan{Model: "Nextra", Year: 2020}
+// positional field values
+b := Bayan{"Omnia", 2021}
+// anomymous struct, structural typing
+var c Bayan = struct{Model string; Year int}{"Selecta", 2022}
+// struct literal
+p := &Bayan{Model: "Prime"} // Prime, 0
+// constructor function
+q := NewBayan("Spectrum", 2024)
+// nil Bayan
+s := new(Bayan)
+fmt.Println(a, b, c, p, q, s)
+#+END_SRC
+
+- Struct embedding :: a *composition* of types where fields of embedded types
+  are promoted to a containing type
+  - *Composition*: an embedded type is a method receiver; a new type is not an
+    embedded type
+  - *Inheritance*: a subclass is a method receiver; a subclass can substitute a
+    superclass
+
+#+BEGIN_SRC go
+type Product struct {
+  Bayan // embedded fields without name
+  Price float64
+}
+p := Product{Bayan{"Nextra", 2020}, 1.6e4}
+// fields of an embedded type are promoted to a top-level containing type
+fmt.Println(p.Model, p.Price, p.Bayan.Year)
+#+END_SRC
+
+** Flow control
+
+*** if/else
+
+- ~if/else~ :: allows /arbitrary conditions/ in each clause; each clause has its
+  /own scope/
+  - Align the happy path to the left; favor early return/break/continue
+  - The happy path goes down, while edge cases are handled on the right
+
+#+BEGIN_SRC go
+if i := rand.Intn(10); i < 3 {
+  fmt.Println(i, "low")
+} else if i < 8 {
+  fmt.Println(i, "mid")
+} else {
+  fmt.Println(i, "high")
+}
+#+END_SRC
+
+*** for/range + break/continue [label]
+
+- ~for/range~ :: provides a wide range of iteration algorithms
+  - A controlled iteration with a start, end, and step
+  - A loop with dynamic exit condition
+  - A loop with unconditional first iteration
+  - A loop over strings, arrays, slices, and maps
+
+#+BEGIN_SRC go
+// controlled iteration with start, end, and step
+for i := 0; i < 3; i++ {
+  fmt.Println(i) // 0, 1, 2
+}
+a := []int{1, 2, 3}
+// multiple initialization
+for i, l := 0, len(a); i < l; i++ {
+  fmt.Println(a[i]) // 1, 2, 3
+}
+i := 0
+// dynamic exit condition
+for i < 3 {
+  fmt.Println(i) // 0, 1, 2
+  i++
+}
+i = 0
+// unconditional first iteration
+for {
+  fmt.Println(i) // 0, 1, 2
+  i++
+  if i > 2 {
+    break
+  }
+}
+// iterate over strings, arrays, slices, maps
+// range returns a copy values not suitable for update: use indexing
+for i, v := range []int{1, 2, 3} {
+  fmt.Printf("%d: %d\n", i, v) // 0: 1, 1: 2, 2: 3
+}
+// range expression evaluated once before a loop
+a = []int{1, 2, 3}
+for range a {
+  a = append(a, 9) // 1, 2, 3, 9, 9, 9
+}
+#+END_SRC
+
+*** switch/case + break label
+
+- ~switch/case~ :: provides conditionals based on equality check or arbitrary
+  conditions in each clause
+
+#+BEGIN_SRC go
+a := []string{"one", "eleven", "thousand"}
+outer: for _, v := range a {
+  // equality == check in each clause
+  switch l := len(v); l {
+  case 1, 2, 3:
+    fmt.Println("small")
+  case 4, 5, 6:
+    fmt.Println("medium")
+    break outer
+  default:
+    fmt.Println("large")
+  }
+}
+for _, v := range a {
+  // arbitrary condition in each clause
+  switch l := len(v); {
+  case l < 4:
+    fmt.Println("small")
+  case l < 7:
+    fmt.Println("medium")
+  default:
+    fmt.Println("large")
+  }
+}
+#+END_SRC
+
+*** goto label
+
+#+BEGIN_SRC go
+for _, v := range []int{1, 2, 3} {
+  if v == 2 {
+    goto print
+  }
+  v *= 10
+  print: fmt.Println(v) // 10, 2, 30
+}
+#+END_SRC
+
+** Functions and methods
+
+*** Functions
+
+- Function :: all function parameters including pointers are call-by-value
+  copies. A function allows multiple return values
+  - *Named return values* mostly for documentation of function types and
+    interfaces, and also to access return values in ~defer~
+  - *Anonymous functions* (function literals) are closures
+
+#+BEGIN_SRC go
+// multiple return values
+func quoteRem(a, b int) (int, int) {
+  return a / b, a % b
+}
+q, r := quoteRem(5, 3) // 1, 2
+// variadic parameters
+func sum(vals ...int) int {
+  sum := 0
+  for _, v := range vals {
+    sum += v
+  }
+  return sum
+}
+s := sum([]int{1, 2, 3}...) // 6
+// function type
+type Op func(a, b int) (res int)
+// anonymous function: function literal
+var sum Op = func(a, b int) int {
+  return a + b
+}
+fmt.Println(sum(1, 2)) // 3
+// anonymous function: closure
+for _, v := range []int{1, 2, 3} {
+  v := v // variable shadowing, new variable per iteration
+  func() {
+    // closes over an iteration-local variable
+    fmt.Println(v) // 1, 2, 3
+  }() // immediately invoked function literal
+}
+#+END_SRC
+
+- ~defer~ :: defer closures are evaluated after function return in the reverse
+  order. Defer receivers and arguments to defer closures are evaluated when
+  declared, not when executed
+
+#+BEGIN_SRC go
+// evaluation of defer receivers and arguments
+func evalDefer() {
+  b := Bayan{"Nextra", 2020}
+  // defer value receiver is evaluated when declared
+  defer b.Print() // Bayan Nextra 2020
+  b = Bayan{"Omnia", 2021}
+  i := 1
+  // defer arguments are evaluated when declared
+  defer fmt.Println(i) // 1
+  i = 2
+}
+// extending error context in defer reqiores named return values
+func errorDefer() (err error) {
+  err = fmt.Errorf("function oh")
+  defer func() {
+    if err != nil {
+      // captures and wraps function error
+      err = fmt.Errorf("defer oh: %w", err)
+    }
+  }()
+  return err // defer oh: function oh
+}
+#+END_SRC
+
+*** Methods
+
+- Method :: a function that operates on a type value or a type pointer. A method
+  can be invoked through a nil pointer receiver (make a zero value useful)
+  - src_go{ function(receiver, args...) == receiver.method(args...) }
+  - *Pointer receiver* ~(t *T)~ implies mutation
+  - *Value receiver* ~(t T)~ a method operates on a copy of a type
+  - Methods of an embedded type are promoted to a containing type
+
+#+BEGIN_SRC go
+type Bayan struct {
+  Model string
+  Year int
+}
+func (b Bayan) Print() {
+  fmt.Printf("Bayan %v %v", b.Model, b.Year)
+}
+b := Bayan{"Nextra", 2020}
+b.Print()
+// method value closes over its instance
+bPrint := b.Print
+bPrint()
+// method expression accepts a receiver as the first argument
+bPrint2 := Bayan.Print
+bPrint2(b)
 #+END_SRC
