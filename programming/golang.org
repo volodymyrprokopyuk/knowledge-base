@@ -1,0 +1,99 @@
+* Go lang
+
+** Type system
+
+*** Primitive and composite types
+
+| Primitive value types                                 |
+|-------------------------------------------------------|
+| ~bool~, ~byte = int8~, ~int = int64~, ~uint = uint64~ |
+| ~float64~                                             |
+| ~rune = int32~, ~string~                              |
+
+| Composite reference types                          |
+|----------------------------------------------------|
+| src_go{ var arr [4]int } fixed-length array        |
+| src_go{ var slc []int } slice = dynamic array      |
+| src_go{ var htb map[string]int } map = hash table  |
+| src_go{ var ch chan int } concurrency-safe channel |
+
+- Comparable types ~a == b~ :: all primitive types, pointers, arrays, channels,
+  structs of comparable types, interfaces. Slices and maps are not comparable:
+  use custom ~Equal()~ implementation
+
+*** Type alias
+
+- Type alias :: allows to attach different methods to the same underlying type
+
+#+BEGIN_SRC go
+type Year int // type alias
+func (y Year) String() string {
+  return fmt.Sprintf("Year %v", int(y))
+}
+year := Year(2024) // explicity type conversion
+fmt.Println(year) // Year 2024
+#+END_SRC
+
+*** Constants and enumerations
+
+- Typed constant :: compile-time declaration only for primitive types
+  src_go{ const i int = 1 }
+- Untyped constant :: compile-time named literal src_go{ const i = 1 }
+  - No immutable values at runtime: use a call-by-value copy
+  - For mutable values at runtime: use a pointer to a value
+- Enumeration :: typed list of constants using ~iota~
+
+#+BEGIN_SRC go
+type BayanModel int
+const (
+  Nextra BayanModel = iota
+  Omnia
+  Selecta
+  Prime
+  Spectrum
+)
+fmt.Println(Nextra, Selecta, Spectrum) // 0, 2, 4
+#+END_SRC
+
+*** Variables and pointers
+
+#+BEGIN_SRC go
+var i, j int = 1, 2 // typed variables
+var i, f = 1, 1.2 // default type for literals int, float64
+var b, s, r = false, "ok", 'a' // type inference
+var (
+  // default initialization to zero value for primitive types
+  b bool; i int; f float64; r rune; s string;
+  // default initialization to nil for slice/map/chan, pointer/interface/func
+  slc []int; htb map[string]int; ch chan int;
+)
+// short variable declaration: inferred in-function initialization
+b, i, f, r, s := true, 1, 1.2, 'a', `ok`
+#+END_SRC
+
+- Pointer :: implies mutable data vs a call-by-value copy that preserves
+  immutability of original data
+
+#+BEGIN_SRC go
+var i int = 1
+var p *int = &i // & address
+i++; *p++ // * dereferencing
+fmt.Println(i, *p) // 3, 3
+#+END_SRC
+
+*** Strings and runes
+
+- String :: a length and a pointer to an immutable array of arbitrary bytes
+  - Charset Unicode code points: variable-length encoding UTF-8 (up to 4 bytes)
+
+#+BEGIN_SRC go
+s := "Добро"
+for i, b := range s {
+  fmt.Printf("%d:%c ", i, b) // byte index: 0:Д 2:о 4:б 6:р 8:о
+}
+fmt.Println(s[:2]) // first 2 bytes: Д
+for i, r := range []rune(s) {
+  fmt.Printf("%d:%c ", i, r) // rune index: 0:Д 1:о 2:б 3:р 4:о
+}
+fmt.Println(string([]rune(s)[:2])) // first two runes: До
+#+END_SRC

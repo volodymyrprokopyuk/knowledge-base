@@ -1,50 +1,50 @@
-/* Primitives */
-// bool, int = int64, uint = uint64, float64
-// byte = uint8, rune = int32, string
-// type alias = attach different methods to the same underlying type
-type Year int // nominal typing, block-level scope
-type Year2 = Year // type alias for backward compatibility
-var a Year = Year2(2023)
-// comparable types (==) bool, int/float64, string, pointer, array,
-// struct of comparable types, chan, interface (identical dynamic values)
-// slices and maps are not comparable => use reflect.DeepEqual or a custom equal
-// integer overflows and underflows are silent
+// /* Primitives */
+// // bool, int = int64, uint = uint64, float64
+// // byte = uint8, rune = int32, string
+// // type alias = attach different methods to the same underlying type
+// type Year int // nominal typing, block-level scope
+// type Year2 = Year // type alias for backward compatibility
+// var a Year = Year2(2023)
+// // comparable types (==) bool, int/float64, string, pointer, array,
+// // struct of comparable types, chan, interface (identical dynamic values)
+// // slices and maps are not comparable => use reflect.DeepEqual or a custom equal
+// // integer overflows and underflows are silent
 
-/* Constants, enumerations */
-const i int = 1 // compile-time typed constant only for primitive types
-// no immutable definitions at runtime => use call-by-value
-// for mutable definitions at runtime => use pointers
-const i = 1 // compile-time untyped constant = named literal
-type BayanModel int // enumeration = type + typed const list + iota
-const (Nextra BayanModel = iota; Omnia; Selecta; Prime; Spectrum)
+// /* Constants, enumerations */
+// const i int = 1 // compile-time typed constant only for primitive types
+// // no immutable definitions at runtime => use call-by-value
+// // for mutable definitions at runtime => use pointers
+// const i = 1 // compile-time untyped constant = named literal
+// type BayanModel int // enumeration = type + typed const list + iota
+// const (Nextra BayanModel = iota; Omnia; Selecta; Prime; Spectrum)
 
-/* Variables */
-var i, j int = 1, 2
-var i, f = 1, 1.2 // default type of literals int, float64
-var b, s, r = false, "ok", 'a' // type inference
-// default initialization to zero for primitives
-var (b bool; i int; f float64; r rune; s string)
-// default initialization to nil for slice/map/chan, pointer/interface/func
-// short variable declaration = in-function inferred initialization/redefinition
-b, i, f, r, s := true, 1, 1.2, 'a', `ok`
+// /* Variables */
+// var i, j int = 1, 2
+// var i, f = 1, 1.2 // default type of literals int, float64
+// var b, s, r = false, "ok", 'a' // type inference
+// // default initialization to zero for primitives
+// var (b bool; i int; f float64; r rune; s string)
+// // default initialization to nil for slice/map/chan, pointer/interface/func
+// // short variable declaration = in-function inferred initialization/redefinition
+// b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 
-/* Pointers */
-// call-by-value preserves immutability of original data
-// use of pointers implies mutable data
-// pointer initialization & address and * dereferencing
-var i int = 1; var p *int = &i; i++; *p++ // i == 3; *p == 3
-var p *int = new(int) // p* == 0
+// /* Pointers */
+// // call-by-value preserves immutability of original data
+// // use of pointers implies mutable data
+// // pointer initialization & address and * dereferencing
+// var i int = 1; var p *int = &i; i++; *p++ // i == 3; *p == 3
+// var p *int = new(int) // p* == 0
 
-/* Strings, runes */
-// string = immutable sequence of arbitrary bytes; pointer to a byte array + len
-// charset Unicode code points => variable length encoding UTF-8 (up to 4 bytes)
-s := "Добро"
-// byte index 0 2 4 6 8
-for i, r := range s { fmt.Printf("%d: %c, ", i, r) }
-s[:2] // first two bytes
-// rune index 0 1 2 3 4
-for i, r := range []rune(s) { fmt.Printf("%d: %c, ", i, r) }
-string([]rune(s)[:2]) // first two runes
+// /* Strings, runes */
+// // string = immutable sequence of arbitrary bytes; pointer to a byte array + len
+// // charset Unicode code points => variable length encoding UTF-8 (up to 4 bytes)
+// s := "Добро"
+// // byte index 0 2 4 6 8
+// for i, r := range s { fmt.Printf("%d: %c, ", i, r) }
+// s[:2] // first two bytes
+// // rune index 0 1 2 3 4
+// for i, r := range []rune(s) { fmt.Printf("%d: %c, ", i, r) }
+// string([]rune(s)[:2]) // first two runes
 
 /* Arrays */
 // allocated on stack as array size is known at compile-time
@@ -467,30 +467,68 @@ func init() { }
 // mkdir v2; git branch v2 # for backward incompatible versions
 import "scm/user/mod/v2/pkgdir" // new module import path
 
-/* concurrency */
-// concurrency = provides a structures to solve a problem with sequential steps
-// that may be parallelized
-// parallelism = independent execution of sequences of instructions
-// goroutine (gor) = internally sync lightweight threads 1e4 managed by the Go
-// runtime, multiplexed over OS threads, small stack (can grow), fast context
-// switching, runtime-aware scheduling (IO, GC)
-// gor = accepts parameters, return values are ignored (use channels)
+/* concurrency
+- concurrency = a code structure to solve a problem with sequential sync steps
+  that may be parallelized
+- parallelism = independent execution of sequences of instructions
+- CSP (more generic and flexible) = a randezvous-based system within a single
+  node with focus on typed first-class channels and synchronization where
+  anonymous gors read/write without having to specify an identity of a receiver
+- actor model (more specific and complex) = fire-and-forget system distributed
+  over a cluster of nodex with focus on async named actors with untyped
+  mailboxes and an internal mutable state combined in a fault-tolerant
+  supervision hierarchy. A receiver reference is required to send an
+  actor-to-actor message (coupling of a sender to a receiver)
+ */
 
-// channel (chan) = is a read/write pipe that connects gors. Multiple gors can
-// write to and read from the same chan, but each value is delivered to only one
-// gor
-// chan<- write-only chan, <-chan read-only chan (for vars, func params)
-// share memory by communicating, do not communicate by sharing memory
-// read from a closed chan constantly returns a zero value for a channel type
-// read/write to a nil chan blocks forever
-// unbuffered chan (blocking, sync) = write blocks until read, read blocks until
-// write. Only unbuffered chan provides a strong synchronization guarantee
+/* goroutine
+- goroutine (gor) = internally sync, lightweight, non-preemptive (not
+  interruptible) thread that is executed concurrently and is managed by the Go
+  runtime. Gor is non-preemptive, but has well-defined points (IO, system call,
+  function call) to suspend and resume execution
+- Gors =
+  run in a single address space,
+  are multiplexed over OS threads,
+  software-defined M:N scheduler with fast context switching,
+  runtime-aware scheduling following the fork-join concurrency model,
+  have small stack (that can grow),
+  low-latency concurrent GC,
+- gor = accepts parameters, return values are ignored (use <-chan, chan<-)
+ */
+
+/* channel
+- channel (chan) = a first-class composable bidirectional pipe that connects
+  gors. Multiple gors can write to and read from the same chan, but each value
+  is delivered to only one gor
+- unidirectional chan = chan<- write-only chan, <-chan read-only chan (for vars
+  and func params). Bidirectional chans are implicitly converted to read-only or
+  write-only
+- share memory by communicating, do not communicate by sharing memory
+_ read from a closed chan immediately returns a zero value for a channel type
+- read/write to a nil chan blocks forever, close a nil chan panics
+- unbuffered chan (blocking, sync) = write blocks until read, read blocks until
+  write. Only unbuffered chan provides a strong synchronization guarantee and
+  delivery confirmation to a sender: send => receive => send complete
+- receive from an unbuffered channel happens before a send completes
+ */
 ch := make(chan int)
-// buffered chan (backpressure, async) = up until n non-blocking writes/reads,
-// full buffer blocks writing, empty buffer blocks reading
-// buffered chan = limits a number of gors (worker pool), limits a number of
-// queued values (rate limiter). Buffered write is not confirmed to a sender
+/*
+- buffered chan (backpressure, async) = efficient, async in-memory queue. Up
+  until n non-blocking writes/reads, full buffer blocks writing, empty buffer
+  blocks reading
+- buffered chan (concurrent-safe in-memory FIFO) = limits a number of gors
+  (worker pool), limits a number of values in a queue (rate limiter). Buffered
+  write returns immediately and is not confirmed to a sender
+ */
 ch := make(chan int, 1) // 1 is a recommended default
+if v, open := <- ch; open {
+  fmt.Printf("value %v from an open channel", v)
+} else {
+  fmt.Printf("zefor value %v from a closed channel", v)
+}
+/*
+- channel ownership = a gor that creates, writes and closes a chan
+ */
 
 // business logic is unaware of concurrent execution, concurrency-free API
 func inc(val int) int { return val + 1 }
@@ -499,7 +537,7 @@ in, out := make(chan int), make(chan int)
 // return values from gor are ignored
 go func(in <-chan int, out chan<- int) {
   // gor is sync internally
-  if val, ok := <- in; ok { // read from a channel
+  if val, open := <- in; open { // read from an open channel
     res := inc(val) // business logic
     out <- res // write to a channel, panic if closed
   }
@@ -514,10 +552,13 @@ close(in) // a writer must close a channel, panic if already closed
 res := <- out
 fmt.Println(res) // 2
 
-// select = simultaneous random order wait for read/write on multiple channels
-// select = randomly repeatedly evaluates each case (simultaneously blocks on
-// multiple channels) until the first channel operation is completed, or a
-// non-blocking default clause, if present
+/* select
+- select = enables composition of channels by efficiently and simultaneously
+  selecting messages from multiple competing channels in a uniformly random way
+- select = evaluates each case (simultaneously blocks on multiple channels)
+  until the first channel operation is complete, or a non-blocking default
+  clause that is executed immediately if all cases are blocked
+ */
 ch1, ch2 := make(chan int), make(chan int)
 go func() {
   ch1 <- 1 // blocking write
@@ -546,25 +587,42 @@ for {
   }
 }
 
-// mutex = is used to control access (synchronize critical section) to a shared
-// resource between independent gors in a parallel environment
-// chan = implements a transformation flow (orchestration, ownership
-// transfer) for values between dependent gors in a concurrent environment
-// atomic operations = built in modern CPUs (add, compare, load, store, swap)
-// data race (increment) = multiple gors access the same memory location
-// simultaneously and at least one of gors is writing. Solutions: atomic
-// operation, mutex, channel
-// race condition (assignment) = a final result depends on ordering of
-// concurrent operations. Solution: channel
-// receive from an unbuffered channel happens before a send completes
-// CPU-bound tasks = worker pool size = N CPU
-// IO-bound tasks = worker pool size = optimal number of connections to an
-// external system
+/* mutex
+- mutex = provides an exclusive access (synchronizes a critical section) to a
+  resource shared  between independent gors in a parallel environment
+- chan = implements a transformation flow (orchestration, ownership transfer)
+  for values between dependent gors in a concurrent environment. Sefe concurrent
+  programs ensure that only one gor has ownership of data at a time
+- atomic operations = are safe in a concurrent environment (CPU built-in add,
+  compare, load, store, swap)
+- data race (interleaving of steps e.g. increment) = multiple gors access the
+  same memory location simultaneously and at least one of gors is writing.
+  Solutions: atomic operation, mutex, channel
+- race condition (ordering of operations e.g. assignment) = a final result
+  depends on ordering of concurrent operations. Solution: channel
+- deadlock = all gors are waiting on one another. Coffman conditions of a
+  deadlock
+    - mutual exclusion = a gor has exclusive rights on a resource
+    - wait for condition = a gor holds a resource while waiting for another
+      resource
+    - no preemption = a resource can only be released by a holding gor
+    - circular wait = a gor waits on a chain of other gors that in turn wait on
+      the first gor
+- livelock = two or more gors operate, but make no progress
+- starvation = a gor cannot get all resources needed to perform a task
+- CPU-bound tasks = worker pool size = number of CPU cores
+- IO-bound tasks = worker pool size = optimal number of connections to an
+  external system
+ */
 
-// context = hierarchical immutable structure (context wrapping) that is used
-// to forward meta data to deeper layers (never to return results) and
-// provides an explicit or timeout/deadline-based cancellation from upstream of
-// multiple gors working on a shared context
+// context = hierarchical immutable read-only structure (context wrapping) that
+// is used to forward request-scoped meta data (type unsafe, linear search, key
+// collisions, invisible dependencies) to children = call-graph (never to return
+// results) and provides an explicit or timeout/deadline-based cancellation from
+// the upstream (children receiving a context cannot cancel it) of multiple gors
+// working on a shared context. A received context can be wrapped with new
+// cancellation instructions and forwarded to children without affecting
+// upstream parents
 
 // cond (broadcast) = a container for gors publishing and listening for events.
 // A cond uses a sync.Locker to prevent data races. A cond implements a repeated
