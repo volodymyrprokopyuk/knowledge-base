@@ -605,4 +605,20 @@ for _, v := range vals {
 
 ** Generics
 ** Packages and modules
+
+- Package :: a set of types and functions defined in multiple files under a
+  package directory. One-word all-lowercase package name should match a package
+  directory. Every source file in a package directory must have the same package
+  name src_go{ package pkgname }. Top-level Capitalized identifiers are exported
+  from a package. Merge packages or create a new common package to resolve
+  circular dependencies
+  - Import a package src_go{ import "scm/user/mod/pkgdir" }
+  - Import alias src_go{ import pkgname "scm/user/mod/pkgdir" }
+  - Access an identifier src_go{ pkgname.Identifier }
+- Module :: a unit of versioning identified by a repository path. A module
+  represents a *library* of /importable packages/ src_fish{ go get ... } or an
+  *application* of /executable commands/ src_fish{ go install ... }
+  - Initialize a module src_fish{ go mod init scm/user/mod }
+  - Update module dependencies src_fish{ go mod tidy }
+
 ** Concurrency

@@ -434,39 +434,39 @@ ks := keys(m) // inferred type parameters
 // }
 // panicRecover(); fmt.Println("continue") // oh continue
 
-/* modules, packages */
-// Go programs build from source code into a self-contained executable
-// module = commands/packages root that consists of packages in a repository
-// commands => go install ..., packages => go get -u ..., import "..."
-// module = unit of versioning identified by a repository path (module ID)
-// go mod init <scm/user/mod> => go.mod
-// package name should match package directory
-// name a package after what it provides, not what it contains
-// package = noun, exports = nouns/verbs
-// every source file in a directory must have the same package name
-// package level Capitalized identifiers are exported (public API)
-// unexported identifiers are accessible from different files of a package
-// top-level identifiers in all package files must be unique
-// merge packages or create a new package to resolve circular dependencies
-package pkgname
-import "scm/user/mod/pkgdir" // pkgname ~= pkgdir, absolute import always
-pkgname.Identifier
-package main; func main() { }
-// import alias
-import (crand "crypto/rand"; "math/rand")
-// shares identifiers between parent and sibling packages without exporting them
-package internal // special package recognized by go tooling
-// automatic singleton initialization of package state through global variables
-// prefer encapsulated variables + errors over global variables + panic
-// init function runs after initialization of package variables
-// inside an init function only panic is available to signal an error
-func init() { }
-// go get scm/user/mod@version # upgrades a module to a specific version
-// go get -u scm/user/mod # upgrades a module to the most recent version
-// go mod tidy # removes unused versions from go.mod
-// git tag v1.2.3 # for backward compatible versions
-// mkdir v2; git branch v2 # for backward incompatible versions
-import "scm/user/mod/v2/pkgdir" // new module import path
+// /* modules, packages */
+// // Go programs build from source code into a self-contained executable
+// // module = commands/packages root that consists of packages in a repository
+// // commands => go install ..., packages => go get -u ..., import "..."
+// // module = unit of versioning identified by a repository path (module ID)
+// // go mod init <scm/user/mod> => go.mod
+// // package name should match package directory
+// // name a package after what it provides, not what it contains
+// // package = noun, exports = nouns/verbs
+// // every source file in a directory must have the same package name
+// // package level Capitalized identifiers are exported (public API)
+// // unexported identifiers are accessible from different files of a package
+// // top-level identifiers in all package files must be unique
+// // merge packages or create a new package to resolve circular dependencies
+// package pkgname
+// import "scm/user/mod/pkgdir" // pkgname ~= pkgdir, absolute import always
+// pkgname.Identifier
+// package main; func main() { }
+// // import alias
+// import (crand "crypto/rand"; "math/rand")
+// // shares identifiers between parent and sibling packages without exporting them
+// package internal // special package recognized by go tooling
+// // automatic singleton initialization of package state through global variables
+// // prefer encapsulated variables + errors over global variables + panic
+// // init function runs after initialization of package variables
+// // inside an init function only panic is available to signal an error
+// func init() { }
+// // go get scm/user/mod@version # upgrades a module to a specific version
+// // go get -u scm/user/mod # upgrades a module to the most recent version
+// // go mod tidy # removes unused versions from go.mod
+// // git tag v1.2.3 # for backward compatible versions
+// // mkdir v2; git branch v2 # for backward incompatible versions
+// import "scm/user/mod/v2/pkgdir" // new module import path
 
 /* concurrency
 - concurrency = a code structure to solve a problem with sequential sync steps
