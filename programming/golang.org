@@ -21,7 +21,6 @@
   structs of comparable types, interfaces. *Slices* and *maps* are /not
   comparable/: use custom ~Equal()~ implementation
 
-*** Type alias
 
 - Type alias :: allows to attach different methods to the same underlying type.
   A type alias implements *nominal typing*
@@ -327,6 +326,83 @@ for _, v := range []int{1, 2, 3} {
 }
 #+END_SRC
 
+** Error handling
+
+*** Sentinel and custom errors, error wrapping
+
+- Error :: a type that signals an unexpected yet recoverable situation and
+  implements the ~error~ interface
+  - *Sentinel error* an error value that signals an expected outcome e.g. EOF
+  - *Error wrapping* builds a chain of error types that convey additional
+    context
+  - A function can return different error types by returning an ~error~
+    interface
+
+#+BEGIN_SRC go
+// sentinel error
+var ErrDivideByZero = errors.New("divide by zero")
+func quoteRem(a, b int) (int, int, error) {
+  if b == 0 {
+    // return zero values for non-error return types
+    return 0, 0, ErrDivideByZero
+  }
+  // return nil for error return type
+  return a / b, a % b, nil
+}
+// custom error type
+type CustomError struct {
+  Msg string
+}
+// implements the built-in error interface
+func (ce CustomError) Error() string {
+  return fmt.Sprintf("custom error: %v", ce.Msg)
+}
+// error wrapping
+func wrapError(sentinel bool) error {
+  if sentinel {
+    // sentinel error: expected outcome
+    return ErrDivideByZero
+  }
+  // error wrapping: additional error context
+  return fmt.Errorf("wrapped error: %w", CustomError{"oh"})
+}
+err := wrapError(false)
+if err != nil {
+  // check for a sentinel error value in a wrapped chain of errors (==)
+  if errors.Is(err, ErrDivideByZero) {
+    fmt.Println("sentinel error:", err)
+  }
+  // check for a custom error type in a wrapped chain of errors (reflection)
+  if errors.As(err, &CustomError{}) {
+    fmt.Println("custom error:", err)
+  }
+}
+#+END_SRC
+
+*** panic/recover
+
+- Panic :: signals a termination of a program due to an unrecoverable
+  situation. A panic unwinds a stack only to the top of a current goroutine, so
+  a recover must be within the scope of a goroutine
+  - *Recover* must be called only from ~defer~ as only defer functions are
+    executed on panic
+  - In an app use recover to gracefully handle shutdown
+  - In a lib use recover to convert a panic to an error at a public API boundary
+
+#+BEGIN_SRC go
+func panicRecover() {
+  defer func() {
+    // call recover only in defer
+    if msg := recover(); msg != nil {
+      fmt.Println("panic:", msg)
+    }
+  }()
+  panic("oh") // unrecoverable situation
+}
+panicRecover()
+fmt.Println("continue") // panic: oh, continue
+#+END_SRC
+
 ** Functions and methods
 
 *** Functions
@@ -424,3 +500,109 @@ bPrint()
 bPrint2 := Bayan.Print
 bPrint2(b)
 #+END_SRC
+
+** Interfaces
+
+- Interface :: an abstract type that defines common behavior across distinct
+  concrete types. An interface implements type-safe *structural typing* when a
+  method set of a concrete type including promoted methods from embedded types
+  fully covers all methods defined in an interface. An interface consists of
+  - A *static type* an abstract interface type
+  - A *dynamic type* concrete value type that implements an interface
+  - *Dependency inversion principle* rely on an abstraction, not an
+    implementation
+  - *Interface segregation principle* the bigger the interface, the weaker the
+    abstraction. Abstractions should be discovered, not created. Do not force an
+    interface on a producer side: let a consumer discover the right abstractions
+    with a minimal set of methods
+  - *Robustness principle* accept interfaces (flexible input), return structs
+    (compliant output)
+  - *Type assertion* ~v.(Type)~ is applied to an interface at runtime
+  - *Type conversion* ~Type(v)~ is applied to a concrete type at compile-time
+
+#+BEGIN_SRC go
+type Printer interface {
+  Print()
+}
+type Int int
+// a type just implements methods
+// that can be used individually or as part of an interface
+// a type is totally unaware of any interfaces
+func (i Int) Print() {
+  fmt.Println("Int", i)
+}
+type Flo float64
+func (f Flo) Print() {
+  fmt.Println("Flo", f)
+}
+// only a client specifies a required interface
+vals := []Printer{Int(1), Flo(1.2)}
+// process incompatible types through a uniform interface
+for _, v := range vals {
+  v.Print() // Int 1, Flo 1.2
+}
+// type assertion to access a dynamic type of an interface
+var p Printer = Int(1) // type conversion
+if i, is := p.(Int); is { // type assertion
+  i.Print() // Int 1
+}
+// type switch to access a dynamic type of an interface
+for _, v := range vals {
+  switch v.(type) {
+  case Int:
+    fmt.Print("Integer ")
+    v.Print() // Integer Int 1
+  case Flo:
+    fmt.Print("Float ")
+    v.Print() // Float Flo 1.2
+  }
+}
+#+END_SRC
+
+- A function can implement a one-method interface
+
+#+BEGIN_SRC go
+// one-method interface
+type Logger interface {
+  Log(msg string)
+}
+// function type
+type LogFunc func(msg string)
+// function type implements a one-method interface
+func (lf LogFunc) Log(msg string) {
+  lf(msg)
+}
+// log function
+func log(msg string) {
+  fmt.Println(msg)
+}
+// log function == function type == one-method interface
+var logger Logger = LogFunc(log)
+logger.Log("ok") // ok
+#+END_SRC
+
+- Interface embedding :: a composition of abstract types: a containing type
+  automatically implements all interfaces implemented by embedded types
+
+#+BEGIN_SRC go
+type Negator interface {
+  Printer // embedded interface
+  Neg()
+}
+func (i *Int) Neg() {
+  ,*i = -*i
+}
+func (f *Flo) Neg() {
+  ,*f = -*f
+}
+i, f := Int(1), Flo(1.2)
+vals := []Negator{&i, &f}
+for _, v := range vals {
+  v.Neg()
+  v.Print() // Int -1, Flo -1.2
+}
+#+END_SRC
+
+** Generics
+** Packages and modules
+** Concurrency

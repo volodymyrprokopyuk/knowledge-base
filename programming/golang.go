@@ -251,102 +251,102 @@
 // p := Product{Bayan{"Nextra", 2023}, 1e3}
 // fmt.Println(p.model); p.show()
 
-/* interfaces */
-// interface (the only abstract type)
-// static type (interface type, abstract type) => interface{} +
-// dynamic type (value type, concrete implementation) => nil
-// nil interface == nil; nil receiver converted to interface != nil
-// when returning an interface, return nil directly, not a nil pointer
-type Err struct { }
-func (e Err) Error() string { return "oh" }
-func f(a bool) error {
-  var err *Err
-  if a { err = &Err{} }
-  return err // nil pointer converted to the error interface != nil
-}
-func g(a bool) error {
-  if a { return Err{} }
-  return nil // nil converted to the error interface == nil
-}
-if err := f(false); err != nil { fmt.Println(err) } // <nil>
-if err := f(true); err != nil { fmt.Println(err) } // oh
-if err := g(false); err != nil { fmt.Println(err) } // no error
-if err := g(true); err != nil { fmt.Println(err) } // oh
-// interface = implicit type-safe structural typing when a method set of a
-// concrete type including promoted methods from embedded types contains a
-// method set of an interface
-// common behavior = across distinct types e. g. sort.Interface
-type Interface interface { len() int; less(i, j int) bool; swap(i, j int) }
-// decoupling = rely on an abstraction, not an implementation (Dependency
-// Inversion Principle)
-// restriction = an interface restricts available operations e. g. read-only
-// the bigger the interface, the weaker the abstraction
-// abstractions should be discovered, not created: struct => interface
-// do not force an interface on a producer side, let a consumer discover the
-// right abstraction (Interface Segregation Principle)
-// accept interfaces (flexible input), return structs (compliant output)
-// (Robustness Principle)
-// do not return an interface defined on a consumer side (unnecessary circular
-// dependency)
+// /* interfaces */
+// // interface (the only abstract type)
+// // static type (interface type, abstract type) => interface{} +
+// // dynamic type (value type, concrete implementation) => nil
+// // nil interface == nil; nil receiver converted to interface != nil
+// // when returning an interface, return nil directly, not a nil pointer
+// type Err struct { }
+// func (e Err) Error() string { return "oh" }
+// func f(a bool) error {
+//   var err *Err
+//   if a { err = &Err{} }
+//   return err // nil pointer converted to the error interface != nil
+// }
+// func g(a bool) error {
+//   if a { return Err{} }
+//   return nil // nil converted to the error interface == nil
+// }
+// if err := f(false); err != nil { fmt.Println(err) } // <nil>
+// if err := f(true); err != nil { fmt.Println(err) } // oh
+// if err := g(false); err != nil { fmt.Println(err) } // no error
+// if err := g(true); err != nil { fmt.Println(err) } // oh
+// // interface = implicit type-safe structural typing when a method set of a
+// // concrete type including promoted methods from embedded types contains a
+// // method set of an interface
+// // common behavior = across distinct types e. g. sort.Interface
+// type Interface interface { len() int; less(i, j int) bool; swap(i, j int) }
+// // decoupling = rely on an abstraction, not an implementation (Dependency
+// // Inversion Principle)
+// // restriction = an interface restricts available operations e. g. read-only
+// // the bigger the interface, the weaker the abstraction
+// // abstractions should be discovered, not created: struct => interface
+// // do not force an interface on a producer side, let a consumer discover the
+// // right abstraction (Interface Segregation Principle)
+// // accept interfaces (flexible input), return structs (compliant output)
+// // (Robustness Principle)
+// // do not return an interface defined on a consumer side (unnecessary circular
+// // dependency)
 
-// empty interface and any type accepts a value of any type
-type any = interface{}
-var a any // should be minimized
-a = Int(1); fmt.Println(a)
-a = Flo(1.2); fmt.Println(a)
+// // empty interface and any type accepts a value of any type
+// type any = interface{}
+// var a any // should be minimized
+// a = Int(1); fmt.Println(a)
+// a = Flo(1.2); fmt.Println(a)
 
-// assignment to an interface variable
-var i = Int(1)
-var v1, v2 View = i, &i // copy, pointer
-i = 2; fmt.Println(i); v1.show(); v2.show() // 2 1 2
+// // assignment to an interface variable
+// var i = Int(1)
+// var v1, v2 View = i, &i // copy, pointer
+// i = 2; fmt.Println(i); v1.show(); v2.show() // 2 1 2
 
-// process incompatible types through a uniform interface
-type View interface { show() }
-type Int int
-// a type is decoupled from the implicit interface
-func (i Int) show() { fmt.Println(i) }
-type Flo float64
-func (f Flo) show() { fmt.Println(f) }
-// only a client specifies the required interface
-vs := []View{Int(1), Flo(1.2)}
-for _, v := range vs { v.show() } // 1, 1.2
+// // process incompatible types through a uniform interface
+// type View interface { show() }
+// type Int int
+// // a type is decoupled from the implicit interface
+// func (i Int) show() { fmt.Println(i) }
+// type Flo float64
+// func (f Flo) show() { fmt.Println(f) }
+// // only a client specifies the required interface
+// vs := []View{Int(1), Flo(1.2)}
+// for _, v := range vs { v.show() } // 1, 1.2
 
-// type assertion applied to an interface at runtime v.(Type)
-// vs type conversions applied to concrete types at compile-time Type(v)
-// type assertion to access a dynamic type of an interface
-var v View = Int(1)
-if i, ok := v.(Int); ok { i.show() }
+// // type assertion applied to an interface at runtime v.(Type)
+// // vs type conversions applied to concrete types at compile-time Type(v)
+// // type assertion to access a dynamic type of an interface
+// var v View = Int(1)
+// if i, ok := v.(Int); ok { i.show() }
 
-// type switch to access a dynamic type of an interface at runtime
-vs := []View{Int(1), Flo(1.2)}
-for _, v := range vs {
-  switch v.(type) {
-  case Int: fmt.Print("Int "); v.show()
-  case Flo: fmt.Print("Flo "); v.show()
-  default: fmt.Println("unknown type")
-  }
-}
+// // type switch to access a dynamic type of an interface at runtime
+// vs := []View{Int(1), Flo(1.2)}
+// for _, v := range vs {
+//   switch v.(type) {
+//   case Int: fmt.Print("Int "); v.show()
+//   case Flo: fmt.Print("Flo "); v.show()
+//   default: fmt.Println("unknown type")
+//   }
+// }
 
-// a function can implement a one-method interface
-type Logger interface { log(msg string) } // one-method interface
-type LogFunc func(msg string) // function type
-// function type implements a Logger interface
-func (lf LogFunc) log(msg string) { lf(msg) }
-func log(msg string) { fmt.Println(msg) } // log function
-// log function => function type => one-method interface
-var logger Logger = LogFunc(log)
-logger.log("ok") // ok
+// // a function can implement a one-method interface
+// type Logger interface { log(msg string) } // one-method interface
+// type LogFunc func(msg string) // function type
+// // function type implements a one-method interface
+// func (lf LogFunc) log(msg string) { lf(msg) }
+// func log(msg string) { fmt.Println(msg) } // log function
+// // log function == function type == one-method interface
+// var logger Logger = LogFunc(log)
+// logger.log("ok") // ok
 
-// interface embedding = composition of abstract types
-type Negate interface { View; neg() }
-func (i *Int) neg() { *i = -*i }
-func (f *Flo) neg() { *f = -*f }
-i, f := Int(1), Flo(1.2)
-var in, fn Negate = &i, &f
-// embedded View.show() is directly accessible through the Negate interface
-in.neg(); in.show(); fn.neg(); fn.show()
-// containing struct automatically implements all interfaces implemented by
-// embedded types
+// // interface embedding = composition of abstract types
+// type Negate interface { View; neg() }
+// func (i *Int) neg() { *i = -*i }
+// func (f *Flo) neg() { *f = -*f }
+// i, f := Int(1), Flo(1.2)
+// var in, fn Negate = &i, &f
+// // embedded View.show() is directly accessible through the Negate interface
+// in.neg(); in.show(); fn.neg(); fn.show()
+// // containing struct automatically implements all interfaces implemented by
+// // embedded types
 
 /* generics */
 // type parameeters cannot be used with method arguments, only with
@@ -362,77 +362,77 @@ m := map[string]int{"a": 1, "b": 2}
 ks := keys[string, int](m)
 ks := keys(m) // inferred type parameters
 
-/* errors */
-// error = error type that signals an unexpected yet recoverable situation
-// sentinel error = signals an expected, recoverable error (empty dataset, EOF)
-// sentinel error = a value assigned to a global variable and compared with ==
-// error type = unexpected error; switch err.(type); errors.As(err, &AnError{})
-// sintinel error value = expected error; err == ErrA; errors.Is(err, ErrA)
-// handle an error only once, provide additional context using wrapping, produce
-// single error log entry (either log or return an error, but not both)
-var ErrSentinel = errors.New("Sentinel Error")
-type error interface { Error() string } // built-in error interface
-// always return error interface => return different error types from a function
-func quoteRem(a, b int) (quote, rem int, err error) {
-  if b == 0 { err = errors.New("divide by zero"); return quote, rem }
-  quote, rem = a / b, a % b; return quote, rem
-}
-if quote, rem, err := quoteRem(5, 3); err != nil { fmt.Println(err)
-} else { fmt.Println(quote, rem) }
+// /* errors */
+// // error = error type that signals an unexpected yet recoverable situation
+// // sentinel error = signals an expected, recoverable error (empty dataset, EOF)
+// // sentinel error = a value assigned to a global variable and compared with ==
+// // error type = unexpected error; switch err.(type); errors.As(err, &AnError{})
+// // sentinel error value = expected error; err == ErrA; errors.Is(err, ErrA)
+// // handle an error only once, provide additional context using wrapping, produce
+// // single error log entry (either log or return an error, but not both)
+// var ErrSentinel = errors.New("Sentinel Error")
+// type error interface { Error() string } // built-in error interface
+// // always return error interface => return different error types from a function
+// func quoteRem(a, b int) (quote, rem int, err error) {
+//   if b == 0 { err = errors.New("divide by zero"); return quote, rem }
+//   quote, rem = a / b, a % b; return quote, rem
+// }
+// if quote, rem, err := quoteRem(5, 3); err != nil { fmt.Println(err)
+// } else { fmt.Println(quote, rem) }
 
-// custom error
-type Status int
-const (BadRequest Status = iota + 1; NotFound)
-// specific error type
-type CustomError struct { status Status; err error }
-func (ce CustomError) Error() string {
-  switch ce.status {
-  case BadRequest: return fmt.Sprintf("400 Bad Request: %s", ce.err)
-  case NotFound: return fmt.Sprintf("404 Not Found: %s", ce.err)
-  default: return fmt.Sprintf("000 Unknown Error: %s", ce.err)
-  }
-}
-func (ce CustomError) Unwrap() error { return ce.err }
+// // custom error
+// type Status int
+// const (BadRequest Status = iota + 1; NotFound)
+// // specific error type
+// type CustomError struct { status Status; err error }
+// func (ce CustomError) Error() string {
+//   switch ce.status {
+//   case BadRequest: return fmt.Sprintf("400 Bad Request: %s", ce.err)
+//   case NotFound: return fmt.Sprintf("404 Not Found: %s", ce.err)
+//   default: return fmt.Sprintf("000 Unknown Error: %s", ce.err)
+//   }
+// }
+// func (ce CustomError) Unwrap() error { return ce.err }
 
-// wrap/unwrap errors = build an error chain with additional context wrapped in
-// a specific error type
-func wrapError() error {
-  _, err := os.Open("")
-  // include an error message into a new error; a source error is  not available
-  return fmt.Errorf("New error context: %v", err)
-  // wrap a standard error; a source error is available (coupling of a client)
-  return fmt.Errorf("Wrap error context: %w", err)
-  return CustomError{NotFound, err} // wrap a custom error
-}
-// use defer to wrap errors at multiple returns
-func deferWrapError() (err error) {
-  defer func() {
-    if err != nil { err = fmt.Errorf("Wrap error: %w", err) }
-  }()
-  _, err = os.Open(""); return
-}
-// explicit check for errors from a limited scope
-err := wrapError(); fmt.Println(err)
-if werr := errors.Unwrap(err); werr != nil { fmt.Println(werr) }
-// check for a specific sentinel error value using == in an error chain
-if errors.Is(err, os.ErrNotExist) { fmt.Println("Not Exist") }
-// check for a specific error type using reflection in an error chain
-if errors.As(err, &CustomErr{}) { fmt.Println("Custom Error") }
+// // wrap/unwrap errors = build an error chain with additional context wrapped in
+// // a specific error type
+// func wrapError() error {
+//   _, err := os.Open("")
+//   // include an error message into a new error; a source error is not available
+//   return fmt.Errorf("New error context: %v", err)
+//   // wrap a standard error; a source error is available (coupling of a client)
+//   return fmt.Errorf("Wrap error context: %w", err)
+//   return CustomError{NotFound, err} // wrap a custom error
+// }
+// // use defer to wrap errors at multiple returns
+// func deferWrapError() (err error) {
+//   defer func() {
+//     if err != nil { err = fmt.Errorf("Wrap error: %w", err) }
+//   }()
+//   _, err = os.Open(""); return
+// }
+// // explicit check for errors from a limited scope
+// err := wrapError(); fmt.Println(err)
+// if werr := errors.Unwrap(err); werr != nil { fmt.Println(werr) }
+// // check for a specific sentinel error value using == in an error chain
+// if errors.Is(err, os.ErrNotExist) { fmt.Println("Not Exist") }
+// // check for a specific error type using reflection in an error chain
+// if errors.As(err, &CustomErr{}) { fmt.Println("Custom Error") }
 
-// panic = signals a termination of a program due to an unrecoverable situation
-// panic = programming error, unavailable dependency
-// panic = unwinds a stack only to the top of a current goroutine
-// recover must be within the code of a goroutine
-// recover must be called from defer as only defer functions are executed on panic
-// app: use recover to gracefully handle shutdown (log panic message)
-// lib: use recover to convert a panic to an error at a public API boundary
-func panicRecover() {
-  defer func() {
-    if msg := recover(); msg != nil { fmt.Println(msg) }
-  }()
-  panic("oh")
-}
-panicRecover(); fmt.Println("continue") // oh continue
+// // panic = signals a termination of a program due to an unrecoverable situation
+// // panic = programming error, unavailable dependency
+// // panic = unwinds a stack only to the top of a current goroutine
+// // recover must be within the code of a goroutine
+// // recover must be called from defer as only defer functions are executed on panic
+// // app: use recover to gracefully handle shutdown (log panic message)
+// // lib: use recover to convert a panic to an error at a public API boundary
+// func panicRecover() {
+//   defer func() {
+//     if msg := recover(); msg != nil { fmt.Println(msg) }
+//   }()
+//   panic("oh")
+// }
+// panicRecover(); fmt.Println("continue") // oh continue
 
 /* modules, packages */
 // Go programs build from source code into a self-contained executable
