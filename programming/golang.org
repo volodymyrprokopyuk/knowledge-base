@@ -620,6 +620,7 @@ for _, v := range vals {
   *application* of /executable commands/ src_fish{ go install ... }
   - Initialize a module src_fish{ go mod init scm/user/mod }
   - Update module dependencies src_fish{ go mod tidy }
+  - Build a module src_fish{ go build }
 
 ** Concurrency
 
@@ -691,10 +692,82 @@ for _, v := range vals {
   context can also be used to forward request-scoped meta data (invisible
   dependencies) to children goroutines working on a shared context
 
+#+BEGIN_SRC go
+func ctxCancelTimeout() {
+  var wg sync.WaitGroup
+  task := func(ctx context.Context) {
+    defer wg.Done()
+    for {
+      select {
+      // a channel is closed when a context is cancelled
+      case <- ctx.Done(): // immediately returns a zero value when closed
+        if ctx.Err() == context.Canceled {
+          fmt.Println("canceled")
+        }
+        if ctx.Err() == context.DeadlineExceeded {
+          fmt.Println("timeout")
+        }
+        return
+      default:
+        fmt.Println("working...")
+        time.Sleep(100 * time.Millisecond)
+      }
+    }
+  }
+  // cancel context
+  ctx, cancel := context.WithCancel(context.Background())
+  // once created a cancellable context must be cancelled
+  defer cancel()
+  wg.Add(1)
+  go task(ctx)
+  time.Sleep(300 * time.Millisecond)
+  cancel() // further cancellations are ignored
+  wg.Wait()
+  // timeout context
+  ctx, cancel2 := context.WithTimeout(
+    context.Background(), 300 * time.Millisecond,
+  )
+  defer cancel2()
+  wg.Add(1)
+  go task(ctx)
+  wg.Wait()
+}
+#+END_SRC
+
 *** Mutex
 
 - Mutex :: provides an exclusive access (synchronization) to a shared resource
   (critical section) between independent goroutines executed in parallel
+
+#+BEGIN_SRC go
+func rwMutex() {
+  var value int
+  var mu sync.RWMutex // make a zero value useful
+  writeShared := func (val int) {
+    mu.Lock() // a single writer can hold a write lock, no readers
+    defer mu.Unlock()
+    value = val // write critical section
+  }
+  readShared := func() int {
+    mu.RLock() // multiple readers can hold a read lock, no writer
+    defer mu.RUnlock()
+    return value // read critical section
+  }
+  var wg sync.WaitGroup
+  wg.Add(2)
+  go func() {
+    defer wg.Done()
+    writeShared(1)
+  }()
+  go func() {
+    defer wg.Done()
+    time.Sleep(1 * time.Millisecond)
+    fmt.Println(readShared()) // 1
+  }()
+  wg.Wait()
+}
+#+END_SRC
+
 - Channel :: orchestrates a transformation flow of values with ownership
   transfer between concurrent goroutines, ensuring that only one goroutine has
   ownership on specific value at any point in time
@@ -715,14 +788,83 @@ for _, v := range vals {
     goroutine
   - *Circular wait* a goroutine waits on a chain of other goroutines that in
     turn wait on the first goroutine
+
+#+BEGIN_SRC go
+func deadlock() {
+  in, out := make(chan int), make(chan int)
+  go func() {
+    <- in // blocking receive
+    out <- 1
+  }()
+  <- out // blocking receive - deadlock!
+  in <- 2
+  select { // no deadlock, random order of cases
+  case <- out:
+  case in <- 2:
+  }
+}
+#+END_SRC
+
 - Livelock :: two or more goroutines operate, but without making any progress by
   continuously starting and cancelling operation because of the other goroutine
 - Starvation :: a goroutine cannot get all resources needed to complete a task
+
+*** WaitGroup
+
+- WaitGroup :: a concurrency safe counter that allows waiting for multiple
+  goroutines to complete
+
+#+BEGIN_SRC go
+func waitGroup() {
+  var wg sync.WaitGroup // make a zero value useful
+  wg.Add(1) // increment a gor counter outside of a tracking gor
+  go func() {
+    defer wg.Done() // decrement a gor counter
+    time.Sleep(200 * time.Millisecond)
+    fmt.Println("a")
+  }()
+  wg.Add(1)
+  go func() {
+    defer wg.Done()
+    time.Sleep(100 * time.Millisecond)
+    fmt.Println("b")
+  }()
+  wg.Wait() // block a gor until a counter == 0
+  fmt.Println("done")
+}
+#+END_SRC
 
 *** Conditions
 
 - Condition :: provides a continuous broadcast of values to multiple waiting
   goroutines vs channel delivery of values to a single goroutine. A condition
   uses a ~sync.Locker~ to prevent data races
+
+#+BEGIN_SRC go
+func condBroadcast() {
+  balance := 0
+  cond := sync.NewCond(&sync.Mutex{})
+  listen := func(goal int) {
+    cond.L.Lock()
+    defer cond.L.Unlock()
+    // critical section 1: wait for a condition
+    for balance < goal { // exit a loop when a condition is met
+      // listen for an update. Must be within a critical section
+      cond.Wait() // .L.Unlock => wait for the next .Broadcast => .L.Lock
+    }
+    // critical section 2: a condition is met
+    fmt.Println("goal", balance)
+  }
+  go listen(3)
+  go listen(5)
+  for i := 0; i < 7; i++ { // producer
+    time.Sleep(100 * time.Millisecond)
+    cond.L.Lock()
+    balance++
+    cond.L.Unlock()
+    cond.Broadcast() // broadcast an update to all listeners
+  }
+}
+#+END_SRC
 
 ** Testing
