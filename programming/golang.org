@@ -72,7 +72,15 @@ b, i, f, r, s := true, 1, 1.2, 'a', `ok`
 #+END_SRC
 
 - Pointer :: implies /mutable data/ vs a *call-by-value* copy that preserves
-  /immutability/ of original data
+  /immutability/ of original data. Using pointers (implies expensive x10 heap
+  allocation and GC) to avoid (extremely efficient self-cleaning on stack)
+  copies is not necessarily faster. Minimize the on heap allocation of
+  variables by reusing object from ~sync.Pool~
+  - *Sharing up escapes to the heap*. All local variables referenced outside of
+    a function body are allocated on the heap. Avoid returning pointers from a
+    function and sending pointers to a channel
+  - *Sharing down states on the stack*. Forward pointers to local variables to
+    function calls
 
 #+BEGIN_SRC go
 var i int = 1
@@ -604,6 +612,21 @@ for _, v := range vals {
 #+END_SRC
 
 ** Generics
+
+- Generic function :: has type parameters for input arguments and return values
+
+#+BEGIN_SRC go
+func Reduce[T, U any](in []T, i U, acc func(v T, a U) U) U {
+  var out U = i // a type parameter inside a function body
+  for _, v := range in {
+    out = acc(v, out)
+  }
+  return out
+}
+a := []int{1, 2, 3, 4, 5}
+Reduce(a, 0, func(v, i int) int { return v + i }) // 15
+#+END_SRC
+
 ** Packages and modules
 
 - Package :: a set of types and functions defined in multiple files under a
@@ -619,7 +642,8 @@ for _, v := range vals {
   represents a *library* of /importable packages/ src_fish{ go get ... } or an
   *application* of /executable commands/ src_fish{ go install ... }
   - Initialize a module src_fish{ go mod init scm/user/mod }
-  - Update module dependencies src_fish{ go mod tidy }
+  - Update module dependencies src_fish{ go get -u && go mod tidy }
+  - Build and run a module during development src_go{ go run ... }
   - Build a module src_fish{ go build }
 
 ** Concurrency
@@ -658,7 +682,8 @@ for _, v := range vals {
   - *Unidirectional channel* a send-only src_go{ chan<- int } and a receive-only
     src_go{ <-chan int } channels enforced at compile-time mainly for function
     parameters and local variables. Bidirectional channels are implicitly
-    converted to unidirectional channels
+    converted to unidirectional channels. A receive-only channel cannot be
+    closed
   - *Channel ownership* a goroutine that creates, sends, and closes a channel
   - *Share memory by communicating*, do not communicate by sharing memory
   - Receive from a closed channel immediately returns a zero value for a channel
@@ -868,3 +893,83 @@ func condBroadcast() {
 #+END_SRC
 
 ** Testing
+
+- Test a module with coverage
+  src_fish{ go test -v -cover -coverprofile=coverage.cov }
+- HTML coverage report src_fish{ go tool cover -html=coverage.cov }
+- Benchmark with memory allocations src_fish{ go test -v -bench=. -benchmem }
+- Testing of unexported vs exported functions
+
+#+BEGIN_SRC go
+package main
+package main_test // test only public API
+import (
+  "testing"
+  "os"
+  "github.com/volodymyrprokopyuk/main" // test only public API
+)
+var arr []int
+func TestMain(m *testing.M) {
+  // * before all
+  arr = []int{1, 2, 3, 4, 5}
+  exitCode := m.Run() // run tests
+  // * after all
+  arr = arr[:0]
+  os.Exit(exitCode)
+}
+func beforeEach(t *testing.T) []int {
+  // * before each
+  arr := []int{1, 2, 3, 4, 5}
+  // * after each
+  t.Cleanup(func() {
+    arr = arr[:0]
+  })
+  return arr
+}
+func TestReduce(t *testing.T) {
+  arr := beforeEach(t)
+  // test both unexported and exported functions
+  res := Reduce(arr, 0, func(v, i int) int { return v + i })
+  // test only public API
+  res := main.Reduce(arr, 0, func(v, i int) int { return v + i })
+  exp := 15
+  if res != exp {
+    t.Errorf("Reduce: expected %v, got %v", exp, res)
+  }
+}
+#+END_SRC
+
+- Test table :: tests different inputs on the same code
+
+#+BEGIN_SRC go
+func TestTableReduce(t *testing.T) {
+  cases := []struct {
+    name string
+    arr []int
+    exp int
+  }{
+    {"empty slice", []int{}, 0},
+    {"slice", []int{1, 2, 3}, 6},
+  }
+  for _, c := range cases {
+    t.Run(c.name, func(t *testing.T) {
+      res := Reduce(c.arr, 0, func(v, i int) int { return v + i })
+      if res != c.exp {
+        t.Errorf("Reduce: expected %v, got %v", c.exp, res)
+      }
+    })
+  }
+}
+#+END_SRC
+
+- Benchmarking :: measures time per operation and memory allocations per
+  operation
+
+#+BEGIN_SRC go
+var blackhole int
+func BenchmarkReduce(b *testing.B) {
+  for i := 0; i < b.N; i++ {
+    blackhole = Reduce(arr, 0, func(v, i int) int { return v + i })
+  }
+}
+#+END_SRC
