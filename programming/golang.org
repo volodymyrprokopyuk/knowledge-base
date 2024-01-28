@@ -894,11 +894,11 @@ func condBroadcast() {
 
 ** Testing
 
-- Test a module with coverage
-  src_fish{ go test -v -cover -coverprofile=coverage.cov }
+- Test with coverage src_fish{ go test -v -coverprofile=coverage.cov }
 - HTML coverage report src_fish{ go tool cover -html=coverage.cov }
-- Benchmark with memory allocations src_fish{ go test -v -bench=. -benchmem }
-- Testing of unexported vs exported functions
+- ~t.Errorf()~ continues a test function and collects multiple errors
+- ~t.Fatalf()~ exists a test functions and returns the first error
+- Testing of unexported (implementation) vs exported functions (interface)
 
 #+BEGIN_SRC go
 package main
@@ -927,6 +927,13 @@ func beforeEach(t *testing.T) []int {
   return arr
 }
 func TestReduce(t *testing.T) {
+  // test setup
+  arr := []int{1, 2, 3, 4, 5}
+  // sets teardown
+  defer func() {
+    arr = arr[:0]
+  }()
+  // before/after each
   arr := beforeEach(t)
   // test both unexported and exported functions
   res := Reduce(arr, 0, func(v, i int) int { return v + i })
@@ -952,7 +959,9 @@ func TestTableReduce(t *testing.T) {
     {"slice", []int{1, 2, 3}, 6},
   }
   for _, c := range cases {
+    c := c // test closure accesses the right test case
     t.Run(c.name, func(t *testing.T) {
+      t.Parallel() // run the test in parallel
       res := Reduce(c.arr, 0, func(v, i int) int { return v + i })
       if res != c.exp {
         t.Errorf("Reduce: expected %v, got %v", c.exp, res)
@@ -964,6 +973,8 @@ func TestTableReduce(t *testing.T) {
 
 - Benchmarking :: measures time per operation and memory allocations per
   operation
+  - Benchmark with memory allocations
+    src_fish{ go test -v -bench=. -benchmem -benchtime=2s }
 
 #+BEGIN_SRC go
 var blackhole int
