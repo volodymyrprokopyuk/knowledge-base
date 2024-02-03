@@ -1,0 +1,76 @@
+* Blockchian
+
+- Blockchain :: a peer-to-peer network of nodes that execute smart contracts and
+  commit transactions to a ledger following a consensus protocol vs *DLT* that
+  relies only on digital signatures without a consensus protocol e.g. Corda. In
+  a blockchain shared programs (smart contracts) update shared data (ledger)
+  following a consensus protocol without intermediaries vs private data updated
+  by private programs in today's transactional systems
+  - Network :: a distributed network without a central control
+  - Smart contract :: a Turing-complete processor of digitally signed
+    transactions
+  - Ledger :: an immutable database replicated to all nodes
+  - Consensus :: ensures an agreement without intermediaries on the state of
+    transactions
+- Permissionless blockchain :: anyone can anonymously join a network with full
+  access rights to all transactions e.g. Ethereum
+- Permissioned blockchain :: a central authority grants membership and access
+  rights to participants with named identities. All actions of participants are
+  accountable (non-repudiation) e.g. Hyperledger Fabric
+
+** Peer-to-peer network
+
+- Peer-to-peer network :: a distributed communication network without a central
+  control
+
+** Smart contracts
+
+- Smart contract :: a distributed application platform with a consensus-based
+  enforcement of terms and conditions agreed between participants, where each
+  transaction (a consensus-based ordered state transition) is permanently stored
+  in a ledger. A smart contract receives a signed transaction proposal, reads
+  the current state from a blockchain, executes contract logic, commits a new
+  transaction state into a blockchain
+- Transaction :: a time-ordered digitally-signed record of a state transition in
+  a block of records that is cryptographically lined through a hash of the
+  previous block. Transactions in a block are organized into a Merkle tree
+
+** Ledger
+
+- Ledger :: an immutable append-only database (a linked list of blocks, a
+  journal of state transitions) replicated to all nodes that stores all
+  time-ordered transactions (a Merkle tree) since the beginning (a genesis
+  block)
+  - Ledger database :: (transaction log) a cryptographically linked sequence of
+    blocks of time-ordered transactions in a Merkle tree that is replicated to
+    all nodes
+  - World state database :: (status snapshot) a conventional database that
+    represents the current state of a ledger in a form of key-value pairs with
+    rich querying e.g. LevelDB, CouchDB for Hyperledger Fabric
+- Block :: an element of a linked list that contains a block meta data, a
+  timestamp, a Merkle tree of transactions, and a hash of the previous block
+- Wallet :: a client that manages public/verifying keys (account address) and
+  private/signing keys (sign transactions). A wallet submits transactions and
+  queries a balance of an account
+
+** Consensus
+
+- Consensus :: a comprehensive verification of transactions in a block through a
+  complete transaction lifecycle. A consensus protocol leads participants to
+  reach an agreement on state of transactions even in face of a node failure or
+  fraudulent behavior. A consensus protocol excludes any intermediaries with
+  associated costs from a direct transaction between participants, and ensures
+  transaction validity and integrity. However, a consensus reduces scalability
+  of a system due to considerable latency of transaction processing
+- Proof of work PoW :: fraudulent behavior is disincentivized by energy spent by
+  a miner to solve a probabilistic cryptographic puzzle: a hash of a block must
+  start with a certain number of leading zeros (difficulty) e.g. Bitcoin
+- Proof of state PoS :: fraudulent behavior is disincentivized by burning of a
+  deposited stake that is needed to participate in a random selection of
+  proposers and validators e.g. Ethereum
+- Practical Byzantine fault tolerance PBFT :: a consensus is reached even when
+  up to 1/3 of nodes are fraudulent or fail e.g. Hyperledger Fabric
+- Crash fault tolerance CFT ::
+- Proof of elapsed time PoET :: each node generates a random duration using a
+  Trusted Execution Environment TEE e.g. Intel Software Guard Extension SGX. A
+  node with the shortest duration wins the elections e.g. Hyperledger Sawtooth

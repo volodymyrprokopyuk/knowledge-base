@@ -1,0 +1,71 @@
+* Hyperledger Fabric
+
+- Hyperledger Fabric :: an enterprise-grade permissioned distributed ledger and
+  application framework with modular architecture that supports flexible trust
+  assumptions with pluggable consensus protocols, performance at scale through
+  the execute-order-validate model, and privacy through multi-ledger channels
+
+
+** Execute-order-validate
+
+- Order-execute-validate :: smart contracts must be deterministic (implies using
+  a DSL e.g. Solidity + gas), otherwise consensus might never be reached. All
+  transactions are executed sequentially on all nodes (impacts scalability,
+  smart contract code and transaction data are not confidential) e.g. Ethereum
+- Execute-order-validate :: executes transactions before reaching a final
+  agreement on their order. Each transaction has to be executed only on a subset
+  of authorized endorsers (confidentiality) to satisfy the endorsement policy
+  (implies parallel execution, improves scalability). Any non-deterministic
+  chaincode is filtered out before ordering. All communication between nodes
+  during a transaction lifecycle is signed, verified and authenticated
+  - Client proposal :: a client submits a signed transaction proposal to
+    endorsers chaincode through the Fabric gateway gRPC
+  - Endorsment :: an endorser verifies a signed transaction proposal,
+    executes/simultates a potentially untrusted and non-deterministic chaincode,
+    endorses a new transaction state by signing it. Each endorsment with read
+    and write sets is sent back to a client. Multiple transactions can be
+    executed simultaneously (scalability), transaction states may be in a
+    conflict
+  - Client :: sends a transaction with all received endorsments to an orderer.
+    Optionally asks a committer about transaction finality
+  - Ordering :: executes a consensus protocol to reach an agreement on ordering
+    of transactions, combines transactions into a block, sends complete blocks
+    to committers. An ordering service is unique to a channel and is logically
+    decoupled from endorsers/committers An ordering service contains only a
+    blockchain database and not a world state database. A chaincode is not
+    installed on an ordering service
+  - Validation and commitment :: validates a transaction compliance with an
+    endorsement policy, commits a new transaction state to a ledger and updates
+    a world state database. Optionally confirms to a client transaction finality
+
+** Channel
+
+- Certificate Authority :: represents an organization and enrolls identities in
+  a form of digital certificates for organization peers, clients, and admins.
+  Certificates are used by clients to sign transaction proposals, by endorsers
+  to sign transaction endorsement, by committers to validate transaction blocks
+- Membership Service Provider MSP :: maps a root CA certificate to an
+  organization
+- Peer :: an endorser/orderer/committer that hosts a copy of a ledger and
+  instantiates a chaincode (a chaincode is not installed on orderers). A peer
+  can be connected to multiple channels
+- Channel :: a network of peers (endorsers, orderers, committers) where state
+  transitions are stored on a separate ledger with a private communication
+  channel that allows confidential multilateral transactions. On a channel a
+  subset of authorized peers work on a subset of private transactions using a
+  subset of confidential chaincodes with associated endorsement policies. A
+  channel is an administration unit with its own set of governing policies.
+  There is one ledger per channel. A peer maintains one copy of a ledger for
+  each channel it participates
+- Private Data Collection PDC :: a private database logically separated from a
+  ledger that keeps transaction data confidential within a channel. A PDC is
+  accessible only to an authorized subset of peers of a channel
+
+** Chaincode
+
+- Chaincode :: is initiated with a signed transaction proposal submitted by a
+  client. A chaincode executes logic against a read set of key-value pairs from
+  a world state database, and produces an endorsed write set of key-value pairs
+  (a new state transition). A chaincode is installed on endorsers/committers,
+  but not on the ordering service. A chaincode can be invoked to query a
+  transaction state without performing any modifications
