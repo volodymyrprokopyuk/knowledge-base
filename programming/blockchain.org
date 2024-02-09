@@ -31,9 +31,6 @@
   in a ledger. A smart contract receives a signed transaction proposal, reads
   the current state from a blockchain, executes contract logic, commits a new
   transaction state into a blockchain
-- Transaction :: a time-ordered digitally-signed record of a state transition in
-  a block of records that is cryptographically lined through a hash of the
-  previous block. Transactions in a block are organized into a Merkle tree
 
 ** Ledger
 
@@ -41,14 +38,12 @@
   journal of state transitions) replicated to all nodes that stores all
   time-ordered transactions (a Merkle tree) since the beginning (a genesis
   block)
-  - Ledger database :: (transaction log) a cryptographically linked sequence of
-    blocks of time-ordered transactions in a Merkle tree that is replicated to
-    all nodes
-  - World state database :: (status snapshot) a conventional database that
-    represents the current state of a ledger in a form of key-value pairs with
-    rich querying e.g. LevelDB, CouchDB for Hyperledger Fabric
-- Block :: an element of a linked list that contains a block meta data, a
-  timestamp, a Merkle tree of transactions, and a hash of the previous block
+- Block :: contains a block number, a block timestamp, a hash of a block, a
+  linking hash of the previous block, a Merkle tree of time-ordered
+  transactions, a block meta data
+- Transaction :: a time-ordered digitally-signed record of a state transition in
+  a block of records that is cryptographically linked through a hash of the
+  previous block. Transactions in a block are organized into a Merkle tree
 - Wallet :: a client that manages public/verifying keys (account address) and
   private/signing keys (sign transactions). A wallet submits transactions and
   queries a balance of an account

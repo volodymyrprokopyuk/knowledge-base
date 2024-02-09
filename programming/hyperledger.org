@@ -4,68 +4,253 @@
   application framework with modular architecture that supports flexible trust
   assumptions with pluggable consensus protocols, performance at scale through
   the execute-order-validate model, and privacy through multi-ledger channels
+- Contract API connects clients to peers through the Fabric Gateway and supports
+  submit transaction, query ledger, listen for events
+- Admin CLI handles blockchain network administration
 
 
-** Execute-order-validate
+** Execute-order-validate consensus
 
 - Order-execute-validate :: smart contracts must be deterministic (implies using
   a DSL e.g. Solidity + gas), otherwise consensus might never be reached. All
   transactions are executed sequentially on all nodes (impacts scalability,
   smart contract code and transaction data are not confidential) e.g. Ethereum
-- Execute-order-validate :: executes transactions before reaching a final
-  agreement on their order. Each transaction has to be executed only on a subset
-  of authorized endorsers (confidentiality) to satisfy the endorsement policy
-  (implies parallel execution, improves scalability). Any non-deterministic
-  chaincode is filtered out before ordering. All communication between nodes
-  during a transaction lifecycle is signed, verified and authenticated
-  - Client proposal :: a client submits a signed transaction proposal to
-    endorsers chaincode through the Fabric gateway gRPC
-  - Endorsment :: an endorser verifies a signed transaction proposal,
-    executes/simultates a potentially untrusted and non-deterministic chaincode,
-    endorses a new transaction state by signing it. Each endorsment with read
-    and write sets is sent back to a client. Multiple transactions can be
-    executed simultaneously (scalability), transaction states may be in a
-    conflict
-  - Client :: sends a transaction with all received endorsments to an orderer.
-    Optionally asks a committer about transaction finality
-  - Ordering :: executes a consensus protocol to reach an agreement on ordering
-    of transactions, combines transactions into a block, sends complete blocks
-    to committers. An ordering service is unique to a channel and is logically
-    decoupled from endorsers/committers An ordering service contains only a
-    blockchain database and not a world state database. A chaincode is not
-    installed on an ordering service
-  - Validation and commitment :: validates a transaction compliance with an
-    endorsement policy, commits a new transaction state to a ledger and updates
-    a world state database. Optionally confirms to a client transaction finality
+- Execute-order-validate consensus :: executes transactions before reaching a
+  final agreement on their order. Each transaction has to be executed only on a
+  subset of authorized endorsers (confidentiality) to satisfy the endorsement
+  policy (implies parallel execution, improves scalability). Any
+  non-deterministic chaincode is filtered out before ordering. All communication
+  between nodes during a transaction lifecycle is signed, verified and
+  authenticated
+  - Client transaction proposal SDK :: a client submits a signed transaction
+    proposal to the Fabric Gateway which in turn forwards a transaction
+    proposal for execution and endorsement to endorsers defined in an
+    endorsement policy
+  - Execution and endorsement GW :: an endorser verifies a signed transaction
+    proposal, executes a potentially untrusted and non-deterministic chaincode,
+    endorses a new transaction state by signing read and write sets. Each
+    endorsement with read and write sets is sent back to the Fabric Gateway.
+    Multiple transactions can be executed simultaneously (scalability),
+    transaction states may be in a conflict (need ordering via consensus)
+  - Fabric Gateway :: returns a transaction envelope with all transaction
+    endorsements to a client
+  - Client transaction submission SDK :: a client sends a signed transaction
+    envelop with all endorsements to the Fabric Gateway which in turn forwards a
+    transaction envelop for ordering and commitment to an orderer
+  - Consensus and ordering GW :: an orderer executes a consensus protocol to
+    reach an agreement on ordering of transactions from multiple clients,
+    combines transactions regardless of their semantics into a block,
+    distributes a complete block to all committers through a direct call. An
+    orderer is unique to a channel and is logically decoupled from
+    endorsers/committers. An orderer contains only a blockchain database and not
+    a world state database. A chaincode is not installed on an orderer
+  - Validation and commitment DC :: a committer verifies signatures of a
+    transaction proposal and a transaction envelop, verifies that all
+    endorsements match and satisfy an endorsement policy (a chaincode is not
+    executed), verifies that the current value of a world state database matches
+    a read set of a transaction when it was signed by endorsers (there was no
+    intermediary updates to a read set), commits a new transaction state to a
+    ledger and updates a world state database. Invalid transactions are retained
+    in an immutable block, but they are marked as invalid and do not update a
+    world state database. Each committer sends a commit status event to the
+    Fabric Gateway. Not all committers have to be connected to an orderer:
+    offline committers will receive missed blocks after recovery from other
+    committers through a gossip protocol
+  - Fabric Gateway :: returns a proof that a ledger update has happened to a
+    client
+
+** Identities and permissions
+
+- Certificate Authority CA :: represents an organization and issues identities
+  in a form of X.509 digital certificates for organization peers, orderers,
+  clients, and admins using PKI. Certificates are used by clients to sign
+  transaction proposals, by endorsers to sign transaction endorsements, by
+  committers to validate transaction blocks. All messages on a channel are
+  authenticated using digital certificates. A CA maintains and publishes a
+  Certificate Revocation List CRL
+- Chain of trust :: intermediate CAs have their certificates signed by a root CA
+  for scalability (intermediate CAs can issue certificates) and limited exposure
+  of a root CA (only level 1 intermediate CAs are signed with a root CA).
+  Organizations on a blockchain use either a dedicated root CA for each
+  organizations or an intermediate CA signed with a single root CA
+- Digital certificate :: a document signed by a CA that binds a public key and
+  optional attributes to an identity/subject. A certificate attributes describe
+  facts about a subject and list permissions granted to a subject. A certificate
+  allows an identity to prove facts and permissions to a third party, as long as
+  a third party trusts a CA that signed a certificate. A certificate contains a
+  public key of an identity for authentication of massage signed by an identity
+- Principal :: an identity with associated attributes/role ~MSP.Role~ that
+  represent facts about an identity and list permissions granted to an identity.
+  Types of roles: ~Client~, ~Peer~, ~Orderer~, ~Admin~, ~Member~
+- Membership Service Provider MSP :: identifies root CAs and intermediary CAs of
+  organizations authorized to define members of a trust domain (channel),
+  associates specific roles with permissions to identities within a channel, and
+  verifies identities and permissions of peers, orderers, clients, and admins.
+  There is an MPS per organization
+  - Local MPS domain :: defines administrative roles and permissions scoped to
+    nodes (peers and orderers) and participatory roles and permissions scoped to
+    clients. Local MPS is instantiated on a node to which it applies and must
+    contain a private key to sign transaction proposals (clients) and
+    transaction endorsements (peers)
+  - Channel MPS domain :: defines administrative and participatory roles and
+    permissions scoped to a channel. Channel MPS is instantiated on all nodes in
+    a channel and is kept in sync via consensus. Channel MPS does not need a
+    private key
+- Policy :: a set of rules that define actions that principals can perform on
+  assets. A policy has a hierarchical structure and is either an explicit
+  ~Signature~ referencing specific principals with ~AND~, ~OR~,
+  ~NOutOf~ operators, or an implicit ~ImplicitMeta~ defining groups of
+  principals with ~ANY~, ~MAJORITY~, ~ALL~ operators. Meta policies at the top
+  of a hierarchy ultimately resolve to policies with specific principals at the
+  bottom of a hierarchy. Types of policies:
+  - Channel policy :: defines rules to add peers or orderers to a channel
+  - Modification policy :: defines identities that must sign a change of
+    configuration
+  - ACL :: controls access of principals to assets on a channel
+  - Chaincode lifecycle policy :: defines a number of organizations that have to
+    approve a chaincode before it can be committed to a channel
+  - Endorsement policy :: defines a number of peers that have to endorse a
+    transaction before it is committed to a ledger
 
 ** Channel
 
-- Certificate Authority :: represents an organization and enrolls identities in
-  a form of digital certificates for organization peers, clients, and admins.
-  Certificates are used by clients to sign transaction proposals, by endorsers
-  to sign transaction endorsement, by committers to validate transaction blocks
-- Membership Service Provider MSP :: maps a root CA certificate to an
-  organization
-- Peer :: an endorser/orderer/committer that hosts a copy of a ledger and
-  instantiates a chaincode (a chaincode is not installed on orderers). A peer
-  can be connected to multiple channels
-- Channel :: a network of peers (endorsers, orderers, committers) where state
-  transitions are stored on a separate ledger with a private communication
-  channel that allows confidential multilateral transactions. On a channel a
-  subset of authorized peers work on a subset of private transactions using a
-  subset of confidential chaincodes with associated endorsement policies. A
-  channel is an administration unit with its own set of governing policies.
-  There is one ledger per channel. A peer maintains one copy of a ledger for
-  each channel it participates
-- Private Data Collection PDC :: a private database logically separated from a
-  ledger that keeps transaction data confidential within a channel. A PDC is
-  accessible only to an authorized subset of peers of a channel
+- Peer :: an endorser or a committer that hosts a copy of a ledger and instances
+  of a chaincode (deliberate redundancy). A peer can be connected to multiple
+  channels and host multiple ledgers and chaincodes. A client interacts with
+  peers through the Fabric Gateway that is running on each peer. A peer is owned
+  by a single organization and can be hosted on a cluod or in a data center. An
+  orderer is not a peer (a chaincode is not installed on an orderer)
+- Channel :: a network of peers, orderers, and clients that collectively manage
+  and share identical copies of a separate ledger through a private
+  communication that allows confidential multilateral transactions. On a channel
+  a subset of authorized peers, orderers and clients work on a subset of private
+  transactions using a subset of confidential chaincodes with associated
+  endorsement policies. A channel is an administration unit with its own set of
+  governing policies. There is one ledger per channel. A peer maintains one copy
+  of a ledger for each channel it participates
+- Private Data Collection PDC :: a private state database logically separated
+  from a ledger, maintained on authorized peers via a agossip protocol that
+  keeps transaction data confidential from other organizations on a channel. A
+  PDC is accessible only to a subset of authorized organizations on a channel.
+  The ordering service does not have access to PDC. Only a hash of PDC is
+  endorsed, ordered, and committed to a ledger. A PDC is defined explicitly in a
+  chaincode definition. Each chaincode has an implicit private data namespace
+  reserved for organization-specific private data (single organization). PDC
+  transaction lifecycle
+  - Transaction proposal :: a client submits a signed transaction proposal along
+    with associated private data to a target peer. A target peer distributes a
+    transaction proposal to authorized endorsers through a gossip protocol
+  - Transaction response :: endorsers send back to a target peer a signed
+    transaction response with public read-write sets and only a hash of private
+    data. A target peer sends a transaction envelope to a client for signing
+  - Transaction ordering :: an orderer includes a transaction with a hash of
+    private data into a block as normal: a block with a private data hash is
+    distributed to all committers for validation
+  - Block commitment :: authorized committers validate a private data hash
+    agains their private state database before committing a transaction to a
+    public ledger with on-chain hashes of private data
+- Blockchain network :: a set of organizations that collectively contribute
+  individual resources (peers, orderers, clients, and chaincode) to a collective
+  network, and manage a set of channels through governing policies. Besides
+  orderers there is no centralized resources. A network is decentralized and
+  does not depend on any individual organization that can join and leave.
+  Clients connect to peers of the same or different organization through the
+  Fabric Gateway
 
-** Chaincode
+** Ledger
 
-- Chaincode :: is initiated with a signed transaction proposal submitted by a
-  client. A chaincode executes logic against a read set of key-value pairs from
-  a world state database, and produces an endorsed write set of key-value pairs
-  (a new state transition). A chaincode is installed on endorsers/committers,
-  but not on the ordering service. A chaincode can be invoked to query a
-  transaction state without performing any modifications
+- Ledger :: consists of a ledger database (a transaction log) that is a single
+  source of truth updated in consensus and a world state database (a status
+  snapshot) derived from a blockchain database
+  - Ledger database, blockchain :: (a transaction log) a file with a
+    cryptographically linked sequence of append-only immutable blocks of
+    time-ordered transactions in a Merkle tree that is replicated to all peers
+  - World state database :: (a status snapshot) a conventional database that
+    represents the current state of a ledger as a set of facts about each asset
+    in a form of versioned key-value pairs e.g. LevelDB embedded into a peer for
+    simple key-value pairs, standalone CouchDB for JSON rich querying. A world
+    state database is derived from a ledger database
+- Block :: contains a block number, a block timestamp, a hash of a block, a
+  linking hash of the previous block, a Merkle tree of time-ordered
+  transactions, a block metadata
+- Transaction :: consists of a signed transaction proposal, a signed transaction
+  envelope with read and write sets and endorsements, a transaction metadata
+
+** Consensus and ordering
+
+- Probabilistic consensus :: eventually guarantees ledger consistency to a high
+  degree of probability in a permissionless blockchain, but still vulnerable to
+  ledger forks when different participants have conflicting views on the order
+  of transactions e.g. Ethereum
+- Deterministic consensus :: a committed block is guarantted to be final and
+  correct, validated transactions will never be reverted e.g. Hyperledger Fabric
+- Orderer :: also includes channel configuration transactions into a block to be
+  validated by committers. Channel configuration transactions modify governing
+  and endorsement policies and are validated against the current governing
+  policies
+- Raft consensus :: is a Crash Fault Tolerant CFT consensus where decisions of a
+  leader elected from orderers on a channel are replicated to followers. Raft
+  distributes FSMs across a cluster of nodes and ensures that each node agrees
+  on the same sequence of state transitions. A sequence of transactions (log) is
+  considered valid if majority (quorum) of ordereres agree on transactions and
+  their order. If quorum is not available the ordering service is not available
+  as well. New leader elections start when followers stop receiving transactions
+  or heartbeat from the previous leader. A new leader is elected when a majority
+  has voted for a candidate. Raft is not BFT: nodes trust an elected leader.
+  Every channel has a separate instance of the Raft protocol. Endorsed
+  transaction envelops and configuration update transactions are transparently
+  forwarded by followers to a leader: all changes to a system go through a
+  leader. A leader accepts new transaction envelops (log entries), orders
+  transactions as per quorum and replicates transactions (log) to followers. A
+  leader broadcasts a proposal, followers vote on a proposal, on majority
+  (quorum) a leader commits a transaction, a leader broadcasts a transaction
+  (log replication), followers commit a transaction
+
+** Smart contracts and chaincode
+
+- Smart contract :: a domain-speciic program that defines transactional logic
+  that manages lifecycle of assets in a world state database, automatically
+  enforces terms and conditions of contractual agreements between organizations.
+  A smart contract is initiated with a signed transaction proposal (a smart
+  contract and input parameters) submitted by a client. A smart contract
+  executes logic against a read set ~get()~ of key-value pairs from a world
+  state database, and produces an endorsed transaction response that contains a
+  read and a write sets ~put()~, ~delete()~ of key-value pairs (a new state
+  transition) that are ordered following consensus and committed to a ledger
+  database with updates to a world state database. A smart contract can also
+  query a ledger database for historical records. A smart contract can be
+  invoked to query a world state database without performing any modifications
+  on a ledger database. A smart contract can call other smart contracts withing
+  the same channel or across different channels
+- Chaincode :: a administrative container that packages a set of smart contracts
+  into a single deployment unit to a blockchain network. A chaincode is deployed
+  on endorsers and committers, but not on orderers. A chaincode lifecycle
+  - Package :: smart contracts with meetadata into an archive
+  - Install :: build and install a chaincode on each peer
+  - Approve :: a chaincode definition with an endorsement policy. Each
+    organization can approve a chaincode definition with the same endorsement
+    policy, but with different chaincode binaries that implement
+    organization-specific logic in the same read-write chaincode namesapce.
+    Approvals are submitted to the ordering service and then distributed to all
+    peers
+  - Commit :: a chaincode definition to a channel after a successful approval
+- Endorsement policy :: a set of rules attached to a chaincode that specify
+  which specific organizations ~Signature~ (vs any node in Ethereum can create a
+  valid transaction) or generic groups of organizations ~ImplicitMeta~ must sign
+  an executed transaction, so it can be committed to a ledger. An endorsement
+  policy applies to all smart contracts in a chaincode. An endorsement policy
+  provides a way for organizations to agree governing policies of all smart
+  contracts in a chaincode before it is deployed to a channel. All transactions,
+  whether valid or invalid are committed to a ledger with appropriate validity
+  marks, but only valid transactions update a world state database
+- System chaincode :: a low-level logic that implements domain independent
+  system interactions unrelated to smart contracts
+  - Lifecycle system chaincode :: manages approval and commitment of a chaincode
+    definition to a channel, deploys a chaincode to a channel
+  - Configuration system chaincode :: manages updates to channel configuration
+    e.g. governing policies
+  - Query system chaincode :: manages block and transaction queries to a ledger
+    database
+  - Endorsement system chaincode :: manages signature of a transaction response
+  - Validation system chaincode :: manages verification of endorsement policies
+    and checking for conflicts of transaction read and write sets
