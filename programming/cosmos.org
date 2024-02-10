@@ -1,0 +1,17 @@
+* Cosmos SDK
+
+- Cosmos SDK :: a modular framework for building from scratch
+  application-specific multi-asset public Proof-of-Stake PoS and permissioned
+  Proof-of-Authority PoA custom blockchains that interoperate with other
+  blockchains
+- CometBFT :: a BFT consensus engine for building PoS
+- Application-specific blockchain :: a blockchain customized to operate a single
+  application vs limited competing smarty contracts in Solidity DSL interpreted
+  on a shared EVM virtual machine. CometBFT provides networking and consensus,
+  while Cosmos SDK provides an application state machine. A Cosmos SDK state
+  machine is connected to a pluggable CometBFT consensus engine through an
+  Application Blockchain Interface ABCI that can be wrapped by any programming
+  language to develop a state machine using different designs e.g. validation,
+  storage and libraries e.g. cryptography
+- Sovereignty :: application developers have full control over both an
+  application-specific blockchain and an application state machine
