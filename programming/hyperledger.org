@@ -8,7 +8,6 @@
   submit transaction, query ledger, listen for events
 - Admin CLI handles blockchain network administration
 
-
 ** Execute-order-validate consensus
 
 - Order-execute-validate :: smart contracts must be deterministic (implies using
