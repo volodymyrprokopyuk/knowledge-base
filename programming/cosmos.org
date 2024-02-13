@@ -1,20 +1,38 @@
 * Cosmos
 
+- Blockchain evolution ::
+  - Blockchain 1.0 :: (cryptocurrency) a single blockchain with limited
+    scripting focused on a single use case (payments) using a PoW consensus and
+    UTXO model e.g. Bitcoin
+  - Blockchain 2.0 :: (smart contracts) a single blockchain with a limited
+    shared virtual machine EVM that interprets Solidity smart contracts that
+    compete for EVM resources. Different use cases use the same EVM and an
+    imposed account model e.g. Ethereum
+  - Blockchain 3.0 :: (Internet of blockchains) application-specific, modular,
+    capability-based, sovereign, and scalable blockchains built in any language
+    that interoperate with other blockchains: Internet of blockchains e.g.
+    Cosmos
+- Cosmos :: a decentralized network of independent and interconnected
+  blockchains working in parallel on top of CometBFT consensus engine
+
 ** Cosmos SDK
 
 - Cosmos SDK :: a modular capability-based framework for building from scratch
   application-specific multi-asset public Proof-of-Stake PoS and permissioned
   Proof-of-Authority PoA custom blockchains that interoperate with other
   blockchains. Cosmos SDK facilitates development of replicated deterministic
-  state machines on top of CometBFT
+  state machines in form of applications on top of CometBFT consensus engine
 - Application-specific blockchain :: a blockchain customized to operate a single
   application vs limited interpreted Solidity smart contracts competing on a
-  shared EVM virtual machine
+  shared EVM virtual machine. A Cosmos blockchain consists of three layers:
+  peer-to-peer networking, Byzantine consensus, application replicated
+  deterministic state machine
 - Sovereignty :: application developers have full control over both an
   application state machine and an application-specific blockchain (consensus,
   networking)
-- Full-node client :: a daemon that runs a CometBFT instance and maintains an
-  application state machine by connecting to CometBFT consensus through ABCI
+- Full-node client :: a daemon that runs a CometBFT consensus instance and
+  maintains a Cosmos SDK application state machine connected to CometBFT through
+  ABCI
 
 ** CometBFT
 
@@ -23,40 +41,47 @@
   handle at most one independent server failure (n failures can be handled with
   2n + 1 replicas)
   - State machine :: a tuple of internal states with an initial state, external
-    inputs, resulting outputs; a transition function: input, state => new state;
-    an output function: input, state => output
+    inputs, resulting outputs; a transition function: input, state = new state;
+    an output function: input, state = output
   - Byzantine failure :: a replica sends different values to different peers for
-    the same input and state. 2n + 1 replicas are required to handle a Byzantine
-    failure with message signatures, or 3n + 1 without message signatures
-- CometBFT :: an application-agnostic BFT consensus engine that automatically
-  replicates an application state machine defined with Cosmos SDK. CometBFT
-  provides networking and consensus, while Cosmos SDK provides an application
-  state machine. CometBFT provides consensus on ordering of opaque transactions
-  and propagates transactions to validators that add blocks of transactions to a
-  blockchain
+    the same external input and internal state. 2n + 1 replicas with message
+    signatures are required to handle a Byzantine failure, or 3n + 1 replicas
+    without message signatures
+- CometBFT :: an application-agnostic BFT consensus engine and peer-to-peer
+  networking that automatically replicates an application state machine defined
+  with Cosmos SDK. CometBFT provides networking and consensus, while Cosmos SDK
+  provides an application state machine. CometBFT provides consensus on ordering
+  of opaque transactions and propagates transactions to validators that add
+  blocks of transactions to a blockchain
+  - Custom validator set :: an application defines how a validator set is
+    constituted: permissioned blockchain (authorized set of validators), or
+    permissionless blockchain (validators must own stake)
+  - Instant finality :: TXs in a block are finalized as soon as a block is
+    committed to a blockchain. Forks are never created
 - Validator :: more than 2/3 of validators must sign a prevote and a precommit
-  of a block to be considered valid. All transactions in a block are valid. An
-  validator is randomly chosen to be a proposer for the next block
+  of a block to be considered valid. All transactions in a block are valid. A
+  proposer for the next block is randomly chosen from validators
 
 ** ABCI
 
 - Application Blockchain Interface ABCI :: a Cosmos SDK state machine is
-  connected to a pluggable CometBFT consensus engine through an ABCI that can be
-  wrapped by any programming language to develop a state machine using different
-  designs e.g. validation, storage and libraries e.g. cryptography
+  connected to a CometBFT consensus engine through an ABCI socket protocol that
+  can be wrapped by any programming language to develop a state machine using
+  different designs for validation, storage and different libraries for
+  cryptography
   - CheckTx :: a client sends a TX to CometBFT which forwards a TX to the app
-    CheckTX for validation. If valid a TX is added to a CometBFT mempool and
+    CheckTX for validation. Valid TXs are added to a CometBFT mempool and
     relayed to peers
-  - DeliverTX :: a proposer sends a valid block to CometBFT which forwards TXs
-    in order to the app DeliverTX for execution. Each transaction contains one
+  - DeliverTx :: a proposer sends a valid block to CometBFT which forwards TXs
+    in order to the app DeliverTx for execution. Each transaction contains one
     or more messages
 - Core application :: Cosmos SDK ~baseapp~ implements all ABCI methods, extracts
   messages from transactions relayed by CometBFT, and routes messages to
   appropriate application modules. A core application contains a reference to a
   ~baseapp~, a list of store keys, a list of module ~keepers~, a reference to an
-  ~appCodec~ for serialization and deserialization of state in module store, a
+  ~appCodec~ for serialization and deserialization of state in a module store, a
   reference to a module manager with a list of application modules, module
-  invariants evaluated at the end of each block
+  invariants are evaluated at the end of each block
 - Module :: a nested state machine within an application state machine. An
   application combines a collection of interoperable modules. Each module
   handles a subset of state and has its own message processor and key-value
@@ -65,9 +90,41 @@
   service for processing messages and a query service implemented by keepers to
   access a module store. Each module defines transactions and queries in form of
   CLI commands for local users, gRPC methods for external services, and REST
-  endpoints through a gRPC gateway to be exposed through application interfaces
-- Keeper :: instead of having each module to keep an ACL for other modules, each
-  module implements a ~keeper~ that, when passed to other modules, grants a
+  endpoints fully generated code through a gRPC gateway to be exposed through
+  application interfaces
+- Keeper :: instead of having each module to keep an ACL for every other module,
+  each module implements a ~keeper~ that, when passed to other modules, grants a
   predefined set of read-write capabilities over a key-value store of a module.
   All access to a module store happens through keepers. Only keepers hold keys
   to a module store
+
+** Transactions and queries
+
+- Transaction lifecycle :: order-execute-validate vs Hyperledger Fabric
+  execute-order-validate
+  - Create TX :: a client signs and submits a transaction to CometBFT specifying
+    a fee in gas. Gas ensures that blocks are finalized without consuming too
+    many resources. Gas prevents abuse and spam as each transaction has a cost
+  - Validate TX :: CometBFT adds a TX to a mempool after a stateless and
+    stateful validation of a TX at the app CheckTx. CometBFT propagates new TXs
+    to peers through a gossip protocol
+  - Propose block :: a randomly selected proposer from validators creates the
+    next block of transactions
+  - Execute TX :: validators validate again and execute in order each message
+    from every TX in a block. State transitions are persisted in corresponding
+    module store
+  - Commit block :: more that 2/3 validators vote for a block which is then
+    added to a blockchain. Application state changes are committed to
+    corresponding modules stores
+- Query lifecycle :: a client submits a signed query to CometBFT which forwards
+  a query to an application module which queries a module store and returns a
+  response
+
+** Accounts
+
+- Account :: a key pair were a public key is derived from a private key seeded
+  with a mnemonic of words. A public key is used to derive a tree of addresses
+  that identify a user in an application. A private key is used to sign
+  transactions and authenticate users. Addresses are also used to identify
+  validators participating in a consensus. A keyring creates, exports, and
+  imports private keys, derives new accounts, signs transactions

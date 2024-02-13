@@ -1,22 +1,26 @@
 * Blockchian
 
-- Blockchain :: a peer-to-peer network of nodes that execute smart contracts and
+- Blockchain :: Byzantine fault-tolerant state machine replication. A
+  peer-to-peer network of validator nodes that execute smart contracts and
   commit transactions to a ledger following a consensus protocol vs *DLT* that
   relies only on digital signatures without a consensus protocol e.g. Corda. In
-  a blockchain shared programs (smart contracts) update shared data (ledger)
+  a blockchain shared programs (smart contracts) update shared data (a ledger)
   following a consensus protocol without intermediaries vs private data updated
-  by private programs in today's transactional systems
-  - Network :: a distributed network without a central control
+  by private programs in today's transactional systems. A ledger remains correct
+  even if less than 1/3 of validators are malicious
+  - Network :: a distributed peer-to-peer network without a central control
   - Smart contract :: a Turing-complete processor of digitally signed
     transactions
-  - Ledger :: an immutable database replicated to all nodes
+  - Ledger :: an immutable append-only database replicated to all nodes
   - Consensus :: ensures an agreement without intermediaries on the state of
-    transactions
+    transactions even if less than 1/3 of validators are malicious
+- Blockchain benefit :: participants share the same replicated ledger without
+  any central authority or intermediaries even in face of malicious behavior
 - Permissionless blockchain :: anyone can anonymously join a network with full
   access rights to all transactions e.g. Ethereum
 - Permissioned blockchain :: a central authority grants membership and access
   rights to participants with named identities. All actions of participants are
-  accountable (non-repudiation) e.g. Hyperledger Fabric
+  intermediated and accountable (non-repudiation) e.g. Hyperledger Fabric
 
 ** Peer-to-peer network
 
