@@ -14,32 +14,45 @@
     Cosmos
 - Cosmos :: a decentralized network of independent and interconnected
   blockchains working in parallel on top of CometBFT consensus engine
+- Cosmos Hub :: a public PoS blockchain acting as a hub (router) between
+  connected zones (application-specific blockchains) with a native token ATOM.
+  Stacking ATOM implies a benefit of acquiring a share of transaction fees, but
+  also incurs a risk of loss, if the supported full node becomes unreliable or
+  Byzantine. A privilege of creating the next block is awarded in proportion to
+  the voting power of a validator that is based on the amount of staked ATOM. To
+  prevent concentration of power users elect validators by staking ATOM to the
+  most reliable full nodes with maximum yield of investment and minimum risk of
+  loss
 
 ** Cosmos SDK
 
-- Cosmos SDK :: a modular capability-based framework for building from scratch
-  application-specific multi-asset public Proof-of-Stake PoS and permissioned
-  Proof-of-Authority PoA custom blockchains that interoperate with other
-  blockchains. Cosmos SDK facilitates development of replicated deterministic
-  state machines in form of applications on top of CometBFT consensus engine
+- Cosmos SDK :: a modular, capability-based framework with a set of composable
+  modules for building from scratch application-specific multi-asset public
+  Proof-of-Stake PoS and permissioned Proof-of-Authority PoA custom blockchains
+  that interoperate with other blockchains. Cosmos SDK facilitates development
+  of replicated deterministic state machines in form of applications on top of
+  CometBFT consensus engine
+  - Modularity :: Cosmos SDK provides a comprehensive set of ready-to-use
+    modules, as well as allows to build new modules to further extend
+    application functionality
+  - Capability-based security :: keepers constraint access to a module store
+    from other modules
 - Application-specific blockchain :: a blockchain customized to operate a single
-  application vs limited interpreted Solidity smart contracts competing on a
-  shared EVM virtual machine. A Cosmos blockchain consists of three layers:
-  peer-to-peer networking, Byzantine consensus, application replicated
-  deterministic state machine
+  application where application concerns are directly addressed by a custom
+  blockchain protocol vs limited interpreted Solidity smart contracts competing
+  on a shared EVM virtual machine that tries to optimize for an average use
+  case. A Cosmos blockchain consists of three layers: peer-to-peer networking,
+  Byzantine consensus, application replicated deterministic state machine
 - Sovereignty :: application developers have full control over both an
-  application state machine and an application-specific blockchain (consensus,
-  networking)
-- Full-node client :: a daemon that runs a CometBFT consensus instance and
-  maintains a Cosmos SDK application state machine connected to CometBFT through
-  ABCI
+  application state machine (application logic) and an application-specific
+  blockchain (validator set, BFT consensus, peer-to-peer networking)
 
 ** CometBFT
 
-- Replicated deterministic state machine :: a fault-tolerant distributed service
-  that coordinates client interactions with at least three replicated servers to
-  handle at most one independent server failure (n failures can be handled with
-  2n + 1 replicas)
+- Replicated deterministic state machine :: a Byzantine fault-tolerant
+  distributed service that coordinates client interactions with at least three
+  replicated servers to handle at most one independent server failure (n
+  failures can be handled with 2n + 1 replicas)
   - State machine :: a tuple of internal states with an initial state, external
     inputs, resulting outputs; a transition function: input, state = new state;
     an output function: input, state = output
@@ -47,34 +60,72 @@
     the same external input and internal state. 2n + 1 replicas with message
     signatures are required to handle a Byzantine failure, or 3n + 1 replicas
     without message signatures
-- CometBFT :: an application-agnostic BFT consensus engine and peer-to-peer
-  networking that automatically replicates an application state machine defined
-  with Cosmos SDK. CometBFT provides networking and consensus, while Cosmos SDK
-  provides an application state machine. CometBFT provides consensus on ordering
-  of opaque transactions and propagates transactions to validators that add
-  blocks of transactions to a blockchain
+- CometBFT :: an application- and language-agnostic BFT PoS consensus engine
+  with strict fork accountability and peer-to-peer networking that automatically
+  replicates an application state machine defined with Cosmos SDK. CometBFT
+  provides consensus on ordering of completely opaque transactions and relays
+  transactions to validators that reach consensus about the application state
+  based on a sequence of ordered transactions
+  - CometBFT provides networking and consensus exposed through ABCI, while
+    Cosmos SDK provides an application state machine that communicates with
+    CometBFT using ABCI. Cosmos SDK processes and validates transactions, while
+    CometBFT broadcasts transactions and implements consensus. CometBFT and
+    Cosmos SDK run either in separate processes connected through an ABCI socket
+    when application is implemented not in Go, or in a single process if an
+    application is implemented in Go
+  - Instant finality :: TXs in a block are deterministically finalized as soon
+    as a block is committed to a blockchain and forks never happen e.g. PoS as a
+    total staked amount is known at all times vs *probabilistic finality* where
+    committed blocks may be reverted and forks are possible e.g. PoW as a total
+    hashing capacity is unknown
+  - A proposer creates and broadcasts a candidate block to validators which
+    confirm valid blocks or reject invalid blocks by signing their decision.
+    When a sufficient signatures for a block are received by a proposer a block
+    is unambiguously and irrevocably finalized and broadcast to the whole
+    network. Bitcoin 10 min block, Etheruem 15 secs block, Cosmos 7 secs block
+  - Controlled upgrades :: upgrades to a node software are governed by block
+    creation and block validation: either there is a consensus on simultaneous
+    upgrade on all nodes (no fork is possible), or an upgrade proposal fails.
+    Validators vote on upgrade proposals with voting power proportional to their
+    staked ATOM
   - Custom validator set :: an application defines how a validator set is
     constituted: permissioned blockchain (authorized set of validators), or
     permissionless blockchain (validators must own stake)
-  - Instant finality :: TXs in a block are finalized as soon as a block is
-    committed to a blockchain. Forks are never created
-- Validator :: more than 2/3 of validators must sign a prevote and a precommit
-  of a block to be considered valid. All transactions in a block are valid. A
-  proposer for the next block is randomly chosen from validators
+  - Evidence :: a proof of malicious behavior detected by CometBFT and validated
+    by validators that is committed to a blockchain and passed to an application
+    which is responsible to punish a Byzantine node
 
 ** ABCI
 
 - Application Blockchain Interface ABCI :: a Cosmos SDK state machine is
   connected to a CometBFT consensus engine through an ABCI socket protocol that
   can be wrapped by any programming language to develop a state machine using
-  different designs for validation, storage and different libraries for
-  cryptography
-  - CheckTx :: a client sends a TX to CometBFT which forwards a TX to the app
-    CheckTX for validation. Valid TXs are added to a CometBFT mempool and
-    relayed to peers
-  - DeliverTx :: a proposer sends a valid block to CometBFT which forwards TXs
-    in order to the app DeliverTx for execution. Each transaction contains one
-    or more messages
+  different programming languages. ABCI request and response messages are
+  defined using protobuf. To be deterministic, an application should be
+  exclusively exposed to CometBFT through ABCI, and not to any other external
+  user. For each block CometBFT executes: BeingBlock, [DeliverTx...] , EndBlock,
+  Commit
+  - InitChain :: an application receives and stores a genesis block with a list
+    of initial validators that an application can accept or propose
+  - BeginBlock :: CometBFT instructs an application to load its state at the
+    height of the last committed block and prepare for processing TXs from the
+    next block. CometBFT sends to an application a list of validators that
+    signed the last committed block to reward and a list of evidences for
+    Byzantine validators to punish
+  - CheckTx :: CometBFT sends a new TX to an application for validation against
+    the latest application state. CometBFT adds valid TXs a CometBFT mempool and
+    relays TXs to validators
+  - DeliverTx :: CometBFT sends TXs one-by-one in order to an application for
+    execution and state transition that is not yet stored permanently. Relevant
+    state change information is returned in the form of key-value events that
+    are indexed by a node for fast access. Events are not part of a block. Each
+    transaction contains one or more messages
+  - EndBlock :: CometBFT signals a block end to an application
+  - Commit :: CometBFT signals an application to store permanently to a store
+    state transitions of all transaction in a block. An application returns a
+    deterministic Merkle root of the latest state from a store for consensus
+  - Query :: CometBFT queries an application state at the current or the past
+    block height requesting a Merkle proof of a response
 - Core application :: Cosmos SDK ~baseapp~ implements all ABCI methods, extracts
   messages from transactions relayed by CometBFT, and routes messages to
   appropriate application modules. A core application contains a reference to a
@@ -119,12 +170,36 @@
 - Query lifecycle :: a client submits a signed query to CometBFT which forwards
   a query to an application module which queries a module store and returns a
   response
-
-** Accounts
-
+- Full node client :: a foundation of an application-specific blockchain that
+  consists of a daemon runing a CometBFT consensus instance and maintaining a
+  Cosmos SDK application state machine connected to CometBFT through ABCI socket
+- Validator :: more than 2/3 of validators must sign a prevote and a precommit
+  of a block to be considered valid. All transactions in a block are valid. A
+  proposer for the next block is randomly chosen from validators
 - Account :: a key pair were a public key is derived from a private key seeded
   with a mnemonic of words. A public key is used to derive a tree of addresses
   that identify a user in an application. A private key is used to sign
   transactions and authenticate users. Addresses are also used to identify
   validators participating in a consensus. A keyring creates, exports, and
   imports private keys, derives new accounts, signs transactions
+
+** IBC
+
+- Inter-Blockchain Communication IBC :: a protocol for transferring value and
+  data between different blockchains with fast finality or instant finality PoS
+  consensus. PoW blockchains are not suitable for IBC as they have a
+  probabilistic finality. To transfer tokens from a blockchain A to a blockchain
+  B both blockchains track changes to validator sets of one another by running a
+  light client of the other blockchain that receives only block headers. Tokens
+  on a blockchain A are bonded (locked) and a proof of bonding is relayed to a
+  blockchain B where an equivalent vouchers representing tokens from A are
+  created after validating a proof. While vouchers are used on B, tokens are
+  bonded on A
+- Internet of blockchains :: is constituted of zones and hubs. A zone is an
+  application-specific blockchain that communicates with other blockchains
+  connected to a hub using IBC. A hub is a blockchain that interconnects zones,
+  reduces the number of one-to-one connections between zones, and prevents
+  double spending between zones. Blockchains with probabilistic finality can be
+  connected to a hub through a peg zone. A peg zone is a blockchain proxy with
+  an instant finality that tracks changes in a blockchains with a probabilistic
+  finality based on a finality threshold

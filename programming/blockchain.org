@@ -7,7 +7,8 @@
   a blockchain shared programs (smart contracts) update shared data (a ledger)
   following a consensus protocol without intermediaries vs private data updated
   by private programs in today's transactional systems. A ledger remains correct
-  even if less than 1/3 of validators are malicious
+  even if less than 1/3 of validators are malicious. There is no need to handle
+  and external database as a ledger provides a deterministic blockchain state
   - Network :: a distributed peer-to-peer network without a central control
   - Smart contract :: a Turing-complete processor of digitally signed
     transactions
