@@ -17,12 +17,12 @@
 - Cosmos Hub :: a public PoS blockchain acting as a hub (router) between
   connected zones (application-specific blockchains) with a native token ATOM.
   Stacking ATOM implies a benefit of acquiring a share of transaction fees, but
-  also incurs a risk of loss, if the supported full node becomes unreliable or
-  Byzantine. A privilege of creating the next block is awarded in proportion to
-  the voting power of a validator that is based on the amount of staked ATOM. To
-  prevent concentration of power users elect validators by staking ATOM to the
-  most reliable full nodes with maximum yield of investment and minimum risk of
-  loss
+  also incurs a risk of loss, if a supported full node becomes unreliable or
+  Byzantine. The privilege of creating the next block is awarded in proportion
+  to the voting power of a validator that is based on the amount of staked ATOM.
+  To prevent concentration of power users elect validators by staking ATOM to
+  the most reliable nodes with the maximum yield of investment and the minimum
+  risk of loss
 
 ** Cosmos SDK
 
@@ -91,9 +91,9 @@
   - Custom validator set :: an application defines how a validator set is
     constituted: permissioned blockchain (authorized set of validators), or
     permissionless blockchain (validators must own stake)
-  - Evidence :: a proof of malicious behavior detected by CometBFT and validated
-    by validators that is committed to a blockchain and passed to an application
-    which is responsible to punish a Byzantine node
+  - Evidence :: a proof of node malicious behavior detected by CometBFT and
+    confirmed by validators that is committed to a blockchain and passed to an
+    application which is responsible to punish a Byzantine node
 
 ** ABCI
 
@@ -101,7 +101,7 @@
   connected to a CometBFT consensus engine through an ABCI socket protocol that
   can be wrapped by any programming language to develop a state machine using
   different programming languages. ABCI request and response messages are
-  defined using protobuf. To be deterministic, an application should be
+  defined using ProtoBuf. To be deterministic, an application should be
   exclusively exposed to CometBFT through ABCI, and not to any other external
   user. For each block CometBFT executes: BeingBlock, [DeliverTx...] , EndBlock,
   Commit
@@ -120,46 +120,61 @@
     state change information is returned in the form of key-value events that
     are indexed by a node for fast access. Events are not part of a block. Each
     transaction contains one or more messages
-  - EndBlock :: CometBFT signals a block end to an application
+  - EndBlock :: CometBFT signals a block end to an application that can be used
+    to automatic actions e.g. extra status validation, notifications, cleanup
   - Commit :: CometBFT signals an application to store permanently to a store
     state transitions of all transaction in a block. An application returns a
     deterministic Merkle root of the latest state from a store for consensus
   - Query :: CometBFT queries an application state at the current or the past
     block height requesting a Merkle proof of a response
-- Core application :: Cosmos SDK ~baseapp~ implements all ABCI methods, extracts
+- Core application :: Cosmos SDK BaseApp implements all ABCI methods, extracts
   messages from transactions relayed by CometBFT, and routes messages to
-  appropriate application modules. A core application contains a reference to a
-  ~baseapp~, a list of store keys, a list of module ~keepers~, a reference to an
-  ~appCodec~ for serialization and deserialization of state in a module store, a
+  appropriate application modules. A core application embeds a BaseApp and
+  contains a list of store keys, a list of module keepers, a reference to an
+  appCodec for serialization and deserialization of state in a module store, a
   reference to a module manager with a list of application modules, module
-  invariants are evaluated at the end of each block
-- Module :: a nested state machine within an application state machine. An
-  application combines a collection of interoperable modules. Each module
-  handles a subset of state and has its own message processor and key-value
-  store within a multistore. Modules are mediated by a module manager and
-  interact with each other through keepers. Each module implements a message
-  service for processing messages and a query service implemented by keepers to
-  access a module store. Each module defines transactions and queries in form of
-  CLI commands for local users, gRPC methods for external services, and REST
-  endpoints fully generated code through a gRPC gateway to be exposed through
-  application interfaces
-- Keeper :: instead of having each module to keep an ACL for every other module,
-  each module implements a ~keeper~ that, when passed to other modules, grants a
-  predefined set of read-write capabilities over a key-value store of a module.
-  All access to a module store happens through keepers. Only keepers hold keys
-  to a module store
+  invariants are evaluated at the end of each block.
+- Application states :: a canonical state persisted on Commit, CheckTx volatile
+  state, DeliverTx volatile state reset on BeginBlock. Volatile states are
+  derived from the latest commit to a canonical state using branching and
+  caching into an isolated ephemeral storage that can be safely modified using
+  transaction processing. Changes from a DeliverTx volatile state branch are
+  committed to a canonical state on successful TX execution, or ignored on TX
+  failure
 
-** Transactions and queries
+** Modules and transactions
 
+- Module :: a nested state machine within an application state machine that
+  defines unique properties of each application-specific blockchain. Core
+  modules provided by Cosmos SDK implement ABCI for interactions between an
+  application and CometBFT, a general purpose multistore for application-level
+  state management, a gRPC message service to process messages and a gRPC query
+  service to access module store through keepers. An application-specific custom
+  module handles a subset of message types and a subset of state transitions in
+  a dedicated key-value store within an application multistore. Modules are
+  mediated by a module manager and interact with each other through keepers.
+  Each module defines transactions and queries in form of CLI commands for local
+  users, gRPC methods for external services, and REST endpoints fully generated
+  code through a gRPC gateway to be exposed through application interfaces. Each
+  module has a dedicated repository
+- Transaction :: a set of messages with GasLimit, FeeAmount, TimeoutHeight
+  signed individually by a user and submitted to a module message service that
+  triggers state transition in a module store. A transaction consists of
+  metadata and one or more messages handled by corresponding module message
+  service. Application modules process messages only after a transaction has
+  been confirmed by CometBFT, included in a block, and relayed to application
+  modules for processing. Cosmos SDK automatically extracts messages from a TX
+  and routes messages via BaseApp to a corresponding module message service
 - Transaction lifecycle :: order-execute-validate vs Hyperledger Fabric
   execute-order-validate
   - Create TX :: a client signs and submits a transaction to CometBFT specifying
-    a fee in gas. Gas ensures that blocks are finalized without consuming too
-    many resources. Gas prevents abuse and spam as each transaction has a cost
+    fees in gas. Gas ensures that blocks are finalized without consuming too
+    many resources. Gas prevents abuse and spam as each transaction has a cost.
+    If a provided gas runs out, transaction execution halts
   - Validate TX :: CometBFT adds a TX to a mempool after a stateless and
-    stateful validation of a TX at the app CheckTx. CometBFT propagates new TXs
-    to peers through a gossip protocol
-  - Propose block :: a randomly selected proposer from validators creates the
+    stateful validation of a TX at the application CheckTx. CometBFT propagates
+    new TXs to peers through a gossip protocol
+  - Propose block :: a randomly selected proposer from validators proposes the
     next block of transactions
   - Execute TX :: validators validate again and execute in order each message
     from every TX in a block. State transitions are persisted in corresponding
@@ -167,34 +182,67 @@
   - Commit block :: more that 2/3 validators vote for a block which is then
     added to a blockchain. Application state changes are committed to
     corresponding modules stores
+- Message service :: a ProtoBuf message service that implements a method for
+  each message type supported by a module. A message service accesses a module
+  store through keepers
+- Context :: an object derived from a Go context that queries information about
+  application, block, and transaction state intended to be passed from function
+  to function. A context contains consensus parameters, a block height, a
+  proposer ID, block validators, a branched and cached module store to access TX
+  state, an event manager for emitting events TX and block gas meters, a
+  node-local min gas price
+- Query :: a query is handled by a node as it does not require consensus because
+  it does not change a state
 - Query lifecycle :: a client submits a signed query to CometBFT which forwards
-  a query to an application module which queries a module store and returns a
-  response
+  a query to an application module which queries a module store through a keeper
+  and returns a response
+- Event :: events are key-value pairs attached to responses to BeginBlock,
+  CheckTx, DeliverTx, and EndBlock that convey additional information about
+  state transitions. Events are indexed, can be queried, can be subscribed to
+  through a CometBFT WebSocket
+- Module testing ::
+  - Unit testing :: test a function in isolation with mocked dependencies
+  - Integration testing :: test a module with dependencies in place (minimum
+    viable application)
+  - Simulation testing :: integration testing with introduced random effects
+  - End-to-end testing :: test user flows on a whole application
 - Full node client :: a foundation of an application-specific blockchain that
-  consists of a daemon runing a CometBFT consensus instance and maintaining a
+  consists of a daemon running a CometBFT consensus instance and maintaining a
   Cosmos SDK application state machine connected to CometBFT through ABCI socket
 - Validator :: more than 2/3 of validators must sign a prevote and a precommit
   of a block to be considered valid. All transactions in a block are valid. A
   proposer for the next block is randomly chosen from validators
-- Account :: a key pair were a public key is derived from a private key seeded
-  with a mnemonic of words. A public key is used to derive a tree of addresses
-  that identify a user in an application. A private key is used to sign
-  transactions and authenticate users. Addresses are also used to identify
-  validators participating in a consensus. A keyring creates, exports, and
-  imports private keys, derives new accounts, signs transactions
+
+** Multistore and keepers
+
+- IAVL store :: immutable AVL tree with versioning and snapshots for persistent
+  key-value pairs where each node is indexed by its deterministic Merkle hash.
+  Any node is an immutable snapshot which allows staging of uncommitted
+  transactions with inexpensive roll back to the last committed state
+- Keeper :: (capability-based access) instead of having each module to keep an
+  ACL for every other module, each module implements a keeper that, when passed
+  to other modules, grants a predefined set of read-write capabilities over a
+  key-value store of a module. All access to a module store happens through
+  keepers. Only keepers hold unlimited access keys to a module store
 
 ** IBC
 
-- Inter-Blockchain Communication IBC :: a protocol for transferring value and
-  data between different blockchains with fast finality or instant finality PoS
-  consensus. PoW blockchains are not suitable for IBC as they have a
-  probabilistic finality. To transfer tokens from a blockchain A to a blockchain
-  B both blockchains track changes to validator sets of one another by running a
-  light client of the other blockchain that receives only block headers. Tokens
-  on a blockchain A are bonded (locked) and a proof of bonding is relayed to a
-  blockchain B where an equivalent vouchers representing tokens from A are
-  created after validating a proof. While vouchers are used on B, tokens are
-  bonded on A
+- Inter-Blockchain Communication IBC :: a data-agnostic protocol for
+  transferring value and data between different blockchains with fast finality
+  or instant finality PoS consensus. PoW blockchains are not suitable for IBC as
+  they have a probabilistic finality. To transfer tokens from a blockchain A to
+  a blockchain B both blockchains track changes to validator sets of one another
+  by running a light client of the other blockchain that receives only block
+  headers. Tokens on a blockchain A are bonded (locked) and a proof of bonding
+  is relayed to a blockchain B where an equivalent vouchers representing tokens
+  from A are created after validating a proof bonded tokens in A. While vouchers
+  are used on B, tokens are bonded on A.
+- IBC relaying :: blockchains does not communicate directly with one another.
+  Instead, IBC relayer nodes have access to both source and destination
+  blockchains where they can subscribe to events, query application state and
+  submit messages. IBC relying is permissionless and trustless: light clients
+  running on source and destination blockchains provide trust by verifying
+  proofs of bonded tokens
 - Internet of blockchains :: is constituted of zones and hubs. A zone is an
   application-specific blockchain that communicates with other blockchains
   connected to a hub using IBC. A hub is a blockchain that interconnects zones,
@@ -203,3 +251,24 @@
   connected to a hub through a peg zone. A peg zone is a blockchain proxy with
   an instant finality that tracks changes in a blockchains with a probabilistic
   finality based on a finality threshold
+- Interchain security :: an application-specific blockchain must be secured by a
+  decentralized validator set with a valuable staking token. Cosmos Hub (a
+  security provider chain) enables other blockchains (a security consumer
+  chains) to be secured through PoS consensus by ATOM. A consumer chain retains
+  its sovereignty because the chain owns transaction execution and application
+  state. A provider chain only runs a dedicated validator set (Cross-Chain
+  Validation CCV module via IBC) that provides a secured consensus in exchange
+  for a reward paid in tokens of a consumer blockchain
+
+** Accounts
+
+- Account :: a key pair were a public key is derived from a private key seeded
+  with a mnemonic of words from a standardized dictionary. A public key is used
+  to derive an address that identify a user in an application. A private key is
+  used to sign transactions and authenticate users. Account types: AccAddress
+  identifies a user, ValAddress identifies a validator operator, ConsAddress
+  identifies a validator node. A keyring manages private keys
+- Hierarchichal Deterministic HD wallet :: deterministically derives multiple
+  key pairs from a single seed phrase (mnemonic) and a derivation path e.g.
+  BIP32. A relation between key pairs generated from a single seed cannot be
+  deduced

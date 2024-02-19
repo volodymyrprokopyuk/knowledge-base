@@ -1,0 +1,6 @@
+* Protocol buffers
+
+- Protobuf :: binary backword and forward compatible not self-describing data
+  serialization format for data transfer and storage. Protobof uses IDL to
+  describe structure of messages and generate client and sever code for data
+  serialization and deserialization from a byte stream
