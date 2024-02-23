@@ -1,0 +1,17 @@
+* Docker
+
+- Container :: (OS-level virtualization) an isolated and portable environment to
+  package and efficiently run programs. Containers run both cloud-native
+  applications and serverless functions
+  - Isolation :: each container has its own hostname, IP, and disk.
+  - Density :: all containers share a host OS, CPU, and memory
+  - Network :: containers can be connected to a virtual network
+- Dockerfile :: specifies a packaging procedure to build an image for a single
+  program
+- Image :: a layered packaging format for building a container file system.
+  Read-only image layers are shared between different images to save storage
+  space. Every instruction in a Dockerfile creates an image layer that is reused
+  from a cache to reduce build time on subsequent builds if the instruction and
+  previous layers have not changed. Place instructions that are more likely to
+  change at the bottom of a Dockerfile
+- Docker Compose file :: specifies a deployment procedure for a system

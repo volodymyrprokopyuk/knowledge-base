@@ -38,7 +38,8 @@ fmt.Println(year) // Year 2024
 
 - Typed constant :: compile-time declaration only for primitive types
   src_go{ const i int = 1 }
-- Untyped constant :: compile-time named literal src_go{ const i = 1 }
+- Untyped constant :: compile-time named literal
+  src_go{ const c = 1; var i int = c; var f float64 = c }
   - *Immutable values* at runtime: use a /call-by-value/ copy
   - *Mutable values* at runtime: use a /pointer/ to a value
 - Enumeration :: a typed list of constants using ~iota~
@@ -153,6 +154,8 @@ f := arr[:] // 1, 2, 3
 // array to slice: copy
 g := make([]int, len(arr))
 copy(g, arr[:]) // 1, 2, 3
+// slice to array: copy
+arr2 := [3]int(f) // 1, 2, 3
 #+END_SRC
 
 *** Maps
@@ -613,18 +616,122 @@ for _, v := range vals {
 
 ** Generics
 
+- Generics :: compile-time automatic generation of type-safe structures,
+  functions, and methods
 - Generic function :: has type parameters for input arguments and return values
 
 #+BEGIN_SRC go
-func Reduce[T, U any](in []T, i U, acc func(v T, a U) U) U {
-  var out U = i // a type parameter inside a function body
-  for _, v := range in {
+func Reduce[T, U any](slc []T, i U, acc func(v T, a U) U) U {
+  var out U = i
+  for _, v := range slc {
     out = acc(v, out)
   }
   return out
 }
-a := []int{1, 2, 3, 4, 5}
-Reduce(a, 0, func(v, i int) int { return v + i }) // 15
+slc := []int{1, 2, 3, 4, 5}
+Reduce(slc, 0, func(v, acc int) int { return v + acc }) // 15
+
+// comparable types support ==, !=, but not <, <=, >, >=
+// slice, map, func are not comparable
+func Contains[T comparable](slc []T, val T) bool {
+  for _, v := range slc {
+    if v == val {
+      return true
+    }
+  }
+  return false
+}
+slc := []int{1, 2, 3}
+Contains(slc, 2); Contains(slc, 4) // true, false
+#+END_SRC
+
+- Type elements and type terms :: type elements define operators supported by a
+  type parameter. Supported operators are the intersection of operators from all
+  type terms. Type terms match exactly, use =~= to match derived types. Type
+  terms can be built-in types, arrays, slices, maps, channels, structs, and
+  functions
+
+#+BEGIN_SRC go
+func Min[T ~int | ~string](a, b T) T {
+  if a < b {
+    return a
+  }
+  return b
+}
+Min(1, 2), Min("b", "a") // 1, a
+#+END_SRC
+
+- Generic struct :: has type parameters for its fields and methods
+
+#+BEGIN_SRC go
+type Stack[T any] struct {
+  slc []T
+}
+func (s *Stack[T]) Push(val T) {
+  s.slc = append(s.slc, val)
+}
+func (s *Stack[T]) Pop() (T, bool) {
+  var val T
+  l := len(s.slc)
+  if l == 0 {
+    return val, false
+  }
+  val = s.slc[l - 1]
+  s.slc = s.slc[:l - 1]
+  return val, true
+}
+var stk Stack[int]
+stk.Push(1); stk.Push(2); stk.Push(3)
+for val, nonEmpty := stk.Pop(); nonEmpty; {
+  fmt.Println(val) // 3, 2, 1
+  val, nonEmpty = stk.Pop()
+}
+#+END_SRC
+
+#+BEGIN_SRC go
+// interface with type elements, supports <, <=, >, >=
+type Cmp interface {
+  ~int | ~string
+}
+// any interface can be used as a type constraint
+func Compare[T Cmp](a, b T) int {
+  if a < b {
+    return -1
+  }
+  if a > b {
+    return 1
+  }
+  return 0
+}
+
+type Node[T Cmp] struct {
+  value T
+  left, right *Node[T]
+}
+func (n *Node[T]) Insert(val T) *Node[T] {
+  if n == nil {
+    return &Node[T]{value: val}
+  }
+  switch cmp := Compare(val, n.value); {
+  case cmp < 0:
+    n.left = n.left.Insert(val)
+  case cmp > 0:
+    n.right = n.right.Insert(val)
+  }
+  return n
+}
+func (n *Node[T]) InOrder(f func (val T)) {
+  if n != nil {
+    n.left.InOrder(f)
+    f(n.value)
+    n.right.InOrder(f)
+  }
+}
+var n *Node[int]
+n = n.Insert(1); n = n.Insert(3); n = n.Insert(2) n = n.Insert(4)
+n.InOrder(func (val int) {
+  fmt.Printf("%v ", val) // 1, 2, 3, 4
+})
 #+END_SRC
 
 ** Packages and modules

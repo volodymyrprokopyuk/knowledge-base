@@ -272,3 +272,51 @@
   key pairs from a single seed phrase (mnemonic) and a derivation path e.g.
   BIP32. A relation between key pairs generated from a single seed cannot be
   deduced
+
+** simapp
+
+- simapp :: a single node blockchain
+
+#+BEGIN_SRC fish
+git clone https://github.com/cosmos/cosmos-sdk.git
+cd cosmos-sdk
+make build
+cd build
+# remove data and configuration
+rm -rf ./private/.simapp
+# initialize a chain
+./simd init demo \
+  --home ./private/.simapp --chain-id cochain
+# add a key (an account)
+./simd keys add vlad \
+  --home ./private/.simapp --keyring-backend test
+# list keys
+./simd keys list \
+  --home ./private/.simapp --keyring-backend test
+# add a genesis account
+./simd genesis add-genesis-account vlad 100000000stake \
+  --home ./private/.simapp --keyring-backend test
+# execute a genesis TX
+./simd genesis gentx vlad 70000000stake \
+  --home ./private/.simapp --keyring-backend test --chain-id cochain
+# collect genesis TXs from all validators
+./simd genesis collect-gentxs \
+  --home ./private/.simapp
+# start block production and validation
+./simd start \
+  --home ./private/.simapp
+# send a TX (new terminal)
+set -g vladaddr (./simd keys show vlad --address \
+  --home ./private/.simapp/ --keyring-backend test)
+set -g lanaaddr cosmos1ytt4z085fwxwnj0xdckk43ek4c9znuy00cghtq
+./simd tx bank send $vladaddr $lanaaddr 10stake \
+  --home ./private/.simapp/ --keyring-backend test --chain-id cochain
+# query an account balance
+./simd query bank balances $vladaddr
+#+END_SRC
+
+**Important** write this mnemonic phrase in a safe place.
+It is the only way to recover your account if you ever forget your password.
+
+female sniff flavor ahead oppose upset pledge hockey destroy puppy earn hundred
+evoke solve cruel category child lava debate desert token embark appear beauty
