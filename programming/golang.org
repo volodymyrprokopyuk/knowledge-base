@@ -350,6 +350,28 @@ for _, v := range []int{1, 2, 3} {
     interface
 
 #+BEGIN_SRC go
+var ErrOh = errors.New("sentinel oh")
+// custom error
+type OhError struct {
+  Msg string
+}
+// custom error must implement the error interface
+func (e OhError) Error() string {
+  return e.Msg
+}
+err := func() error {
+  return ErrOh // sentinel error
+  return OhError{"custom oh"} // custom error
+}()
+if errors.Is(err, ErrOh) {
+  fmt.Println(err) // sentinel oh
+}
+if errors.As(err, &OhError{}) {
+  fmt.Println(err) // custom oh
+}
+#+END_SRC
+
+#+BEGIN_SRC go
 // sentinel error
 var ErrDivideByZero = errors.New("divide by zero")
 func quoteRem(a, b int) (int, int, error) {
@@ -688,6 +710,9 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
 }
 #+END_SRC
 
+- Type constants :: =T any= (unconstrained), =T comparable= (==, !=),
+  =T ~ind | ~string= (<, <=, >,>=), =interface= (custom operations)
+
 #+BEGIN_SRC go
 // interface with type elements, supports <, <=, >, >=
 type Cmp interface {
@@ -749,9 +774,16 @@ n.InOrder(func (val int) {
   represents a *library* of /importable packages/ src_fish{ go get ... } or an
   *application* of /executable commands/ src_fish{ go install ... }
   - Initialize a module src_fish{ go mod init scm/user/mod }
-  - Update module dependencies src_fish{ go get -u && go mod tidy }
+  - Update module dependencies src_fish{ go get -u ./... && go mod tidy }
   - Build and run a module during development src_go{ go run ... }
   - Build a module src_fish{ go build }
+  - Static code analysis
+    - src_fish{ go install honnef.co/go/tools/cmd/staticcheck@latest }
+      src_fish{ staticcheck ./... }
+    - src_fish{ go install github.com/mgechev/revive@latest }
+      src_fish{ revive ./... }
+    - src_fish{ yay -S golangci-lint }
+      src_fish{ golangci-lint run }
 
 ** Concurrency
 
