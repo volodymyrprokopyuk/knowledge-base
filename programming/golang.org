@@ -339,15 +339,15 @@ for _, v := range []int{1, 2, 3} {
 
 ** Error handling
 
-*** Sentinel and custom errors, error wrapping
+*** Error wrapping
 
 - Error :: a type that signals an unexpected yet recoverable situation and
-  implements the ~error~ interface
+  implements the src_go{ type error interface { Error() string } } interface
   - *Sentinel error* an error value that signals an expected outcome e.g. EOF
   - *Error wrapping* builds a chain of error types that convey additional
     context
-  - A function can return different error types by returning an ~error~
-    interface
+  - By returning an ~error~ interface a function can return different error
+    types
 
 #+BEGIN_SRC go
 var ErrOh = errors.New("sentinel oh")
@@ -379,7 +379,7 @@ func quoteRem(a, b int) (int, int, error) {
     // return zero values for non-error return types
     return 0, 0, ErrDivideByZero
   }
-  // return nil for error return type
+  // return nil for the error return type
   return a / b, a % b, nil
 }
 // custom error type
@@ -414,13 +414,14 @@ if err != nil {
 
 *** panic/recover
 
-- Panic :: signals a termination of a program due to an unrecoverable
-  situation. A panic unwinds a stack only to the top of a current goroutine, so
-  a recover must be within the scope of a goroutine
-  - *Recover* must be called only from ~defer~ as only defer functions are
+- Panic :: signals termination of a program due to an unrecoverable situation. A
+  ~panic~ unwinds a stack only to the top of the current goroutine, so a
+  ~recover~ must be within a scope of the current goroutine
+  - ~recover~ must be called only inside a ~defer~ as only defer functions are
     executed on panic
-  - In an app use recover to gracefully handle shutdown
-  - In a lib use recover to convert a panic to an error at a public API boundary
+  - An application uses a recover to gracefully handle a shutdown
+  - A library uses a recover to convert a panic into an error at a public API
+    boundary
 
 #+BEGIN_SRC go
 func panicRecover() {
@@ -770,12 +771,15 @@ n.InOrder(func (val int) {
   - Import a package src_go{ import "scm/user/mod/pkgdir" }
   - Import alias src_go{ import pkgname "scm/user/mod/pkgdir" }
   - Access an identifier src_go{ pkgname.Identifier }
-- Module :: a unit of versioning identified by a repository path. A module
-  represents a *library* of /importable packages/ src_fish{ go get ... } or an
-  *application* of /executable commands/ src_fish{ go install ... }
-  - Initialize a module src_fish{ go mod init scm/user/mod }
-  - Update module dependencies src_fish{ go get -u ./... && go mod tidy }
-  - Build and run a module during development src_go{ go run ... }
+- Module :: a unit of versioning identified by a repository path
+  ~"scm/user/mod"~. A module represents either
+  - *Library* of /importable packages/ src_fish{ go get ... } or
+  - *Application* of /executable commands/ src_fish{ go install ... }
+    src_go{ package main; func main { ... } }
+  - Initialize a module src_fish{ go mod init scm/user/mod }. The ~go.mod~
+    defines the current module, a supported Go version, and dependency modules
+  - Update module dependencies src_fish{ go get -u ./...; go mod tidy }
+  - Build and run a module during development src_fish{ go run ... }
   - Build a module src_fish{ go build }
   - Static code analysis
     - src_fish{ go install honnef.co/go/tools/cmd/staticcheck@latest }
