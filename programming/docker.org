@@ -3,6 +3,77 @@
 - Docker :: a platform for software distribution: multi-stage image build,
   share images through a image registry, run a container from an image. Image
   layers reduce build time, storage space, and network bandwidth
+- Reproducible builds :: Docker allows to build and test applications without
+  having to locally install compilers, runtimes, testing frameworks, and
+  packages. All build and test instructions are captured in a multi-stage
+  Dockerfile. All deployment instructions are captured in a compose file
+- Container orchestrator :: provides an API to manage a cluster of nodes as a
+  single unit, runs multi-container applications on a cluster. Network
+  management, container scheduling, data management, configuration management,
+  application resilience
+
+** Images
+
+- Image reference :: a unique identifier of a specific image in a registry
+  ~registryDomain/userAccount/imageRepository:versionTag~
+- Image :: (initial file system from a Dockerfile) a layered packaging format to
+  build a file system of a container. Immutable image layers are shared between
+  different images to save storage space, reduce network traffic and build time.
+  Every instruction in a Dockerfile creates an immutable image layer that is
+  reused from a cache to reduce a build time of subsequent builds if the
+  instruction and previous image layers have not been altered
+- Image hierarchy :: base image e.g. golang, golden image e.g. golang + tools,
+  application image e.g. golden image + application artefacts
+- Image optimizations :: Place instructions that are more likely to change
+  towards the end of a Dockerfile to minimize the number of layers that have to
+  be rebuilt after a change. Removing files after a COPY in a Dockerfiles does
+  not frees space in image layers. COPY only the necessary files, do not ~rm -rf
+  ...~ afterwards. To build images on a remote Docker engine, Docker compresses
+  a build context (directory) and send it to a remote Docker engine. Use
+  ~.dockerignore~ to exclude from compression unnecessary files and folders. Use
+  a multi-stage build with absolutely necessary runtime in production images
+
+** Dockerfiles
+
+- Dockerfile :: (run an image within a runtime) specifies a packaging procedure
+  to build an image of a single application
+- Multi-stage Dockerfile :: (build an image with a toolchain) builds a final
+  image using independent, isolated, and reproducible stages each starting from
+  a potentially different image with a different toolchain for building and
+  testing an application. Each stage is started with src_fish{ FROM image AS
+  stage }. Files from previous stages are selectively copied into the next
+  stages through src_fish{ COPY --from=stage src dst }. The final image is clean
+  and minimal, and contains only tested artifacts for production
+
+** Docker compose
+
+- Docker compose file :: specifies a deployment procedure for an application
+  consisting of multiple containers deployed to a single host. A compose file
+  declares a desired state of containers and networks that Docker compose tries
+  to satisfy. Once deployed, docker compose neither monitors nor restarts
+  containers until the next explicit src_fish{ docker-compose up }.
+- Compose override files :: override files with environment-specific
+  configuration differences can be applied to a single core compose file with
+  common definitions to simultaneously deploy the same application on the same
+  host on different isolated networks under different project/directory names
+- Compose extension fields :: avoid file-level duplication of configuration by
+  using the YAML merge syntax with element anchors and element references
+
+#+BEGIN_SRC yaml
+# definition of an extension field
+x-networks: &networks # element anchor
+  networks:
+    -vladnet
+services:
+  caddy:
+    # mering of an extension field (in multiple services)
+    <<: *networks # element reference
+networks:
+  vladnet: { }
+#+END_SRC
+
+** Containers
+
 - Container :: (OS-level virtualization) a portable image format for packaging
   and an isolated environment to efficiently run applications that share a host
   OS
@@ -10,6 +81,11 @@
   - Density :: all containers efficiently share a host OS, CPU, and memory
   - Network :: containers communicate through a virtual network. A Docker
     internal DNS provides service discovery by a container name
+- Container resilience :: when a container ~HEALTHCHEC~ fails, Docker notifies a
+  container orchestrator to take an action on the unhealthy container. A
+  container should fail fast if its dependencies are not satisfied
+  src_fish{ CMD curl --fail $host && ./app }. Docker compose ensures correct
+  order of starting containers through a ~depends_on~ directive
 - Union file system :: a container has a single, independent, layered, virtual,
   union file system that integrates data from image layers, volume mounts, and
   bind mounts.
@@ -21,6 +97,9 @@
   uses copy-on-write for modifications of existing files from image layers. A
   file system of a stopped container is accessible through src_fish{ docker
   container cp src dst } until a container is removed
+
+** Mounts
+
 - Volume mount :: (~--volume~ persistent Docker-managed storage) provides a
   persistent, decoupled from a container storage. A volume is allocated on a
   host and managed by Docker. A volume is accessible only from a container (not
@@ -31,26 +110,3 @@
   directory mount over an already existing target directory completely replaces
   a target directory. A file mount over an already existing target directory
   merges a new file with already existing files from image layers
-- Image :: (initial file system from a Dockerfile) a layered packaging format
-  for building a file system of a container. Immutable image layers are shared
-  between different images to save storage space and reduce build time. Every
-  instruction in a Dockerfile creates an immutable image layer that is reused
-  from a cache to reduce a build time of subsequent builds if the instruction
-  and previous image layers have not changed. Place instructions that are more
-  likely to change at the bottom of a Dockerfile
-- Image reference :: a unique identifier of a specific image in a registry
-  ~registryDomain/userAccount/imageRepository:versionTag~
-- Dockerfile :: (run an image within a runtime) specifies a packaging procedure
-  to build an image of a single application
-- Multi-stage Dockerfile :: (build an image with a toolchain) builds a final
-  image using independent, isolated, and reproducible stages each starting from
-  a potentially different image with a different toolchain for building and
-  testing an application. Each stage is started with src_fish{ FROM image AS
-  stage }. Files from previous stages are selectively copied into the next
-  stages through src_fish{ COPY --from=stage src dst }. The final image is clean
-  and minimal, and contains only tested artifacts for production
-- Docker Compose file :: specifies a deployment procedure for an application
-  consisting of multiple containers deployed to a single host. A compose file
-  declares a desired state of containers and networks that Docker compose tries
-  to satisfy. Once deployed, docker compose does not monitor and restart
-  containers until the next explicit src_fish{ docker-compose up }

@@ -1,0 +1,33 @@
+* gRPC
+
+- gRPC :: a contract-driven inter-service communication protocol based on the
+  ProtoBuf binary message format over the bidirectional HTTP/2 transport for
+  sync request-response and async bidirectional streaming of messages to
+  interconnect internal heterogeneous services. ProtoBuf encodes a positional
+  field number, a field type, a field length, and a field content. Protobuf uses
+  a length-prefixed message to delimit messages on the wire
+- Automatic code generation :: gRPC automatically generates server and client
+  stubs with low-level serialization and communication abstractions from a
+  service description in an IDL proto file. A server implements business logic
+  under a defined interface. A client invokes a remote service by performing a
+  local function call
+- gRPC communication patterns :: a client always initiates a conversation by
+  sending request headers (method: POST, scheme: HTTP(S), path: /service/method,
+  content-type: application/grpc, encoding: gzip, timeout: 1s, authorization:
+  bearer, status: 200, x-header: custom), one or more length-prefixed messages,
+  end of stream marker
+  - Sync request-response :: a client sends a request, a server returns a
+    response e.g. src_protobuf{ rpc GetProduct(productID) returns (Product) }
+  - Server streaming :: a client sens a request, a server returns a stream of
+    responses concluding with an end of stream mark e.g. src_protobuf{ rpc
+    SearchProducts(query) returns (stream Product) }
+  - Client streaming :: a client sends a stream of messages, a server returns a
+    response after receiving one or more messages or after all messages e.g.
+    src_protobuf{ rpc updateProducts(stream Product) returns (Status) }
+  - Bidirectional streaming :: a client sends a stream of messages, a server
+    returns a stream of messages e.g. src_protobuf{ rpc getProducts(stream
+    ProductID) returns (stream Product) }. Inbound and outbound streams operate
+    independently in parallel
+- gRPC interceptors :: client and server unary and stream interceptors allow
+  access to unary request-response and stream send-receive messages for
+  cross-cutting concerns e.g. logging, authN, metrics, tracing

@@ -1,0 +1,50 @@
+* Fish
+
+* awk
+
+- AWK :: (data-driven processing, line-oriented langauge) matches lines against
+  patterns and executes actions on matched lines. src_awk{ /pattern/ { action }
+  }
+  - If multiple patterns match then multiple actions are executed for the same
+    line
+  - If no pattern match, then no action is executed for a line
+  - If a pattern is omitted, then the default action is performed on every line
+  - If an action is omitted that the default action print is performed on every
+    matching line
+
+#+BEGIN_SRC awk
+# executes actions before reading any input
+BEGIN { print "ok" }
+# print every line
+{ print } # pattern omitted
+/.?/ # action omitted
+# an expression as a pattern
+length($0) > 80 # action omitted
+{ # prints max line length; max is automatically initialized to zero
+  if (length($0) > max) { max = length($0) }
+}
+END { print max } # print an accumulator
+#+END_SRC
+
+* yq
+
+#+BEGIN_SRC fish
+# root element
+.
+# field access
+.pieces
+# single array element
+.pieces[0]
+# update of a single element
+.pieces[0] | .tit = .tit + "NEW"
+# whole array access
+.pieces[]
+# nested field access
+.pieces[].tit
+.pieces[] | .tit
+# filter on a field value
+.pieces[] | select(.sty == "aut")
+# update of a filtered subset
+(.pieces[] | select(.sty == "aut") | .sty) = "cus"
+(.pieces[] | select(.sty == "aut") | .sty) |= . + "cus"
+#+END_SRC
