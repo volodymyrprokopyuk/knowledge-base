@@ -30,4 +30,20 @@
     independently in parallel
 - gRPC interceptors :: client and server unary and stream interceptors allow
   access to unary request-response and stream send-receive messages for
-  cross-cutting concerns e.g. logging, authN, metrics, tracing
+  cross-cutting concerns e.g. logging, metrics, tracing, authN, validation,
+  retries, rate limiting
+- gRPC timeouts/deadlines and cancellations :: a client initiates a request or a
+  stream by providing a Go context with a specified timeout/deadline or a
+  cancellation. A server should explicitly use a ~ctx.Done()~ of a
+  ~stream.Context().Done()~ in a ~select~ to prevent unnecessary execution after
+  a timeout/deadline or a cancellation
+- gRPC multiplexing :: multiple gRPC services can be registered at the same gRPC
+  server; multiple client stubs can be attached to the same gRPC client
+  connection
+- gRPC security :: gRPC supports TLS and mTLS. gRPC supports Basic authN
+  credentials and OAuth 2.0 verifiable access tokens or self-contained JWT authZ
+  through client side per RPC credentials and server side interceptors that
+  validate authorization: Basic credentilas or authorization: Breader token
+  retrieved from a context metadata
+- gRPC server reflection :: a gRPC server exposes proto definitions of deployed
+  services for clients to read and consume
