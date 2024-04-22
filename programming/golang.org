@@ -1140,3 +1140,47 @@ func BenchmarkReduce(b *testing.B) {
   }
 }
 #+END_SRC
+
+** Style guide
+
+- Refactor long lines, do not split long lines
+- Length of a variable is proportional to a scope (the smaller a scope, the
+  shorter a variable) and is inversely proportional to a usage frequency (the
+  more frequent, the shorter a variable)
+- ~pkgname~ short, all lowercase package names
+- ~pkg.Name()~ short, not repetitive names that use a context and improve
+  callsite reading. Do not repeat a package name in a function name, a method
+  receiver in a method name, names of input parameters and return values if
+  there is no collision
+- ~MaxLength, URLPath, UserID~ exported. ~maxLength, urlPath, userID~ unexported
+- ~Counter()~ a getter. ~SetCounter()~ a setter
+- Handle errors first on the left src_go{ if err != nil { return } }. Push happy
+  path processing to the bottom of a function on the right (without indentation)
+- Prefer nil container src_go{ var arr []int } over initialized empty container
+  src_go{ var arr = []int{} }. Make the nil value useful src_go{ var wg
+  sync.WaitGroup }
+- Prefer error over panic: use panic mostly in must-style functions
+- Keep concurrent code within a scope of a sync function that clearly defines
+  lifetimes of goroutines. Never start a goroutine without knowing how it will
+  stop
+- Go interfaces generally belong to a consumer package not to a provider
+  package. An interface should be discovered by a consumer, not imposed by a
+  provider. Accept interfaces, return concrete types
+- Value receiver
+  - A receiver is a built-in value type e.g. int, string
+  - A method does not modify a receiver
+- Pointer receiver
+  - A method needs to modify a receiver
+  - A receiver contains fields that cannot safely be copied e.g. sync.Mutex
+  - A receiver is large
+  - A receiver contains a pointer type
+  - When in doubt use a pointer receiver
+- Make method of a type either all pointer methods or all value methods
+- Equivalences
+  - src_go{ var i int } and src_go{ i := 0 }
+  - src_go{ new(File) } and src_go{ &File{} }
+  - src_go{ make(map[string]int) } and src_go{ map[string]int{} }
+  - src_go{ fmt.Errorf("oh") } and src_go{ errors.New("oh") }
+- It is fine to reuse variables that are no longer needed e.g. reassign to
+  function parameters
+- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
