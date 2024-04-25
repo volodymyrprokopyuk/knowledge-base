@@ -131,7 +131,9 @@ d := [...]int{1, 2: 2, 4: 3} // 1, 0, 2, 0, 3
 
 - Slice :: a /non-comparable/ *dynamic array*. A slice contains a pointer to an
   array, a length, and a capacity. Slices can provide /multiple views/ into the
-  single underlying array
+  single underlying array. A slice passed by value to a function can be modified
+  by a function as a pointer to the underlying array is copied. src_go{ var a
+  []int; a[0] } gives the index out of range runtime error
   - *Full slice expression* ~slc[i:j:cap]~ limits side effects of appending by
     reallocating the underlying array when ~len == cap~
 
@@ -167,7 +169,10 @@ arr2 := [3]int(f) // 1, 2, 3
 *** Maps
 
 - Map :: a /non-comparable/ *hash table*. A map contains a pointer on an array
-  of buckets, a length, and a capacity
+  of buckets, a length, and a capacity. A map passed by value to a function can
+  be modified by a function as a pointer to the underlying data structure is
+  copied. src_go{ var m map[string]int; m["a"] = 1 } gives the assignment to nil
+  runtime error
 
 #+BEGIN_SRC go
 // nil map
@@ -350,9 +355,20 @@ for _, v := range []int{1, 2, 3} {
   implements the src_go{ type error interface { Error() string } } interface
   - *Sentinel error* an error value that signals an expected outcome e.g. EOF
   - *Error wrapping* builds a chain of error types that convey additional
-    context
+    context. Place the %w verb at the end of a wrapping error
   - By returning an ~error~ interface a function can return different error
     types
+
+#+BEGIN_SRC go
+// var sentinel error
+var ErrInsufficientFunds = errors.New("Insufficient funds")
+// const sentinel error
+type WalletError string
+func (we WalletError) Error() string {
+  return string(we)
+}
+const ErrInsufficientFunds = WalletError("Insufficient funds")
+#+END_SRC
 
 #+BEGIN_SRC go
 var ErrOh = errors.New("sentinel oh")
@@ -642,6 +658,30 @@ vals := []Negator{&i, &f}
 for _, v := range vals {
   v.Neg()
   v.Print() // Int -1, Flo -1.2
+}
+#+END_SRC
+
+- Dependency injection :: provides external dependencies to a function in form
+  of interfaces. Dependency injection fosters separation of concerns e.g. how to
+  generate data vs where to write generated data
+
+#+BEGIN_SRC go
+func Greet(w io.Writer, name string) {
+  fmt.Fprintf(w, "Hello, %v", name)
+}
+// testing context
+func TestGreet(t *testing.T) {
+  buf := new(bytes.Buffer)
+  Greet(buf, "Vlad") // writes data to a bytes buffer
+  got := buf.String()
+  exp := "Hello, Vlad"
+  if got != exp {
+    t.Errorf("got %q, expected %q", got ,exp)
+  }
+}
+// web handler context
+func GreetHandler(w http.ResponseWriter, r *http.Request) {
+  Greet(w, "Vlad") // writes data to a web response
 }
 #+END_SRC
 
@@ -1050,11 +1090,13 @@ func condBroadcast() {
 
 ** Testing
 
-- Test with coverage src_fish{ go test -v -coverprofile=coverage.cov }
+- Test file ~file_test.go~, src_go{ import "testing" }, test function
+  ~TestFunc(t *testing.T)~
+- Selective testing src_fish{ go test -v -run Test/Sub }
+- Test with coverage src_fish{ go test -v -cover -coverprofile=coverage.cov }
 - HTML coverage report src_fish{ go tool cover -html=coverage.cov }
 - ~t.Errorf()~ continues a test function and collects multiple errors
 - ~t.Fatalf()~ exits a test functions and returns the first error
-- Testing of unexported (implementation) vs exported functions (interface)
 
 #+BEGIN_SRC go
 package main
@@ -1128,7 +1170,7 @@ func TestTableReduce(t *testing.T) {
 #+END_SRC
 
 - Benchmarking :: measures time per operation and memory allocations per
-  operation
+  operation. By default benchmarks are run sequentially
   - Benchmark with memory allocations
     src_fish{ go test -v -bench=. -benchmem -benchtime=2s }
 
@@ -1176,11 +1218,16 @@ func BenchmarkReduce(b *testing.B) {
   - A receiver contains a pointer type
   - When in doubt use a pointer receiver
 - Make method of a type either all pointer methods or all value methods
+
+** Variables
+
 - Equivalences
   - src_go{ var i int } and src_go{ i := 0 }
   - src_go{ new(File) } and src_go{ &File{} }
   - src_go{ make(map[string]int) } and src_go{ map[string]int{} }
   - src_go{ fmt.Errorf("oh") } and src_go{ errors.New("oh") }
+- Prefer ~var i int~ over ~i := 0~ for a zero value initialization
+- Prefer ~a := 1~ over ~var a = 1~ for a non-zero value initialization
+- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
 - It is fine to reuse variables that are no longer needed e.g. reassign to
   function parameters
-- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
