@@ -760,10 +760,10 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
 #+END_SRC
 
 - Type constants :: Any interface can be used as a type constraint
-  - =T any= (unconstrained)
-  - =T comparable= (only equality ==, !=)
-  - =T ~ind | ~string= (intersection of opertors<, <=, >,>=)
-  - =interface= (custom operations)
+  - =T any= unconstrained
+  - =T comparable= only equality ==, !=
+  - =T ~ind | ~string= intersection of operators <, <=, >,>=
+  - =interface= custom operations
 
 #+BEGIN_SRC go
 // interface with type elements, supports <, <=, >, >=
@@ -905,13 +905,16 @@ n.InOrder(func (val int) {
   simultaneously evaluates each clause until the first operation completes on
   any of the channels or a non-blocking ~default~ that is executed immediately
   if present
-- ~context~ :: a hierarchical (context wrapping), immutable data structure that
-  is used to provide an explicit or timeout/deadline-based cancellation from a
-  parent goroutine of multiple child goroutines working on a shared context. A
-  received context can be wrapped with new cancellation instructions and
-  forwarded to children goroutines without affecting a parent goroutine. A
-  context can also be used to forward request-scoped meta data (invisible
-  dependencies) to children goroutines working on a shared context
+- ~context~ :: a hierarchical, tree-like (context wrapping), immutable data
+  structure that is used to provide an explicit or timeout/deadline-based
+  cancellation from a parent goroutine of multiple child goroutines working on a
+  shared context. A received context can be wrapped with new cancellation
+  instructions and forwarded to children goroutines without affecting a parent
+  goroutine. A context can also be used to forward request-scoped meta data
+  (invisible dependencies) to children goroutines working on a shared context.
+  It is very important to wrap/derive a context forwarded to children, so
+  cancellations are propagated through the call stack. When a context is
+  canceled all derived contexts are also canceled
 
 #+BEGIN_SRC go
 func ctxCancelTimeout() {
@@ -920,7 +923,7 @@ func ctxCancelTimeout() {
     defer wg.Done()
     for {
       select {
-      // a channel is closed when a context is cancelled
+      // a channel is closed when a context is canceled
       case <- ctx.Done(): // immediately returns a zero value when closed
         if ctx.Err() == context.Canceled {
           fmt.Println("canceled")
@@ -937,7 +940,7 @@ func ctxCancelTimeout() {
   }
   // cancel context
   ctx, cancel := context.WithCancel(context.Background())
-  // once created a cancellable context must be cancelled
+  // once created a cancellable context must be canceled
   defer cancel()
   wg.Add(1)
   go task(ctx)
@@ -1090,6 +1093,24 @@ func condBroadcast() {
 
 ** Testing
 
+- Test public behavior using the black box testing
+- Avoid testing private implementation details using the white box testing,
+  mocks, and spies e.g. do not test private functions
+- Tests are a valuable software asset as they define what a program is doing,
+  while a more varying code defines how a program is done
+- Property=based testing :: (vs conventional example-based testing) verifies
+  domain rules and invariants on automatically generated arbitrary input src_go{
+  import "testing/quick" }
+- Stub :: static stateless behavior for all requests carefully crafted for each
+  test
+- Spy :: records a number of calls with call arguments, returned values and
+  errors
+- Mock :: stateless dynamic behavior on specific requests for controllable
+  state + spy, carefully crafter for each test
+- Fake :: simplified stateful implementation of a real dependency for all
+  requests with decorators or stubs for triggering errors e.g. an in-memory DB.
+  A single fake covers all tests for a dependency. Run contract tests against
+  fakes and real dependencies
 - Test file ~file_test.go~, src_go{ import "testing" }, test function
   ~TestFunc(t *testing.T)~
 - Selective testing src_fish{ go test -v -run Test/Sub }
