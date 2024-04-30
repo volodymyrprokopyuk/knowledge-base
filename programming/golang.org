@@ -845,28 +845,40 @@ n.InOrder(func (val int) {
 ** Concurrency
 
 - Concurrency :: a *structure* of code to solve a problem with sync steps that
-  can be run in parallel
-- Parallelism :: *execution* of independent sequences of instructions
+  can be run in parallel ideally without race conditions
+- Parallelism :: parallel *execution* of independent sequences of instructions
 - CSP (Communicating Sequential Processes) :: (more generic and flexible) a
   randevouz-based system within a single node where anonymous goroutines send
-  and receive values over channels without having to specify the identity of a
-  receiver. CSP puts focus on first-class channels and synchronization
+  and receive values over named channels without having to specify the identity
+  of a receiver. CSP puts focus on first-class typed sync channels and
+  synchronization
 - Actor model :: (more specific and complex) a distributed system of named
   actors where actors send and receive messages by specifying the identity of a
-  recipient. An actor has an untyped mailbox and maintains an internal mutable
-  state. Actors are combined in a fault-tolerant supervision hierarchies
+  recipient. An actor has an untyped async mailbox and maintains an internal
+  mutable state. Actors are combined in a fault-tolerant supervision hierarchies
+
+|---------------------------------+----------------------------|
+| CSP                             | Actor model                |
+|---------------------------------+----------------------------|
+| Machine level architecture      | Cluster level architecture |
+| Isolated anonymous goroutines   | Isolated named actors      |
+| Typed synchronous channels      | Untyped async mailboxes    |
+| Named channels                  | Implicit communication     |
+| Channel addressing              | Actor addressing           |
+| Multiple channels per goroutine | Single mailbox per actor   |
 
 *** Goroutines
 
-- Goroutine :: internally sync lightweight thread concurrently executed by the
-  Go runtime. A goroutine has well-defined preemption points (IO, system call)
-  when a goroutine can be suspended and resumed. A goroutine accepts parameters,
-  however return values are ignore
-  - Goroutines follows the fork-join concurrency model, are multiplexed over OS
-    threads by a runtime-aware software-defined M:N scheduler with fast context
-    switching
-  - Goroutines run in a single address space, start with small stack that can
-    grow, and take advantage of a low-latency concurrent GC
+- Goroutine :: an internally sync lightweight thread concurrently executed by
+  the Go runtime with other goroutines. Goroutine are non-preemptive, but have
+  well-defined preemption points (IO operations, system calls) when a goroutine
+  is suspended and resumed. A goroutine accepts parameters, however return
+  values are ignored: use channels instead
+  - Goroutines follow the fork-join concurrency model, are multiplexed over OS
+    threads by a runtime-aware, software-defined, userspace M:N scheduler with
+    fast context switching
+  - Goroutines run in a single address space, start with a small per-goroutine
+    stack that can grow, and take advantage of a low-latency concurrent GC
 
 *** Channels
 
@@ -874,18 +886,24 @@ n.InOrder(func (val int) {
   *bidirectional pipe* that provides sync and async communication between
   goroutines. Multiple goroutines can send and receive from the same channel,
   but each value will be received by exactly one goroutine. A channel is a
-  reference type like a slice and a map
+  reference type like a slice and a map. A channel orchestrates a transformation
+  flow of values with data ownership transfer between concurrent goroutines,
+  ensuring that only one goroutine has ownership on specific value at any point
+  in time
   - *Unidirectional channel* a send-only src_go{ chan<- int } and a receive-only
     src_go{ <-chan int } channels enforced at compile-time mainly for function
     parameters and local variables. Bidirectional channels are implicitly
     converted to unidirectional channels. A receive-only channel cannot be
     closed
-  - *Channel ownership* a goroutine that creates, sends, and closes a channel
-  - *Share memory by communicating*, do not communicate by sharing memory
+  - *Channel ownership* a goroutine that creates a channel src_go{ ch :=
+    make(chan int) } and sends values over a channel has to closes a channel
+    src_go{ close(ch) }
+  - *Share memory by communicating* over channels, do not communicate by sharing
+    memory with mutexes
   - Receive from a closed channel immediately returns a zero value for a channel
     type
   - Send or receive from a nil channel blocks forever
-  - Send to a closed channel, close a nil channel, close an already closed
+  - Send to a closed channel, close an already closed channel, close a nil
     channel panics
 - Unbuffered channel :: (blocking, sync) src_go{ ch := make(chan int) } send
   blocks until receive, receive blocks until send. Only an unbuffered channel
@@ -902,22 +920,22 @@ n.InOrder(func (val int) {
 - ~select~ :: enables composition of channels by efficiently and sumltaneously
   sending and receiving values from multiple competing channels in a uniformly
   random way to avoid deadlocks. ~select~ blocks on multiple channels and
-  simultaneously evaluates each clause until the first operation completes on
-  any of the channels or a non-blocking ~default~ that is executed immediately
-  if present
-- ~context~ :: a hierarchical, tree-like (context wrapping), immutable data
-  structure that is used to provide an explicit or timeout/deadline-based
-  cancellation from a parent goroutine of multiple child goroutines working on a
-  shared context. A received context can be wrapped with new cancellation
-  instructions and forwarded to children goroutines without affecting a parent
-  goroutine. A context can also be used to forward request-scoped meta data
-  (invisible dependencies) to children goroutines working on a shared context.
-  It is very important to wrap/derive a context forwarded to children, so
-  cancellations are propagated through the call stack. When a context is
-  canceled all derived contexts are also canceled
+  simultaneously and randomly evaluates each clause until the first operation
+  completes on any of the channels or a non-blocking ~default~ that is executed
+  immediately if present
+- ~context~ :: a hierarchical, tree-like (context wrapping/derivation),
+  immutable data structure that is used to provide an explicit or
+  timeout/deadline-based cancellation from a parent goroutine of multiple child
+  goroutines working on a shared context. A received context can be wrapped with
+  new cancellation instructions and forwarded to children goroutines without
+  affecting a parent goroutine. It is very important to wrap/derive from a
+  parent context that is forwarded to children, so cancellations are propagated
+  through the call stack. When a context is canceled all derived contexts are
+  also canceled. A context can also be used to forward request-scoped meta data
+  (invisible dependencies) to children goroutines working on a shared context
 
 #+BEGIN_SRC go
-func ctxCancelTimeout() {
+func contextCancelTimeout() {
   var wg sync.WaitGroup
   task := func(ctx context.Context) {
     defer wg.Done()
@@ -925,14 +943,14 @@ func ctxCancelTimeout() {
       select {
       // a channel is closed when a context is canceled
       case <- ctx.Done(): // immediately returns a zero value when closed
-        if ctx.Err() == context.Canceled {
+        switch ctx.Err() {
+        case context.Canceled:
           fmt.Println("canceled")
-        }
-        if ctx.Err() == context.DeadlineExceeded {
+        case context.DeadlineExceeded:
           fmt.Println("timeout")
         }
         return
-      default:
+      default: // non-blocking
         fmt.Println("working...")
         time.Sleep(100 * time.Millisecond)
       }
@@ -960,56 +978,53 @@ func ctxCancelTimeout() {
 
 *** Mutex
 
-- Mutex :: provides an exclusive access (synchronization) to a shared resource
-  (critical section) between independent goroutines executed in parallel
+- Mutex :: provides an exclusive access (synchronization) to a resource shared
+  between independent concurrent goroutines. A critical section is a set of
+  instructions that has to be executed without interruptions
 
 #+BEGIN_SRC go
-func rwMutex() {
-  var value int
-  var mu sync.RWMutex // make a zero value useful
-  writeShared := func (val int) {
-    mu.Lock() // a single writer can hold a write lock, no readers
-    defer mu.Unlock()
-    value = val // write critical section
-  }
-  readShared := func() int {
-    mu.RLock() // multiple readers can hold a read lock, no writer
-    defer mu.RUnlock()
-    return value // read critical section
-  }
+func counterMutex() {
+  n := 100000
+  var cnt int
+  var mtx sync.Mutex // make a zero value useful
   var wg sync.WaitGroup
   wg.Add(2)
   go func() {
     defer wg.Done()
-    writeShared(1)
+    for range n {
+      mtx.Lock() // a single writer can hold a write lock, no readers
+      cnt++ // write critical section
+      mtx.Unlock()
+    }
   }()
   go func() {
     defer wg.Done()
-    time.Sleep(1 * time.Millisecond)
-    fmt.Println(readShared()) // 1
+    for range n {
+      mtx.Lock()
+      cnt-- // read critical section
+      mtx.Unlock()
+    }
   }()
   wg.Wait()
+  fmt.Println(cnt)
 }
 #+END_SRC
 
-- Channel :: orchestrates a transformation flow of values with ownership
-  transfer between concurrent goroutines, ensuring that only one goroutine has
-  ownership on specific value at any point in time
-- Data race :: interleaving of instructions operating on the same data from two
-  operations e.g. two increments (read, update, write) resulting in data
-  inconsistency or invalid data when multiple goroutines access the same memory
-  location simultaneously and at least one of them is writing. Solution: atomic
-  operations, mutex, channel
+- Data race :: interleaving of instructions from two operations that modify the
+  same data e.g. two increments (read, update, write) resulting in data
+  inconsistency or data corruption when multiple goroutines access the same
+  memory location simultaneously and at least one of them is writing. Solution:
+  atomic operations, mutex, channel
 - Race conditions :: incorrect ordering of two operations modifying the same
   data e.g. two assignments resulting in data inconsistency when a final result
   depends on the ordering of concurrent operations. Solution: channel
 - Deadlock :: all goroutines are blocked waiting on one another. Solution:
-  ~select~. Coffman conditions of a deadlock
-  - *Mutual exclusion* a goroutine has exclusive rights on a shared resource
+  ~select/case~. Coffman conditions of a deadlock
+  - *Mutual exclusion* a goroutine has an exclusive access to a shared resource
+  - *Non-preemption* a shared resource can only be released by a holding
+    goroutine
   - *Wait for condition* a goroutine holds a shared resource while waiting for
     another resource
-  - *No preemption* a shared resource can only be realeaded by a holding
-    goroutine
   - *Circular wait* a goroutine waits on a chain of other goroutines that in
     turn wait on the first goroutine
 
@@ -1022,7 +1037,7 @@ func deadlock() {
   }()
   <- out // blocking receive - deadlock!
   in <- 2
-  select { // no deadlock, random order of cases
+  select { // no deadlock, simultaneous and random order of cases
   case <- out:
   case in <- 2:
   }
@@ -1030,20 +1045,21 @@ func deadlock() {
 #+END_SRC
 
 - Livelock :: two or more goroutines operate, but without making any progress by
-  continuously starting and cancelling operation because of the other goroutine
+  continuously starting and cancelling operations because of the other
+  goroutines
 - Starvation :: a goroutine cannot get all resources needed to complete a task
 
 *** WaitGroup
 
-- WaitGroup :: a concurrency safe counter that allows waiting for multiple
+- WaitGroup :: a concurrency-safe counter that allows waiting for multiple
   goroutines to complete
 
 #+BEGIN_SRC go
 func waitGroup() {
   var wg sync.WaitGroup // make a zero value useful
-  wg.Add(1) // increment a gor counter outside of a tracking gor
+  wg.Add(1) // increment a counter
   go func() {
-    defer wg.Done() // decrement a gor counter
+    defer wg.Done() // decrement a counter
     time.Sleep(200 * time.Millisecond)
     fmt.Println("a")
   }()
@@ -1054,39 +1070,40 @@ func waitGroup() {
     fmt.Println("b")
   }()
   wg.Wait() // block a gor until a counter == 0
-  fmt.Println("done")
+  fmt.Println("done") // b a done
 }
 #+END_SRC
 
 *** Conditions
 
 - Condition :: provides a continuous broadcast of values to multiple waiting
-  goroutines vs channel delivery of values to a single goroutine. A condition
-  uses a ~sync.Locker~ to prevent data races
+  goroutines vs delivery of values over a channel to a single goroutine. A
+  condition uses a ~sync.Locker~ to prevent data races on a shared state
 
 #+BEGIN_SRC go
 func condBroadcast() {
-  balance := 0
-  cond := sync.NewCond(&sync.Mutex{})
+  var balance int
+  cnd := sync.NewCond(new(sync.Mutex))
   listen := func(goal int) {
-    cond.L.Lock()
-    defer cond.L.Unlock()
+    cnd.L.Lock()
     // critical section 1: wait for a condition
     for balance < goal { // exit a loop when a condition is met
       // listen for an update. Must be within a critical section
-      cond.Wait() // .L.Unlock => wait for the next .Broadcast => .L.Lock
+      // cnd.L.Unlock => wait for the next cnd.Broadcast => cnd.L.Lock
+      cnd.Wait()
     }
     // critical section 2: a condition is met
-    fmt.Println("goal", balance)
+    fmt.Printf("goal %v\n", balance)
+    cnd.L.Unlock()
   }
   go listen(3)
   go listen(5)
   for i := 0; i < 7; i++ { // producer
     time.Sleep(100 * time.Millisecond)
-    cond.L.Lock()
-    balance++
-    cond.L.Unlock()
-    cond.Broadcast() // broadcast an update to all listeners
+    cnd.L.Lock()
+    balance++ // critical section 2: update a shared state
+    cnd.Broadcast() // broadcast an update to all listeners
+    cnd.L.Unlock()
   }
 }
 #+END_SRC
