@@ -16,23 +16,33 @@
 
 - Image reference :: a unique identifier of a specific image in a registry
   ~registryDomain/userAccount/imageRepository:versionTag~
-- Image :: (initial file system from a Dockerfile) a portable packaging format
-  to build a layered file system of a container. An image is a read-only
-  template for creating containers. Immutable image layers are shared between
-  different images to save storage space, reduce network traffic and build time.
-  Every instruction in a Dockerfile creates an immutable image layer that is
-  reused from a cache to reduce a build time of subsequent builds if the
-  instruction and previous image layers have not been altered
+- Image :: (the initial file system for a container from a Dockerfile) a
+  portable packaging format to build a layered file system of a container. An
+  image is a read-only template for creating containers. Immutable image layers
+  are shared between different images to save storage space, reduce network
+  traffic and build time. Every instruction in a Dockerfile creates an immutable
+  image layer that is reused from a cache to reduce a build time of subsequent
+  builds if the instruction and the previous image layers have not been altered
 - Image hierarchy :: base image e.g. golang, golden image e.g. golang + tools,
   application image e.g. golden image + application artifacts
-- Image optimizations :: Place instructions that are more likely to change
-  towards the end of a Dockerfile to minimize the number of layers that have to
-  be rebuilt after a change. Removing files after a COPY in a Dockerfiles does
-  not frees space in image layers. COPY only the necessary files, do not ~rm -rf
-  ...~ afterwards. To build images on a remote Docker engine, Docker compresses
-  a build context (directory) and send it to a remote Docker engine. Use
-  ~.dockerignore~ to exclude from compression unnecessary files and folders. Use
-  a multi-stage build with the absolutely necessary runtime in production images
+- Image optimizations :: once a layer changes all downstream layers has to be
+  recreated
+  - Minimize the number of RUN commands by chaining commands using shell
+    mechanisms
+  - Place instructions that are more likely to change towards the end of a
+    Dockerfile to minimize the number of layers that have to be rebuilt after a
+    change
+  - Removing files after a COPY in a Dockerfiles does not frees space in image
+    layers. COPY only the necessary files, do not ~rm -rf ...~ in a separate RUN
+    command
+  - Prefer temporal mounts for a single RUN command that do not persist in the
+    image src_fish{ RUN --mount=type=bind,from=stage,source=src,target=dst }
+    over COPY that is persisted in the image
+  - To build images on a remote Docker engine, Docker compresses a build context
+    (directory) and send it to a remote Docker engine. Use ~.dockerignore~ to
+    exclude from compression unnecessary files and folders.
+  - Use a multi-stage build with the absolutely necessary runtime in production
+    images
 
 ** Dockerfile
 
@@ -53,20 +63,22 @@
 - ~ENV~ persists variables into the image. Exports variables into a container
 - ~ARG~ non-persisted build-time variables with either a default value or a
   value from a command line ~--build-arg VAR=val~
-- Multi-stage Dockerfile :: (build an image with a toolchain) builds a final
-  image using independent, isolated, and reproducible stages each starting from
-  a potentially different image with a different toolchain for building and
+- Multi-stage Dockerfile :: (build an image with a toolchain) separate
+  build-time dependencies from runtime dependencies. Builds a final image using
+  independent, isolated, and reproducible stages each starting from a
+  potentially different image with a different toolchain for building and
   testing an application. Each stage is started with src_fish{ FROM image AS
   stage }. Files from previous stages are selectively copied into the next
-  stages using src_fish{ COPY --from=stage|image src dst } or src_fish{ RUN
-  --mount=type=bind,from=stage,source=src,target=dst }. The final image is clean
-  and minimal, and contains only tested artifacts for production
+  stages using src_fish{ COPY --from=stage|image src dst }. The final image is
+  clean and minimal, and contains only tested artifacts for production
 
 ** Containers
 
 - Container :: (OS-level virtualization) a portable image format for packaging
   and an isolated environment for efficient execution of applications that share
-  a host kernel. A container is a runnable instance of an image
+  a host kernel. A container is a runnable instance of an image. A container is
+  a normal OS process, but is isolated and has its own file system and
+  networking
   - Isolation :: each container has its own hostname, IP, and a file system
   - Density :: all containers efficiently share a host kernel, CPU, and memory
   - Network :: containers communicate through a virtual network. A Docker
@@ -91,23 +103,26 @@
 ** Mounts
 
 - Volume mount :: (~--volume~ persistent Docker-managed storage) provides a
-  persistent, decoupled from a container storage. A volume is allocated on a
-  host and managed by Docker. A volume is accessible only from a container (not
-  from a host)
+  persistent, decoupled from a container storage for production. A volume is
+  allocated on a host and managed by Docker. A volume is accessible only from a
+  container (not from a host). A volume mount survives container restarts or a
+  removal
 - Bind mount :: (~--mount~ bidirectional shared local or distributed storage)
   makes a directory or a file on a host available on a container. A bind mount
-  is bidirectional and is accessible from both a container and a host. A
-  directory mount over an already existing target directory completely replaces
-  a target directory. A file mount over an already existing target directory
-  merges a new file with already existing files from image layers
+  is bidirectional and is accessible from both a container and a host mostly for
+  development. Changes to a host directory are immediately available to the
+  container. A directory mount over an already existing target directory
+  completely replaces a target directory. A file mount over an already existing
+  target directory merges a new file with already existing files from image
+  layers. A bind mount survives container restarts or a removal
 
 ** Docker compose
 
-- Docker compose file :: specifies a deployment procedure for an application
-  consisting of multiple containers deployed to a single host. A compose file
-  declares a desired state of containers and networks that Docker compose tries
-  to satisfy. Once deployed, docker compose neither monitors nor restarts
-  containers until the next explicit src_fish{ docker-compose up }.
+- Docker compose file :: specifies a deployment procedure for local development
+  of an application consisting of multiple containers deployed to a single host.
+  A compose file declares a desired state of containers and networks that Docker
+  compose tries to satisfy. Once deployed, docker compose neither monitors nor
+  restarts containers until the next explicit src_fish{ docker-compose up }.
 - Compose override files :: override files with environment-specific
   configuration differences can be applied to a single core compose file with
   common definitions to simultaneously deploy the same application on the same
