@@ -46,7 +46,7 @@ fmt.Println(year) // Year 2024, using the String() method
 #+BEGIN_SRC go
 type BayanModel int
 const (
-  Nextra BayanModel = iota
+  Nextra BayanModel = iota + 1 // start from 1, not 0
   Omnia
   Selecta
   Prime
@@ -574,7 +574,7 @@ bPrint2(b)
     interface on a producer side: let a consumer discover the right abstractions
     with a minimal set of methods
   - *Robustness principle* accept interfaces (flexible input), return structs
-    (compliant output)
+    (compliant output). Exception: error interface
   - *Type assertion* ~v.(Type)~ is applied to an interface at runtime
   - *Type conversion* ~Type(v)~ is applied to a concrete type at compile-time
 
@@ -1223,29 +1223,41 @@ func BenchmarkReduce(b *testing.B) {
 
 ** Style guide
 
-- Refactor long lines, do not split long lines
-- Length of a variable is proportional to a scope (the smaller a scope, the
-  shorter a variable) and is inversely proportional to a usage frequency (the
-  more frequent, the shorter a variable)
-- ~pkgname~ short, all lowercase package names
-- ~pkg.Name()~ short, not repetitive names that use a context and improve
+*** Naming
+
+- ~pkgname~ short, all lowercase package name
+- ~pkg.Name()~ short, not repetitive name that uses a context and improves
   callsite reading. Do not repeat a package name in a function name, a method
   receiver in a method name, names of input parameters and return values if
   there is no collision
 - ~MaxLength, URLPath, UserID~ exported. ~maxLength, urlPath, userID~ unexported
 - ~Counter()~ a getter. ~SetCounter()~ a setter
-- Handle errors first on the left src_go{ if err != nil { return } }. Push happy
-  path processing to the bottom of a function on the right (without indentation)
+- Refactor long lines into separate statements, do not split long lines
+
+*** Variables
+
+- Length of a variable is proportional to a scope (the smaller a scope, the
+  shorter a variable) and is inversely proportional to a usage frequency (the
+  more frequent, the shorter a variable)
+- It is fine to reuse variables that are no longer needed e.g. reassign to
+  function parameters
+- Equivalences
+  - src_go{ var i int } and src_go{ i := 0 }
+  - src_go{ new(File) } and src_go{ &File{} }
+  - src_go{ make(map[string]int) } and src_go{ map[string]int{} }
+  - src_go{ fmt.Errorf("oh") } and src_go{ errors.New("oh") }
+- Prefer ~var i int~ over ~i := 0~ for a zero value initialization
+- Prefer ~a := 1~ over ~var a = 1~ for a non-zero value initialization
+- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
 - Prefer nil container src_go{ var arr []int } over initialized empty container
   src_go{ var arr = []int{} }. Make the nil value useful src_go{ var wg
   sync.WaitGroup }
-- Prefer error over panic: use panic mostly in must-style functions
-- Keep concurrent code within a scope of a sync function that clearly defines
-  lifetimes of goroutines. Never start a goroutine without knowing how it will
-  stop
-- Go interfaces generally belong to a consumer package not to a provider
-  package. An interface should be discovered by a consumer, not imposed by a
-  provider. Accept interfaces, return concrete types
+
+*** Interfaces
+
+- Go interfaces generally belong to a consumer not to a provider. An interface
+  should be discovered by a consumer, not imposed by a provider. Accept
+  interfaces, return concrete types
 - Value receiver
   - A receiver is a built-in value type e.g. int, string
   - A method does not modify a receiver
@@ -1256,16 +1268,29 @@ func BenchmarkReduce(b *testing.B) {
   - A receiver contains a pointer type
   - When in doubt use a pointer receiver
 - Make method of a type either all pointer methods or all value methods
+- Verify interface compliance for custom types at compile time
+  - Value type src_go{ var _ http.Handler = CustomHandler{} }
+  - Pointer type src_go{ var _ http.Handler = (*CustomHandler)(nil) }
+- Methods with value receivers can be called on pointers and values
+- Methods with pointer receivers can only be called on pointers (addressable
+  values)
 
-** Variables
+*** Error handling
 
-- Equivalences
-  - src_go{ var i int } and src_go{ i := 0 }
-  - src_go{ new(File) } and src_go{ &File{} }
-  - src_go{ make(map[string]int) } and src_go{ map[string]int{} }
-  - src_go{ fmt.Errorf("oh") } and src_go{ errors.New("oh") }
-- Prefer ~var i int~ over ~i := 0~ for a zero value initialization
-- Prefer ~a := 1~ over ~var a = 1~ for a non-zero value initialization
-- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
-- It is fine to reuse variables that are no longer needed e.g. reassign to
-  function parameters
+- Handle errors first on the right src_go{ if err != nil { return } }. Push
+  happy path processing to the bottom of a function on the left (without
+  indentation)
+- Handle type assertion failures src_go{ t, assert := a.(Type) }
+- Prefer error over panic: use panic mostly in must-style functions e.g.
+  ~MustCompile()~
+- ~panic/recover~ is not an error handling strategy
+- Use ~defer~ to clean up resources e.g. close files, unlock mutexes
+- Call ~os.Exit()~ at most once only in ~main()~. All other functions should
+  return errors to signal a failure or multiple exist scenarios. ~defer~
+  functions are not executed when ~os.Exit()~ is called
+
+*** Concurrency
+
+- Keep concurrent code within a scope of a sync function that clearly defines
+  lifetimes of goroutines. Never start a goroutine without knowing how it will
+  stop. There must be a way to signal a goroutine it should stop
