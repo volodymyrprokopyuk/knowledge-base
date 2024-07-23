@@ -712,26 +712,28 @@ func GreetHandler(w http.ResponseWriter, r *http.Request) {
 
 ** Generics
 
+*** Generic functions
+
 - Generics :: compile-time automatic generation of type-safe structures,
   functions, and methods
 - Generic function :: has type parameters for input arguments and return values
 
 #+BEGIN_SRC go
-func Reduce[T, U any](slc []T, i U, acc func(v T, a U) U) U {
-  var out U = i
-  for _, v := range slc {
-    out = acc(v, out)
+// any types
+func Reduce[T, U any](slc []T, i U, rdc func(e T, r U) U) U {
+  var r U = i
+  for _, e := range slc {
+    r = rdc(e, r)
   }
-  return out
+  return r
 }
 slc := []int{1, 2, 3, 4, 5}
-Reduce(slc, 0, func(v, acc int) int { return v + acc }) // 15
-
+fmt.Println(Reduce(slc, 0, func(a, b int) int { return a + b })) // 15
 // comparable types support ==, !=, but not <, <=, >, >=
 // slice, map, func are not comparable
 func Contains[T comparable](slc []T, val T) bool {
-  for _, v := range slc {
-    if v == val {
+  for _, e := range slc {
+    if e == val {
       return true
     }
   }
@@ -741,11 +743,13 @@ slc := []int{1, 2, 3}
 Contains(slc, 2); Contains(slc, 9) // true, false
 #+END_SRC
 
+*** Type elements
+
 - Type elements and type terms :: type elements define operators supported by a
-  type parameter. Supported operators are the intersection of operators from all
-  type terms. Type terms match exactly, use =~= to match derived types. Type
-  terms can be built-in types, arrays, slices, maps, channels, structs, and
-  functions
+  type parameter. Supported operators are the *intersection* of operators from
+  all type terms. Type terms match exactly, prepend =~= to a type term to match
+  derived types e.g. type aliases. Type terms can be built-in types, arrays,
+  slices, maps, channels, structs, and functions
 
 #+BEGIN_SRC go
 func Min[T ~int | ~string](a, b T) T {
@@ -757,7 +761,9 @@ func Min[T ~int | ~string](a, b T) T {
 Min(1, 2), Min("b", "a") // 1, a
 #+END_SRC
 
-- Generic struct :: has type parameters for its fields and methods
+*** Generic structs
+
+- Generic struct :: has type parameters for struct fields and methods
 
 #+BEGIN_SRC go
 type Stack[T any] struct {
@@ -784,11 +790,13 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
 }
 #+END_SRC
 
-- Type constants :: Any interface can be used as a type constraint
-  - =T any= unconstrained
-  - =T comparable= only equality ==, !=
-  - =T ~ind | ~string= intersection of operators <, <=, >,>=
-  - =interface= custom operations
+*** Type constraints
+
+- Type constraints :: any *interface* can be used as a type constraint
+  - Any ~T any~ unconstrained
+  - Comparable ~T comparable~ only equality ==, !=
+  - Type elements =T ~int | ~string= intersection of operators <, <=, >,>=
+  - Type constraints ~interface~ custom operations
 
 #+BEGIN_SRC go
 // interface with type elements, supports <, <=, >, >=
@@ -804,7 +812,6 @@ func Compare[T Cmp](a, b T) int {
   }
   return 0
 }
-
 type Node[T Cmp] struct {
   value T
   left, right *Node[T]
@@ -837,35 +844,43 @@ n.InOrder(func (val int) {
 
 ** Packages and modules
 
-- Package :: a set of types and functions defined in multiple files under a
-  package directory. One-word all-lowercase package name should match a package
-  directory. Every source file in a package directory must have the same package
-  name src_go{ package pkgname }. Top-level Capitalized identifiers are exported
-  from a package. Merge packages or create a new common package to resolve
-  circular dependencies
+*** Packages
+
+- Package :: a set of types, functions, and methods defined in multiple files
+  under a package directory. One-word all-lowercase package name should match a
+  package directory. Every source file in a package directory must have the same
+  package name src_go{ package pkgname }. Top-level Capitalized identifiers are
+  exported from a package. Merge packages or create a new common package to
+  resolve circular dependencies
   - Import a package src_go{ import "scm/user/mod/pkgdir" }
   - Import alias src_go{ import pkgname "scm/user/mod/pkgdir" }
   - Access an identifier src_go{ pkgname.Identifier }
+
+*** Modules
+
 - Module :: a unit of versioning identified by a repository path
   ~scm/user/mod~. A module represents either
-  - *Library* of /importable packages/ src_fish{ go get ... } or
-  - *Application* of /executable commands/ src_fish{ go install ... }
+  - *Library* of *importable packages* src_fish{ go get ... } or
+  - *Application* of *executable commands* src_fish{ go install ... }
     src_go{ package main; func main { ... } }
-  - Initialize a module src_fish{ go mod init scm/user/mod }. The ~go.mod~
-    defines the current module, a supported Go version, and dependency modules
-  - Upgrade module dependencies src_fish{ go mod tidy; go get -u ./... }.
-    Synchnonizes ~go.mod~ modules with imported packages from the source code.
-    Upgrades patch and minor versions of dependency modules. A different module
-    path ~scm/user/mod/v2~ is used to upgrade a module major version
-  - Build and run a module during development src_fish{ go run ... }
-  - Build a module src_fish{ go build }
-  - Static code analysis
-    - src_fish{ go install honnef.co/go/tools/cmd/staticcheck@latest }
-      src_fish{ staticcheck ./... }
-    - src_fish{ go install github.com/mgechev/revive@latest }
-      src_fish{ revive ./... }
-    - src_fish{ yay -S golangci-lint }
-      src_fish{ golangci-lint run }
+  - src_fish{ go mod init scm/user/mod } initializes a module in the current
+    directory. The ~go.mod~ file defines the current module name, a supported Go
+    version, and module dependencies
+  - src_fish{ go get -u ./...; go mod tidy } upgrades patch and minor versions
+    module dependencies and synchnonizes ~go.mod~ with imported packages from
+    the source code. A different module path ~scm/user/mod/v2~ is used to
+    upgrade a module major version without changing the module name
+  - src_fish{ go run ... } builds and runs a module during development
+  - src_fish{ go build } builds a module into a self contained executable
+
+*** Static code analysis
+
+- src_fish{ go install honnef.co/go/tools/cmd/staticcheck@latest }
+  src_fish{ staticcheck ./... }
+- src_fish{ go install github.com/mgechev/revive@latest }
+  src_fish{ revive ./... }
+- src_fish{ yay -S golangci-lint }
+  src_fish{ golangci-lint run }
 
 ** Concurrency
 
