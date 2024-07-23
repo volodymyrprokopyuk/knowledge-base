@@ -4,11 +4,11 @@
 
 *** Primitive and composite types
 
-| Primitive value types                                 |
-|-------------------------------------------------------|
-| ~bool~, ~byte = int8~, ~int = int64~, ~uint = uint64~ |
-| ~float64~                                             |
-| ~rune = int32~, ~string~                              |
+| Primitive value types                                  |
+|--------------------------------------------------------|
+| ~bool~, ~byte = uint8~, ~int = int64~, ~uint = uint64~ |
+| ~float64~                                              |
+| ~rune = int32~, ~string~                               |
 
 | Composite reference types                          |
 |----------------------------------------------------|
@@ -18,8 +18,8 @@
 | src_go{ var ch chan int } concurrency-safe channel |
 
 - Comparable types :: ~a == b~ all primitive types, arrays, pointers, structs of
-  comparable types, interfaces, channels. Slices, maps, and funcs are /not
-  comparable/: use custom ~Equal()~ implementation
+  comparable types, interfaces, channels. Slices, maps, and funcs are *not
+  comparable*: use custom ~Equal()~ implementation
 
 - Type alias :: allows to attach different methods to the same underlying type.
   A type alias implements *nominal typing*
@@ -33,26 +33,29 @@ year := Year(2024) // explicit type conversion
 fmt.Println(year) // Year 2024, using the String() method
 #+END_SRC
 
+- Nominal typing :: two types with the same constituent types but different
+  names are different types e.g. type alias, ~struct~
+- Structural typing :: two distinct types with the same set of fields and
+  methods are treated as the same type e.g. anonymous ~struct~, ~interface~
+
 *** Constants and enumerations
 
 - Typed constant :: compile-time declaration only for primitive types
   src_go{ const i int = 1 }
 - Untyped constant :: compile-time named literal
   src_go{ const c = 1; var i int = c; var f float64 = c }
-  - *Immutable values* at runtime: use a /call-by-value/ copy
-  - *Mutable values* at runtime: use a /pointer/ to a value
+  - *Immutable values* at runtime: use a *call-by-value* copy
+  - *Mutable values* at runtime: use a *pointer* to a value
 - Enumeration :: a typed list of constants using ~iota~
 
 #+BEGIN_SRC go
 type BayanModel int
 const (
   Nextra BayanModel = iota + 1 // start from 1, not 0
-  Omnia
-  Selecta
-  Prime
-  Spectrum
+  Omnia; Selecta
+  Prime; Spectrum
 )
-fmt.Println(Nextra, Selecta, Spectrum) // 0, 2, 4
+fmt.Println(Nextra, Selecta, Spectrum) // 1, 3, 5
 #+END_SRC
 
 *** Variables and pointers
@@ -67,15 +70,15 @@ var (
   // default initialization to nil for slice/map/chan, pointer/interface/func
   slc []int; htb map[string]int; ch chan int;
 )
-// short variable declaration: in-function inferred initialization
+// in-function short variable declaration with inferred initialization
 b, i, f, r, s := true, 1, 1.2, 'a', `ok` // raw string
 #+END_SRC
 
-- Pointer :: implies /mutable data/ vs a *call-by-value* copy that preserves
-  /immutability/ of original data. Using pointers (implies expensive x10 heap
+- Pointer :: implies *mutable data* vs a *call-by-value* copy that preserves
+  *immutability* of original data. Using pointers (implies expensive x10 heap
   allocation and GC cost) to avoid (extremely efficient self-cleaning on stack)
   copies is not necessarily faster. Minimize the on heap allocation of
-  variables by reusing objects from ~sync.Pool~
+  variables by reusing objects from a cache ~sync.Pool~
   - *Sharing up escapes to the heap*. All local variables referenced outside of
     a function body are automatically allocated on the heap. Avoid returning
     pointers from a function and sending pointers to a channel
@@ -92,8 +95,8 @@ fmt.Println(i, *p) // 3, 3
 *** Strings and runes
 
 - String :: a length and a pointer to an immutable array of arbitrary bytes
-  - *Charset* Unicode code points: to variable-length *encoding* UTF-8 (up to 4
-    bytes)
+  - *Charset* :: a mapping of Unicode code points: to variable-length *encoding*
+    UTF-8 (up to 4 bytes)
 
 #+BEGIN_SRC go
 var a = 'a' // Unicode rune
@@ -129,8 +132,8 @@ d := [...]int{1, 2: 2, 4: 3} // 1, 0, 2, 0, 3
 
 *** Slices
 
-- Slice :: a /non-comparable/ *dynamic array*. A slice contains a pointer to an
-  array, a length, and a capacity. Slices can provide /multiple views/ into the
+- Slice :: a *non-comparable dynamic array*. A slice contains a pointer to an
+  array, a length, and a capacity. Slices can provide multiple views into the
   single underlying array. A slice passed by value to a function can be modified
   by a function as a pointer to the underlying array is copied. src_go{ var a
   []int; a[0] } gives the index out of range runtime error
@@ -168,7 +171,7 @@ arr2 := [3]int(f) // 1, 2, 3
 
 *** Maps
 
-- Map :: a /non-comparable/ *hash table*. A map contains a pointer on an array
+- Map :: a *non-comparable hash table*. A map contains a pointer on an array
   of buckets, a length, and a capacity. A map passed by value to a function can
   be modified by a function as a pointer to the underlying data structure is
   copied. src_go{ var m map[string]int; m["a"] = 1 } gives the assignment to nil
@@ -208,9 +211,9 @@ func NewBayan(model string, year int) *Bayan {
   // when a pointer to the value is returned from a function
   return &Bayan{model, year}
 }
-// explicit field names in any order (some may be omitted)
+// explicit field names in any order (some may be omitted receiving zero value)
 a := Bayan{Model: "Nextra", Year: 2020}
-// positional field values (all fileds must be specified)
+// positional field values (all fields must be specified in definition order)
 b := Bayan{"Omnia", 2021}
 // anomymous struct, structural typing
 var c Bayan = struct{ Model string; Year int }{"Selecta", 2022}
@@ -222,7 +225,7 @@ q := NewBayan("Spectrum", 2024)
 s := new(Bayan)
 #+END_SRC
 
-- Struct embedding :: a *composition* of types where fields of embedded types
+- Struct embedding :: *composition* of types where fields of embedded types
   are promoted to a containing type
   - *Composition*: an embedded type is a method receiver; a new type is not an
     embedded type
@@ -236,17 +239,20 @@ type Product struct {
 }
 p := Product{Bayan{"Nextra", 2020}, 16e3}
 // fields of an embedded type are promoted to a top-level containing type
-fmt.Println(p.Model, p.Price, p.Bayan.Year)
+fmt.Println(p.Model, p.Price, p.Bayan.Year) // Nextra, 16e3, 2020
 #+END_SRC
 
 ** Flow control
 
 *** if/else
 
-- ~if/else~ :: allows /arbitrary conditions/ in each clause; each clause has its
-  /own scope/
-  - Align the happy path to the left; favor early return/break/continue
-  - The happy path goes down, while edge cases are handled on the right
+- ~if/else~ :: allows *arbitrary conditions* in each clause. Each clause has its
+  *own scope*
+  - Handle first errors and edge cases at the top on the right. Favor early
+    ~return~, ~break~, ~continue~
+  - Handle the happy path at the bottom on the left
+- Type assertion :: ~value.(Type)~ to access a dynamic type of an interface (see
+  interfaces below)
 
 #+BEGIN_SRC go
 if i := rand.Intn(10); i < 3 {
@@ -261,29 +267,17 @@ if i := rand.Intn(10); i < 3 {
 *** for/range + break/continue [label]
 
 - ~for/range~ :: provides a wide range of iteration algorithms
-  - A controlled iteration with a start, end, and step
-  - A loop with dynamic exit condition
-  - A loop with unconditional first iteration
-  - A loop over strings, arrays, slices, and maps
+  - A loop with unconditional first iteration src_go{ for { ... } }
+  - A loop with a dynamic exit condition src_go{ for i < 3 { ... } }
+  - A controlled iteration with a start, end, and step src_go{ for i := 0; i <
+    3; i++ { ... } }
+  - A loop over strings, arrays, slices, and maps src_go{ for i, v := range slc
+    { ... } }
+  - An iteration N times src_go{ for range 3 { ... } }
 
 #+BEGIN_SRC go
-// controlled iteration with start, end, and step
-for i := 0; i < 3; i++ {
-  fmt.Println(i) // 0, 1, 2
-}
-a := []int{1, 2, 3}
-// multiple initialization
-for i, l := 0, len(a); i < l; i++ {
-  fmt.Println(a[i]) // 1, 2, 3
-}
-i := 0
-// dynamic exit condition
-for i < 3 {
-  fmt.Println(i) // 0, 1, 2
-  i++
-}
-i = 0
 // unconditional first iteration
+i := 0
 for {
   fmt.Println(i) // 0, 1, 2
   i++
@@ -291,28 +285,49 @@ for {
     break
   }
 }
+// dynamic exit condition
+i = 0
+for i < 3 {
+  fmt.Println(i) // 0, 1, 2
+  i++
+}
+// controlled iteration with start, end, and step
+for i := 0; i < 3; i++ {
+  fmt.Println(i) // 0, 1, 2
+}
+a := []int{1, 2, 3}
+// controlled iteration: multiple initialization
+for i, l := 0, len(a); i < l; i++ {
+  fmt.Println(a[i]) // 1, 2, 3
+}
 // iterate over strings, arrays, slices, maps
 // range returns a copy values not suitable for update: use indexing
 for i, v := range []int{1, 2, 3} {
-  fmt.Printf("%d: %d\n", i, v) // 0: 1, 1: 2, 2: 3
+  fmt.Printf("%v: %v\n", i, v) // 0: 1, 1: 2, 2: 3
 }
-// range expression evaluated once before a loop
+// range expression evaluated once before iteration
 a = []int{1, 2, 3}
 for range a {
   a = append(a, 9) // 1, 2, 3, 9, 9, 9
 }
+// iteration N times
+for range 3 {
+  fmt.Println("a") // a, a, a
+}
 #+END_SRC
 
-*** switch/case + break label
+*** switch/case/default + break label
 
-- ~switch/case~ :: provides conditionals based on equality check or arbitrary
-  conditions in each clause
+- ~switch/case/default~ :: provides equality check with multiple options in each
+  clause or arbitrary conditions in each clause
+- Type switch :: ~value.(type)~ to access a dynamic type of an interface (see
+  interfaces below)
 
 #+BEGIN_SRC go
 a := []string{"one", "eleven", "thousand"}
 outer: for _, v := range a {
   // equality == check in each clause
-  switch l := len(v); l {
+  switch len(v) {
   case 1, 2, 3:
     fmt.Println("small")
   case 4, 5, 6:
@@ -355,9 +370,9 @@ for _, v := range []int{1, 2, 3} {
   implements the src_go{ type error interface { Error() string } } interface
   - *Sentinel error* an error value that signals an expected outcome e.g. EOF
   - *Error wrapping* builds a chain of error types that convey additional
-    context. Place the %w verb at the end of a wrapping error
-  - By returning an ~error~ interface a function can return different error
-    types
+    context. Place the ~%w~ formatting verb at the end of a wrapping error
+  - By returning the ~error~ interface a function can return different error
+    types without modifying its signature
 
 #+BEGIN_SRC go
 // var sentinel error
@@ -438,11 +453,12 @@ if err != nil {
 *** panic/recover
 
 - Panic :: signals termination of a program due to an unrecoverable situation.
-  On panic execution of functions in a call stack stops, all defer functions are
-  executed up until the top of the current goroutine, and then a program
-  terminates. A panic unwinds a stack only to the top of the current goroutine,
-  so a recover must be within the scope of the current goroutine. Recover must
-  be called only inside a defer as only defer functions are executed on panic
+  On panic execution of functions in a call stack stops, *all defer functions
+  are executed* up until the top of the current goroutine, and then a program
+  terminates. A panic unwinds the stack only to the top of the current
+  goroutine, so a recover must be within the scope of the current goroutine.
+  Recover must be called only inside a defer as only defer functions are
+  executed on panic
   - An application uses a recover to gracefully handle a shutdown
   - A library uses a recover to convert a panic into an error at boundary of a
     public API
@@ -465,11 +481,11 @@ fmt.Println("continue") // panic: oh, continue
 
 *** Functions
 
-- Function :: all function parameters including pointers are call-by-value
+- Function :: all function arguments including pointers are *call-by-value*
   copies. A function allows multiple return values
   - *Named return values* mostly for documentation of function types and
-    interfaces, and also to access return values e.g. error in ~defer~
-  - *Anonymous functions* (function literals) are closures
+    interfaces, and also to access return values e.g. ~error~ in ~defer~
+  - *Anonymous functions* (function literals) are *closures*
 
 #+BEGIN_SRC go
 // multiple return values
@@ -486,7 +502,7 @@ func sum(vals ...int) int {
   return sum
 }
 s := sum([]int{1, 2, 3}...) // 6
-// function type
+// function type, named return value for documentation
 type Op func(a, b int) (res int)
 // anonymous function: function literal
 var sum Op = func(a, b int) int {
@@ -503,9 +519,9 @@ for _, v := range []int{1, 2, 3} {
 }
 #+END_SRC
 
-- ~defer~ :: defer closures are executed after function return or panic in the
-  reverse order. Defer receivers and arguments to defer closures are evaluated
-  when declared, not when executed
+- ~defer~ :: defer *closures* are executed after function ~return~ or ~panic~ in
+  the reverse order. Defer receivers and arguments to defer closures are
+  *evaluated when declared*, not when executed
 
 #+BEGIN_SRC go
 // evaluation of defer receivers and arguments
@@ -519,7 +535,7 @@ func evalDefer() {
   defer fmt.Println(i) // 1
   i = 2
 }
-// extending error context in defer reqiores named return values
+// extending error context in defer requires named return values
 func errorDefer() (err error) {
   err = fmt.Errorf("function oh")
   defer func() {
@@ -534,11 +550,12 @@ func errorDefer() (err error) {
 
 *** Methods
 
-- Method :: a function that operates on a type value or a type pointer. A method
-  can be invoked through a nil pointer receiver (make a zero value useful)
+- Method :: a function that operates on a *receiver* which is either a *type
+  value* or a *type pointer*. A method can be invoked through a nil pointer
+  receiver (make a zero value useful)
   - src_go{ function(receiver, args...) == receiver.method(args...) }
-  - *Pointer receiver* ~(t *T)~ implies mutation of a receiver
-  - *Value receiver* ~(t T)~ a method operates on a copy of a receiver
+  - *Pointer receiver* ~(t *T)~ implies *mutation* of a receiver
+  - *Value receiver* ~(t T)~ a method operates on a *copy* of a receiver
   - Methods of an embedded type are promoted to a containing type
 
 #+BEGIN_SRC go
@@ -561,21 +578,25 @@ bPrint2(b)
 
 ** Interfaces
 
-- Interface :: an abstract type that defines common behavior across distinct
-  concrete types. An interface implements type-safe *structural typing* when a
-  method set of a concrete type including promoted methods from embedded types
-  fully covers all methods defined in an interface. An interface consists of
+*** Structural typing
+
+- Interface :: an abstract type that defines common set of methods across
+  distinct concrete types. Primitive data ~int/string~ to a single ~func~, as
+  composite data ~type struct~ to a set of functions ~type interface~. An
+  interface implements type-safe *structural typing* when a method set of a
+  concrete type including promoted methods from embedded types fully covers all
+  methods defined in an interface. An interface consists of
   - A *static type* an abstract interface type
-  - A *dynamic type* concrete value type that implements an interface
+  - A *dynamic type* a concrete value type that implements the interface
   - *Dependency inversion principle* rely on an abstraction, not an
     implementation
   - *Interface segregation principle* the bigger the interface, the weaker the
-    abstraction. Abstractions should be discovered, not created. Do not force an
+    abstraction. Abstractions should be discovered, not defined. Do not force an
     interface on a producer side: let a consumer discover the right abstractions
     with a minimal set of methods
   - *Robustness principle* accept interfaces (flexible input), return structs
-    (compliant output). Exception: error interface
-  - *Type assertion* ~v.(Type)~ is applied to an interface at runtime
+    (compliant output). Exception: ~error~ interface
+  - *Type assertion* ~value.(Type)~ is applied to an interface at runtime
   - *Type conversion* ~Type(v)~ is applied to a concrete type at compile-time
 
 #+BEGIN_SRC go
@@ -617,6 +638,8 @@ for _, v := range vals {
 }
 #+END_SRC
 
+*** One-method interface
+
 - A function can implement a one-method interface
 
 #+BEGIN_SRC go
@@ -639,8 +662,10 @@ var logger Logger = LogFunc(log)
 logger.Log("ok") // ok
 #+END_SRC
 
-- Interface embedding :: a composition of abstract types: a containing type
-  automatically implements all interfaces implemented by embedded types
+*** Interface embedding
+
+- Interface embedding :: *composition* of abstract types: a containing interface
+  automatically has all methods from embedded interfaces
 
 #+BEGIN_SRC go
 type Negator interface {
@@ -648,10 +673,10 @@ type Negator interface {
   Neg()
 }
 func (i *Int) Neg() {
-  ,*i = -*i
+  *i = -*i
 }
 func (f *Flo) Neg() {
-  ,*f = -*f
+  *f = -*f
 }
 i, f := Int(1), Flo(1.2)
 vals := []Negator{&i, &f}
@@ -661,23 +686,23 @@ for _, v := range vals {
 }
 #+END_SRC
 
-- Dependency injection :: provides external dependencies to a function in form
-  of interfaces. Dependency injection fosters separation of concerns e.g. how to
-  generate data vs where to write generated data
+*** Dependency injection
+
+- Dependency injection :: provides external dependencies to a function in a form
+  of interfaces. *Robustness principle* accept interfaces, return structs.
+  Dependency injection fosters separation of concerns e.g. a function defines
+  how to generate data vs an interface argument dynamically specifies where to
+  write generated data
 
 #+BEGIN_SRC go
 func Greet(w io.Writer, name string) {
   fmt.Fprintf(w, "Hello, %v", name)
 }
-// testing context
-func TestGreet(t *testing.T) {
-  buf := new(bytes.Buffer)
-  Greet(buf, "Vlad") // writes data to a bytes buffer
-  got := buf.String()
-  exp := "Hello, Vlad"
-  if got != exp {
-    t.Errorf("got %q, expected %q", got ,exp)
-  }
+// bytes buffer context
+func GreetBuffer() {
+  var buf bytes.Buffer
+  Greet(&buf, "Vlad") // writes data to a bytes buffer
+  fmt.Println(buf.String()) // Hello, Vlad
 }
 // web handler context
 func GreetHandler(w http.ResponseWriter, r *http.Request) {
