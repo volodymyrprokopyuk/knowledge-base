@@ -919,6 +919,9 @@ n.InOrder(func (val int) {
     fast context switching
   - Goroutines run in a single address space, start with a small per-goroutine
     stack that can grow, and take advantage of a low-latency concurrent GC
+- Keep concurrent code within a scope of a sync function that clearly defines
+  lifetimes of goroutines. Never start a goroutine without knowing how it will
+  stop. There must be a way to signal a goroutine it should stop
 
 *** Channels
 
@@ -1150,41 +1153,44 @@ func condBroadcast() {
 
 ** Testing
 
-- Test public behavior using the black box testing
-- Avoid testing private implementation details using the white box testing,
-  mocks, and spies e.g. do not test private functions
-- Tests are a valuable software asset as they define what a program is doing,
-  while a more varying code defines how a program is done
-- Property=based testing :: (vs conventional example-based testing) verifies
-  domain rules and invariants on automatically generated arbitrary input src_go{
-  import "testing/quick" }
-- Stub :: static stateless behavior for all requests carefully crafted for each
-  test
-- Spy :: records a number of calls with call arguments, returned values and
+*** Testing tools
+
+- Test *public behavior, what* using the *simple black box* testing
+- Avoid testing private implementation details, how using the complex white box
+  testing, mocks, and spies e.g. do not test private functions
+- Stable tests are a *valuable software asset* as they define *what* a program
+  is doing, while a more *varying code* defines *how* a program is done
+- Property-based testing :: (vs conventional example-based testing) verifies
+  domain *rules and invariants* on automatically generated *arbitrary input*
+  src_go{ import "testing/quick" }
+- Spy :: records the number of calls with call arguments, returned values, and
   errors
-- Mock :: stateless dynamic behavior on specific requests for controllable
-  state + spy, carefully crafter for each test
-- Fake :: simplified stateful implementation of a real dependency for all
+- Stub :: stateless static behavior for all requests carefully crafted for each
+  test
+- Mock :: stateful dynamic behavior on specific requests for controllable
+  state + spy, carefully crafted for each test
+- Fake :: stateful simplified implementation of a real dependency for all
   requests with decorators or stubs for triggering errors e.g. an in-memory DB.
-  A single fake covers all tests for a dependency. Run contract tests against
-  fakes and real dependencies
-- Test file ~file_test.go~, src_go{ import "testing" }, test function
-  ~TestFunc(t *testing.T)~
-- Selective testing src_fish{ go test -v -run Test/Sub }
-- Test with coverage src_fish{ go test -v -cover -coverprofile=coverage.cov }
-- HTML coverage report src_fish{ go tool cover -html=coverage.cov }
+  A single fake covers all tests for a dependency
+- Test file :: ~file_test.go~, src_go{ import "testing" }
+- Test function :: ~TestFunc(t *testing.T)~
+- src_fish{ go test -v -run Test/Sub } selective testing
+- src_fish{ go test -v -cover -coverprofile=coverage.cov } test with coverage
+- src_fish{ go tool cover -html=coverage.cov } HTML coverage report
 - ~t.Errorf()~ continues a test function and collects multiple errors
 - ~t.Fatalf()~ exits a test functions and returns the first error
 
+*** Before/after all/each, setup/teardown
+
 #+BEGIN_SRC go
-package main
+package main // has access also to private varaibles and functions
 package main_test // test only public API
 import (
   "testing"
   "os"
   "github.com/volodymyrprokopyuk/main" // test only public API
 )
-var arr []int
+var arr []int // for before all
 func TestMain(m *testing.M) {
   // * before all
   arr = []int{1, 2, 3, 4, 5}
@@ -1203,26 +1209,28 @@ func beforeEach(t *testing.T) []int {
   return arr
 }
 func TestReduce(t *testing.T) {
-  // test setup
+  // * test setup
   arr := []int{1, 2, 3, 4, 5}
-  // sets teardown
+  // * test teardown
   defer func() {
     arr = arr[:0]
   }()
   // before/after each
   arr := beforeEach(t)
   // test both unexported and exported functions
-  res := Reduce(arr, 0, func(v, i int) int { return v + i })
+  got := Reduce(arr, 0, func(a, b int) int { return a + b })
   // test only public API
-  res := main.Reduce(arr, 0, func(v, i int) int { return v + i })
+  got := main.Reduce(arr, 0, func(a, b int) int { return a + b })
   exp := 15
-  if res != exp {
-    t.Errorf("Reduce: expected %v, got %v", exp, res)
+  if got != exp {
+    t.Errorf("Reduce: expected %v, got %v", exp, got)
   }
 }
 #+END_SRC
 
-- Test table :: tests different inputs on the same code
+*** Test table
+
+- Test table :: tests different input cases on the same code
 
 #+BEGIN_SRC go
 func TestTableReduce(t *testing.T) {
@@ -1237,26 +1245,28 @@ func TestTableReduce(t *testing.T) {
   for _, c := range cases {
     c := c // test closure accesses the right test case
     t.Run(c.name, func(t *testing.T) {
-      t.Parallel() // run the test in parallel
-      res := Reduce(c.arr, 0, func(v, i int) int { return v + i })
-      if res != c.exp {
-        t.Errorf("Reduce: expected %v, got %v", c.exp, res)
+      t.Parallel() // run test cases in parallel
+      got := Reduce(c.arr, 0, func(a, b int) int { return a + b })
+      if got != c.exp {
+        t.Errorf("Reduce: expected %v, got %v", c.exp, got)
       }
     })
   }
 }
 #+END_SRC
 
-- Benchmarking :: measures time per operation and memory allocations per
+*** Benchmarking
+
+- Benchmarking :: measures the time per operation and memory allocations per
   operation. By default benchmarks are run sequentially
-  - Benchmark with memory allocations
-    src_fish{ go test -v -bench=. -benchmem -benchtime=2s }
+- src_fish{ go test -v -bench=. -benchmem -benchtime=2s } benchmark with memory
+  allocations
 
 #+BEGIN_SRC go
 var blackhole int
 func BenchmarkReduce(b *testing.B) {
   for i := 0; i < b.N; i++ {
-    blackhole = Reduce(arr, 0, func(v, i int) int { return v + i })
+    blackhole = Reduce(arr, 0, func(a, b int) int { return a + b })
   }
 }
 #+END_SRC
@@ -1266,21 +1276,19 @@ func BenchmarkReduce(b *testing.B) {
 *** Naming
 
 - ~pkgname~ short, all lowercase package name
-- ~pkg.Name()~ short, not repetitive name that uses a context and improves
-  callsite reading. Do not repeat a package name in a function name, a method
-  receiver in a method name, names of input parameters and return values if
-  there is no collision
+- ~pkg.Identifier()~ short, not repetitive name that uses a context and improves
+  call site reading. Do not repeat a package name in a function name
 - ~MaxLength, URLPath, UserID~ exported. ~maxLength, urlPath, userID~ unexported
 - ~Counter()~ a getter. ~SetCounter()~ a setter
-- Refactor long lines into separate statements, do not split long lines
+- Refactor long lines into separate statements. Do not split long lines
 
 *** Variables
 
 - Length of a variable is proportional to a scope (the smaller a scope, the
   shorter a variable) and is inversely proportional to a usage frequency (the
-  more frequent, the shorter a variable)
-- It is fine to reuse variables that are no longer needed e.g. reassign to
-  function parameters
+  more frequent usage, the shorter a variable)
+- It is fine to reuse variables that are no longer needed e.g. reassign to a
+  function parameter
 - Equivalences
   - src_go{ var i int } and src_go{ i := 0 }
   - src_go{ new(File) } and src_go{ &File{} }
@@ -1288,32 +1296,30 @@ func BenchmarkReduce(b *testing.B) {
   - src_go{ fmt.Errorf("oh") } and src_go{ errors.New("oh") }
 - Prefer ~var i int~ over ~i := 0~ for a zero value initialization
 - Prefer ~a := 1~ over ~var a = 1~ for a non-zero value initialization
-- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local scopes
-- Prefer nil container src_go{ var arr []int } over initialized empty container
-  src_go{ var arr = []int{} }. Make the nil value useful src_go{ var wg
-  sync.WaitGroup }
+- Prefer ~a = 1~ over ~a := 1~ to avoid shadowing in local nested scopes
+- Prefer nil container src_go{ var arr []int } over an initialized empty
+  container src_go{ var arr = []int{} }. Make the nil value useful src_go{ var
+  wg sync.WaitGroup }
 
 *** Interfaces
 
 - Go interfaces generally belong to a consumer not to a provider. An interface
   should be discovered by a consumer, not imposed by a provider. Accept
-  interfaces, return concrete types
-- Value receiver
-  - A receiver is a built-in value type e.g. int, string
-  - A method does not modify a receiver
-- Pointer receiver
+  interfaces, return structs
+- Value receiver = preserves immutability
+  - A method operates on a copy of a receiver and does not modify the original
+    receiver
+  - Methods with value receivers can be called on pointers and values
+- Pointer receiver = implies mutability. When in doubt use a pointer receiver
   - A method needs to modify a receiver
   - A receiver contains fields that cannot safely be copied e.g. sync.Mutex
   - A receiver is large
-  - A receiver contains a pointer type
-  - When in doubt use a pointer receiver
+  - Methods with pointer receivers can only be called on pointers (addressable
+    values)
 - Make method of a type either all pointer methods or all value methods
 - Verify interface compliance for custom types at compile time
   - Value type src_go{ var _ http.Handler = CustomHandler{} }
   - Pointer type src_go{ var _ http.Handler = (*CustomHandler)(nil) }
-- Methods with value receivers can be called on pointers and values
-- Methods with pointer receivers can only be called on pointers (addressable
-  values)
 
 *** Error handling
 
@@ -1329,8 +1335,3 @@ func BenchmarkReduce(b *testing.B) {
   return errors to signal a failure or multiple exist scenarios. ~defer~
   functions are not executed when ~os.Exit()~ is called
 
-*** Concurrency
-
-- Keep concurrent code within a scope of a sync function that clearly defines
-  lifetimes of goroutines. Never start a goroutine without knowing how it will
-  stop. There must be a way to signal a goroutine it should stop
