@@ -316,11 +316,13 @@ for i := range 3 {
 }
 #+END_SRC
 
-*** Iterators
+*** Range iterators
 
-- Iterator :: a function that yields one value at a time, instead of computing
-  all values at once. The iterator is called by the ~for/range~ loop. The
-  iterator signature src_go{ iterator func(yield func(i int, val T) bool) }
+- Range iterator :: a function that is called by the ~for/range~ statement and
+  yields one value at a time, instead of computing all values at once. The
+  iterator signature src_go{ func(yield func(i int, val T) bool) } that can be
+  used to report errors to the ~for/range~ loop src_go{ func(yield func(val T,
+  err error) bool) }
 #+BEGIN_SRC go
 func iterator() func(yield func(i, val int) bool) {
   return func(yield func(i, val int) bool) {
@@ -332,6 +334,13 @@ func iterator() func(yield func(i, val int) bool) {
   }
 }
 for i, v := range iterator() {
+  fmt.Println(i, v) // 0 1, 1 2, 2 3
+}
+// error handling
+for v, err := range iterator() {
+  if err != nil {
+    return err
+  }
   fmt.Println(i, v) // 0 1, 1 2, 2 3
 }
 #+END_SRC
