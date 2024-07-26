@@ -273,7 +273,7 @@ if i := rand.Intn(10); i < 3 {
     3; i++ { ... } }
   - A loop over strings, arrays, slices, and maps src_go{ for i, v := range slc
     { ... } }
-  - An iteration N times src_go{ for range 3 { ... } }
+  - An iteration N times src_go{ for i := range 3 { ... } }
 
 #+BEGIN_SRC go
 // unconditional first iteration
@@ -311,8 +311,28 @@ for range a {
   a = append(a, 9) // 1, 2, 3, 9, 9, 9
 }
 // iteration N times
-for range 3 {
-  fmt.Println("a") // a, a, a
+for i := range 3 {
+  fmt.Println(1) // 0, 1, 2
+}
+#+END_SRC
+
+*** Iterators
+
+- Iterator :: a function that yields one value at a time, instead of computing
+  all values at once. The iterator is called by the ~for/range~ loop. The
+  iterator signature src_go{ iterator func(yield func(i int, val T) bool) }
+#+BEGIN_SRC go
+func iterator() func(yield func(i, val int) bool) {
+  return func(yield func(i, val int) bool) {
+    for i, v := range []int{1, 2, 3} {
+      if !yield(i, v) {
+        return
+      }
+    }
+  }
+}
+for i, v := range iterator() {
+  fmt.Println(i, v) // 0 1, 1 2, 2 3
 }
 #+END_SRC
 
