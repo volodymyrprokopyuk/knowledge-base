@@ -22,7 +22,8 @@
   comparable*: use custom ~Equal()~ implementation
 
 - Type alias :: allows to attach different methods to the same underlying type.
-  A type alias implements *nominal typing*
+  A type alias implements *nominal typing*. Built-in types do not have methods,
+  but operate with operands
 
 #+BEGIN_SRC go
 type Year int // type alias
@@ -174,8 +175,7 @@ arr2 := [3]int(f) // 1, 2, 3
 - Map :: a *non-comparable hash table*. A map contains a pointer on an array
   of buckets, a length, and a capacity. A map passed by value to a function can
   be modified by a function as a pointer to the underlying data structure is
-  copied. src_go{ var m map[string]int; m["a"] = 1 } gives the assignment to nil
-  runtime error
+  copied
 
 #+BEGIN_SRC go
 // nil map
@@ -194,6 +194,15 @@ for k, v := range b {
 }
 // delete key
 delete(c, "a")
+#+END_SRC
+
+- A map must be initialized before assignment, however a key lookup can be
+  performed on a nil map
+
+#+BEGIN_SRC go
+var htb map[string]int // nil map
+val, exist := htb["a"] // OK: 0, false
+htb["a"] = 1 // error: assignment to nil map
 #+END_SRC
 
 *** Structures
@@ -610,13 +619,18 @@ bPrint2(b)
 *** Structural typing
 
 - Interface :: an abstract type that defines common set of methods across
-  distinct concrete types. Primitive data ~int/string~ to a single ~func~, as
-  composite data ~type struct~ to a set of functions ~type interface~. An
-  interface implements type-safe *structural typing* when a method set of a
-  concrete type including promoted methods from embedded types fully covers all
-  methods defined in an interface. An interface consists of
-  - A *static type* an abstract interface type
-  - A *dynamic type* a concrete value type that implements the interface
+  distinct concrete types e.g. type alias, struct. Primitive data ~int/string~
+  to a single ~func~, as composite data ~type struct~ to a set of functions
+  ~type interface~. An interface implements type-safe *structural typing* when a
+  method set of a concrete type including promoted methods from embedded types
+  fully covers all methods defined in an interface. An interface can be
+  implemented by a type alias or a struct. Built-in types cannot directly
+  implement an interface (use a type alias)
+- An interface implies inefficiency due to the indirection between a static
+  interface type and a dynamic concrete type (vs genericis do not have
+  indirection). An interface consists of
+  - *Static type* an abstract interface type
+  - *Dynamic type* a concrete value type that implements the interface
   - *Dependency inversion principle* rely on an abstraction, not an
     implementation
   - *Interface segregation principle* the bigger the interface, the weaker the
@@ -745,7 +759,12 @@ func GreetHandler(w http.ResponseWriter, r *http.Request) {
 
 - Generics :: compile-time automatic generation of type-safe structures,
   functions, and methods
-- Generic function :: has type parameters for input arguments and return values
+- Generic function :: has type parameters for input arguments and return values.
+  A generic function is not a Go function, but a *template* used by a Go
+  compiler to instantiate Go functions on either concrete types or interfaces. A
+  generic function accepts input arguments and returns return values of
+  unspecified or constrained types not known at the time of definition of a
+  generic algorithm
 
 #+BEGIN_SRC go
 // any types
@@ -774,13 +793,15 @@ Contains(slc, 2); Contains(slc, 9) // true, false
 
 *** Type elements
 
-- Type elements and type terms :: type elements define operators supported by a
-  type parameter. Supported operators are the *intersection* of operators from
-  all type terms. Type terms match exactly, prepend =~= to a type term to match
-  derived types e.g. type aliases. Type terms can be built-in types, arrays,
-  slices, maps, channels, structs, and functions
+- Type element :: defines a set of *operators* supported by a type parameter.
+  Supported operators are an *intersection* of operators from all type terms.
+  *Type terms* match types exactly, prepend =~= a *type approximation* to a type
+  term to match derived types e.g. type aliases. *Union of type terms* combines
+  built-in types, arrays, slices, maps, channels, structs, functions,
+  interfaces, and other type elements
 
 #+BEGIN_SRC go
+// inline type element that allows derived types
 func Min[T ~int | ~string](a, b T) T {
   if a < b {
     return a
@@ -788,6 +809,24 @@ func Min[T ~int | ~string](a, b T) T {
   return b
 }
 Min(1, 2), Min("b", "a") // 1, a
+// type element = union of type terms
+type Integer interface {
+  int | int32 | int64
+}
+type Float interface {
+  float32 | float64
+}
+type Number interface {
+  Integer | Float // type terms can be other type elements
+}
+func Neg[T Number](val T) T {
+  return -val // enables operators on type parameters
+}
+fmt.Println(Neg(1), Neg(1.2)) // -1, -1.2
+func Positive[T Number](val T) bool {
+  return val > 0 // enables operators on type parameters
+}
+fmt.Println(Positive(1), Positive(-1.2)) // true, false
 #+END_SRC
 
 *** Generic structs
@@ -821,11 +860,15 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
 
 *** Type constraints
 
-- Type constraints :: any *interface* can be used as a type constraint
-  - Any ~T any~ unconstrained
-  - Comparable ~T comparable~ only equality ==, !=
-  - Type elements =T ~int | ~string= intersection of operators <, <=, >,>=
-  - Type constraints ~interface~ custom operations
+- Type constraints :: any *interface* can be used as a type constraint. An
+  interface either defines a set of *method elements* that a type parameter must
+  implement, or a set of *type elements* (can only be used as a type constraint)
+  that, in turn, specify a set of allowed operators on type parameters
+  - Any ~[T any]~ unconstrained. The broader the constraint, the more types it
+    allows, the less operations can be guaranteed to be supported
+  - Comparable ~[T comparable]~ only equality ==, !=
+  - Type elements =[T ~int | ~string]= intersection of operators <, <=, >,>=
+  - Type constraints ~[T interface]~ custom methods
 
 #+BEGIN_SRC go
 // interface with type elements, supports <, <=, >, >=
@@ -904,10 +947,6 @@ n.InOrder(func (val int) {
 
 *** Static code analysis
 
-- src_fish{ go install honnef.co/go/tools/cmd/staticcheck@latest }
-  src_fish{ staticcheck ./... }
-- src_fish{ go install github.com/mgechev/revive@latest }
-  src_fish{ revive ./... }
 - src_fish{ yay -S golangci-lint }
   src_fish{ golangci-lint run }
 
@@ -1364,3 +1403,7 @@ func BenchmarkReduce(b *testing.B) {
   return errors to signal a failure or multiple exist scenarios. ~defer~
   functions are not executed when ~os.Exit()~ is called
 
+
+*** Go proverbs
+
+- [[https://go-proverbs.github.io/]]
