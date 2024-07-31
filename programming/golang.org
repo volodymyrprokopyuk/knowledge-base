@@ -628,7 +628,8 @@ bPrint2(b)
   implement an interface (use a type alias)
 - An interface implies inefficiency due to the indirection between a static
   interface type and a dynamic concrete type (vs genericis do not have
-  indirection). An interface consists of
+  indirection). Interface methods can be attached to a type alias, or a struct,
+  but cannot be attached to a built-in times e.g. int. An interface consists of
   - *Static type* an abstract interface type
   - *Dynamic type* a concrete value type that implements the interface
   - *Dependency inversion principle* rely on an abstraction, not an
@@ -796,20 +797,12 @@ Contains(slc, 2); Contains(slc, 9) // true, false
 - Type element :: defines a set of *operators* supported by a type parameter.
   Supported operators are an *intersection* of operators from all type terms.
   *Type terms* match types exactly, prepend =~= a *type approximation* to a type
-  term to match derived types e.g. type aliases. *Union of type terms* combines
-  built-in types, arrays, slices, maps, channels, structs, functions,
-  interfaces, and other type elements
+  term to match derived types e.g. type aliases
+- Union type element :: union of type terms combines built-in types, arrays,
+  slices, maps, channels, structs, functions, interfaces, and other type
+  elements
 
 #+BEGIN_SRC go
-// inline type element that allows derived types
-func Min[T ~int | ~string](a, b T) T {
-  if a < b {
-    return a
-  }
-  return b
-}
-Min(1, 2), Min("b", "a") // 1, a
-// type element = union of type terms
 type Integer interface {
   int | int32 | int64
 }
@@ -829,13 +822,71 @@ func Positive[T Number](val T) bool {
 fmt.Println(Positive(1), Positive(-1.2)) // true, false
 #+END_SRC
 
-*** Generic structs
-
-- Generic struct :: has type parameters for struct fields and methods
+- Intersection type element :: intersection of type terms
 
 #+BEGIN_SRC go
+type IntStringer interface {
+  ~int // both derived from int AND having String() method
+  String() string
+}
+type Int int
+func (i Int) String() string {
+  return fmt.Sprintf("Int %v", int(i))
+}
+func PrintInt[T IntStringer](val T) {
+  fmt.Println(val.String())
+}
+PrintInt(Int(1)) // Int 1, int only does not satisfy type constraint
+#+END_SRC
+
+- Constraint literal :: inline anonymous type element
+
+#+BEGIN_SRC go
+func Min[T ~int | ~string](a, b T) T {
+  if a < b {
+    return a
+  }
+  return b
+}
+Min(1, 2), Min("b", "a") // 1, a
+func PrintInt[T interface { ~int; String() string }](val T) { // IntStringer
+  fmt.Println(val.String())
+}
+PrintInt(Int(1)) // Int 1, int only does not satisfy type constraint
+#+END_SRC
+
+- Self-referential constraint :: refers to T inside the interface itself. Must
+  be defined (the only possible way) as an anonymous constraint literal in order
+  to reference T
+
+#+BEGIN_SRC go
+type Int int
+func (i Int) Equal(val Int) bool {
+  return i == val
+}
+func Contains[T interface { Equal(val T) bool }](slc []T, val T) bool {
+  for _, v := range slc {
+    if v.Equal(val) {
+      return true
+    }
+  }
+  return false
+}
+fmt.Println(Contains([]Int{1, 2}, 2), Contains([]Int{1, 2}, 9)) // true, false
+#+END_SRC
+
+*** Generic structs
+
+- Generic struct :: has type parameters for struct fields and methods. Generic
+  types are always instantiated for concrete types in a compiled program
+- Generic methods :: cannot have type parameters other than type parameters
+  defined in the struct
+
+#+BEGIN_SRC go
+// generic struct and slice
 type Stack[T any] struct {
-  slc []T
+  slc []T // homogeneous slice of any but single type
+  // vs ~slc any~ = heterogeneous slice of different types
 }
 func (s *Stack[T]) Push(val T) {
   s.slc = append(s.slc, val)
@@ -856,6 +907,32 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
   fmt.Println(val) // 3, 2, 1
   val, nonEmpty = stk.Pop()
 }
+// generic map
+type Index[K comparable, V any] map[K]V
+idx := make(Index[string, int])
+idx["a"] = 1
+fmt.Println(idx["a"])
+#+END_SRC
+
+- Generic interface ::
+
+#+BEGIN_SRC go
+type Equaler[T any] interface {
+  Equal(val T) bool
+}
+type Int int
+func (i Int) Equal(val Int) bool {
+  return i == val
+}
+func Contains[T Equaler[T]](slc []T, val T) bool {
+  for _, v := range slc {
+    if v.Equal(val) {
+      return true
+    }
+  }
+  return false
+}
+fmt.Println(Contains([]Int{1, 2}, 2), Contains([]Int{1, 2}, 9)) // true, false
 #+END_SRC
 
 *** Type constraints
@@ -866,8 +943,13 @@ for val, nonEmpty := stk.Pop(); nonEmpty; {
   that, in turn, specify a set of allowed operators on type parameters
   - Any ~[T any]~ unconstrained. The broader the constraint, the more types it
     allows, the less operations can be guaranteed to be supported
-  - Comparable ~[T comparable]~ only equality ==, !=
-  - Type elements =[T ~int | ~string]= intersection of operators <, <=, >,>=
+  - Comparable ~[T comparable]~ comparable, but unordered types that support
+    only equality ==, != e.g. bool, struct of comparable fields. Go operators do
+    not call methods, hence there is no way to manually define an interface
+    equivalent to a language-provided ~comparable~ that also works with
+    user-defined comparable structs
+  - Type elements =[T ~int | ~string]=, ~[T cmp.Ordered]~ intersection of
+    operators <, <=, >,>=. ~cmp.Ordered~ is ~comparable~ but not vice versa
   - Type constraints ~[T interface]~ custom methods
 
 #+BEGIN_SRC go
@@ -1406,4 +1488,13 @@ func BenchmarkReduce(b *testing.B) {
 
 *** Go proverbs
 
-- [[https://go-proverbs.github.io/]]
+- Don't communicate by sharing memory (with mutexes), share memory by
+  communicating (by sending messages through channels)
+- Channels orchestrate (concurrent interactions), mutexes serialize (concurrent
+  access to shared memory)
+- The bigger the interface (Interface Segregation Principle), the weaker the
+  abstraction (Dependency Inversion Principle)
+- Make the zero value useful (do not impose unnecessary initialization)
+- src_go{ type any interface{} } says nothing (about applicable operations to a
+  type)
+- Do not panic (explicitly return and check errors)
