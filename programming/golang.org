@@ -768,16 +768,40 @@ func GreetHandler(w http.ResponseWriter, r *http.Request) {
   generic algorithm
 
 #+BEGIN_SRC go
-// any types
-func Reduce[T, U any](slc []T, i U, rdc func(e T, r U) U) U {
-  var r U = i
-  for _, e := range slc {
-    r = rdc(e, r)
+func Map[T any](fun func(val T) T, slc []T) []T {
+  res := make([]T, len(slc))
+  for i, val := range slc {
+    res[i] = fun(val)
   }
-  return r
+  return res
+}
+func Filter[T any](slc []T, pred func(val T) bool) []T {
+  res := make([]T, 0, len(slc))
+  for _, val := range slc {
+    if pred(val) {
+      res = append(res, val)
+    }
+  }
+  return res
+}
+func Reduce[T, U any](slc []T, fun func(val T, res U) U, init U) U {
+  for _, val := range slc {
+    init = fun(val, init)
+  }
+  return init
 }
 slc := []int{1, 2, 3, 4, 5}
-fmt.Println(Reduce(slc, 0, func(a, b int) int { return a + b })) // 15
+fmt.Println(Reduce(slc, func(val, res int) int { return val + res }, 0)) // 15
+func Compose[T, U, V any](f func(val T) U, g func(val U) V) func(val T) V {
+  return func(val T) V {
+    return g(f(val))
+  }
+}
+fun := Compose(
+  func(val int) float64 { return float64(val) * 2.0 },
+  func(val float64) string { return fmt.Sprintf("val: %v", val) },
+)
+fmt.Println(fun(1)) // val: 2
 // comparable types support ==, !=, but not <, <=, >, >=
 // slice, map, func are not comparable
 func Contains[T comparable](slc []T, val T) bool {
