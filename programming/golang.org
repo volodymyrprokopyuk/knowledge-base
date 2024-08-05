@@ -758,13 +758,13 @@ func GreetHandler(w http.ResponseWriter, r *http.Request) {
 
 *** Generic functions
 
-- Generics :: compile-time automatic generation of type-safe structures,
+- Generics :: compile-time automatic generation of type-safe types, structures,
   functions, and methods
 - Generic function :: has type parameters for input arguments and return values.
-  A generic function is not a Go function, but a *template* used by a Go
+  A generic function is not a Go function, but a *template* used by the Go
   compiler to instantiate Go functions on either concrete types or interfaces. A
   generic function accepts input arguments and returns return values of
-  unspecified or constrained types not known at the time of definition of a
+  unspecified or constrained types, not known at the time of definition of a
   generic algorithm
 
 #+BEGIN_SRC go
@@ -775,10 +775,10 @@ func Map[T any](fun func(val T) T, slc []T) []T {
   }
   return res
 }
-func Filter[T any](slc []T, pred func(val T) bool) []T {
+func Filter[T any](slc []T, prd func(val T) bool) []T {
   res := make([]T, 0, len(slc))
   for _, val := range slc {
-    if pred(val) {
+    if prd(val) {
       res = append(res, val)
     }
   }
@@ -802,7 +802,7 @@ fun := Compose(
   func(val float64) string { return fmt.Sprintf("val: %v", val) },
 )
 fmt.Println(fun(1)) // val: 2
-// comparable types support ==, !=, but not <, <=, >, >=
+// comparable types support ==, !=, but not <, <=, >, >= operators
 // slice, map, func are not comparable
 func Contains[T comparable](slc []T, val T) bool {
   for _, e := range slc {
@@ -818,10 +818,12 @@ Contains(slc, 2); Contains(slc, 9) // true, false
 
 *** Type elements
 
-- Type element :: defines a set of *operators* supported by a type parameter.
-  Supported operators are an *intersection* of operators from all type terms.
-  *Type terms* match types exactly, prepend =~= a *type approximation* to a type
-  term to match derived types e.g. type aliases
+- Type element :: a union or an intersection of type terms that defines a set of
+  *operators* on built-in types supported by a type parameter. Supported
+  operators are an *intersection* of operators from all type terms. *Type term*
+  a built-in type, a type approximation, an interface, or a type element. Type
+  terms match types exactly, use a =~type approximation= to match derived types
+  e.g. type aliases
 - Union type element :: union of type terms combines built-in types, arrays,
   slices, maps, channels, structs, functions, interfaces, and other type
   elements
@@ -834,10 +836,10 @@ type Float interface {
   float32 | float64
 }
 type Number interface {
-  Integer | Float // type terms can be other type elements
+  Integer | Float // type elements are type terms
 }
 func Neg[T Number](val T) T {
-  return -val // enables operators on type parameters
+  return -val // type element enables operators on type parameters
 }
 fmt.Println(Neg(1), Neg(1.2)) // -1, -1.2
 func Positive[T Number](val T) bool {
@@ -879,9 +881,9 @@ func PrintInt[T interface { ~int; String() string }](val T) { // IntStringer
 PrintInt(Int(1)) // Int 1, int only does not satisfy type constraint
 #+END_SRC
 
-- Self-referential constraint :: refers to T inside the interface itself. Must
-  be defined (the only possible way) as an anonymous constraint literal in order
-  to reference T
+- Self-referential constraint literal :: refers to T inside the interface
+  itself. Must be defined (the only possible way) as an anonymous constraint
+  literal in order to reference T
 
 #+BEGIN_SRC go
 type Int int
@@ -902,15 +904,15 @@ fmt.Println(Contains([]Int{1, 2}, 2), Contains([]Int{1, 2}, 9)) // true, false
 *** Generic structs
 
 - Generic struct :: has type parameters for struct fields and methods. Generic
-  types are always instantiated for concrete types in a compiled program
+  types are always instantiated for concrete types at compile time
 - Generic methods :: cannot have type parameters other than type parameters
   defined in the struct
 
 #+BEGIN_SRC go
 // generic struct and slice
 type Stack[T any] struct {
-  slc []T // homogeneous slice of any but single type
-  // vs ~slc any~ = heterogeneous slice of different types
+  slc []T // homogeneous slice of any but, single type
+  // vs ~slc []any~ = heterogeneous slice of different types
 }
 func (s *Stack[T]) Push(val T) {
   s.slc = append(s.slc, val)
@@ -927,9 +929,9 @@ func (s *Stack[T]) Pop() (T, bool) {
 }
 var stk Stack[int]
 stk.Push(1); stk.Push(2); stk.Push(3)
-for val, nonEmpty := stk.Pop(); nonEmpty; {
+for val, more := stk.Pop(); more; {
   fmt.Println(val) // 3, 2, 1
-  val, nonEmpty = stk.Pop()
+  val, more = stk.Pop()
 }
 // generic map
 type Index[K comparable, V any] map[K]V
@@ -962,16 +964,17 @@ fmt.Println(Contains([]Int{1, 2}, 2), Contains([]Int{1, 2}, 9)) // true, false
 *** Type constraints
 
 - Type constraints :: any *interface* can be used as a type constraint. An
-  interface either defines a set of *method elements* that a type parameter must
-  implement, or a set of *type elements* (can only be used as a type constraint)
-  that, in turn, specify a set of allowed operators on type parameters
+  interface either defines a set of *method elements* (is usually used to define
+  common behavior across different types) that a type parameter must implement,
+  or a set of *type elements* (can only be used as a type constraint) that, in
+  turn, specify a set of allowed operators on type parameters
   - Any ~[T any]~ unconstrained. The broader the constraint, the more types it
     allows, the less operations can be guaranteed to be supported
   - Comparable ~[T comparable]~ comparable, but unordered types that support
-    only equality ==, != e.g. bool, struct of comparable fields. Go operators do
-    not call methods, hence there is no way to manually define an interface
-    equivalent to a language-provided ~comparable~ that also works with
-    user-defined comparable structs
+    only equality ==, != e.g. bool, struct of only comparable fields. Go
+    operators do not call methods, hence there is no way to manually define an
+    interface equivalent to a language-provided ~comparable~ that also works
+    with user-defined comparable structs
   - Type elements =[T ~int | ~string]=, ~[T cmp.Ordered]~ intersection of
     operators <, <=, >,>=. ~cmp.Ordered~ is ~comparable~ but not vice versa
   - Type constraints ~[T interface]~ custom methods
