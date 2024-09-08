@@ -1,45 +1,140 @@
+* ProtoBuf
+
+- ProtoBuf :: an *IDL language* and a *message serialization format* that
+  encodes a positional field number, a field type, a field length, and a field
+  content. ProtoBuf uses a length-prefixed message to delimit messages on the
+  wire. ProtoBuf provides serialization of *typed structured data* suitable for
+  transmission over a network or a long-term storage. ProtoBuf is not
+  self-descriptive data serialization format and requires the proto file
+  - Backward compatibility :: new code receives default values for new fields
+    not present in old messages
+  - Forward compatibility :: old code ignores new fields and receives default
+    values for deleted fields in new messages
+- ProtoBuf syntax ::
+  - Import proto files :: src_protobuf { import "dir/file.proto" } are searched
+    on directories specified in ~--proto_path~. Best practice: set
+    ~--proto_path=.~ and use fully qualified imports
+  - Default values :: are returned when the encoded message does not contain a
+    requested field. A field set to its default value will not be serialized
+  - Optional field :: src_protobuf { optional string scalar = 1; } if not set
+    receives a default value. Optional field is not serialized to the wire
+  - Repeated field :: src_protobuf { repeated string array = 1; } has zero or
+    more ordered elements
+  - Deleting fields :: remove a field and reserve numbers and names of deleted
+    fields to prevent future reuse that would result in backward incompatible
+    message formats src_protobuf { reserved 2, 3, 10 to 12; reserved "fieldA",
+    "fieldB"; }
+  - Scalar types ::
+    |----------+---------|
+    | ProtoBuf | Go type |
+    |----------+---------|
+    | bool     | bool    |
+    | sint32   | int32   |
+    | sint64   | int64   |
+    | uint32   | uint32  |
+    | uint64   | uint64  |
+    | double   | float64 |
+    | float    | float32 |
+    | string   | string  |
+    | bytes    | []byte  |
+  - Enum types :: an enum field can have only one value from a predefined list
+    of values. Similar to message fields, enum values can be safely deleted
+    with corresponding reservation of value numbers and value names
+    #+BEGIN_SRC protobuf
+    enum Enu {
+      ENU_DEFAULT = 0; // must start with 0 for the default value
+      ENU_ITEM = 1; // prefer prefixing enum values
+    }
+    #+END_SRC
+  - Composite types :: a message that contains another embedded message that, in
+    turn, represents a user defined type. Both ~enum~ and ~message~ can be
+    defined at the top level or inside another message and referenced as
+    ~Message.Msg~ or ~Message.Enu~
+  - Oneof types :: varying type that allows only one concrete type from a set of
+    predefined types to be used. Field numbers of oneof fields must be unique
+    within the enclosing type. Oneof type cannot contain ~map~ and ~repeated~
+    fields
+    #+BEGIN_SRC protobuf
+    syntax "proto3";
+    message Msg {...}
+    /* Main message */
+    message Message {
+      reserved 2, 3, 10 to 12; // ranges are inclusive: 10, 11, 12
+      reserved "fieldA", "fieldB";
+      enum Enu {...}
+      message Msg {...}
+      string scalar = 1;
+      Enu enu = 2;
+      Msg composite = 3;
+      optional string opt = 4;
+      repeated strint strings = 5; // should use plural
+      oneof eitherOr {
+        sint64 int = 6;
+        double flo = 7;
+      }
+    }
+    #+END_SRC
+- Best practices
+  - Do not reuse field numbers for backward and forward compatibility of encoded
+    messages
+  - Reserve field/value numbers and names of deleted message fields and deleted
+    enum values
+  - The first zero value of an enum must be a default (unspecified) value
+  - Use the well-known types e.g. date, timestamp, duration, interval
+  - Do not use primitive types as a top-level request or response. Wrap
+    primitives in a message for future extension
+  - Do not reuse requests or responses in different RCP methods. Create a
+    dedicated request and response per RPC method for future evolution. The
+    application should share domain objects, not API requests and responses
+  - Use different messages for wire and storage in order to change the storage
+    format without impacting API
+  - Prefer focused partial updates or append-only updated in order to prevent
+    data loss when replacing a whole object
+
 * gRPC
 
-- gRPC :: a contract-driven inter-service communication protocol based on the
-  ProtoBuf binary message format over the bidirectional HTTP/2 transport for
-  sync request-response and async bidirectional streaming of messages to
-  interconnect internal heterogeneous services. ProtoBuf encodes a positional
-  field number, a field type, a field length, and a field content. Protobuf uses
-  a length-prefixed message to delimit messages on the wire
-- Automatic code generation :: gRPC automatically generates server and client
-  stubs with low-level serialization and communication abstractions from a
-  service description in an IDL proto file. A server implements business logic
-  under a defined interface. A client invokes a remote service by performing a
-  local function call
+- gRPC :: a *contract-driven* inter-service communication protocol based on the
+  *ProtoBuf binary message format* over the *bidirectional HTTP/2 transport* for
+  *sync request-response* and *async bidirectional streaming* of messages to
+  interconnect internal heterogeneous services
+- Automatic code generation :: a gRPC language-specific ProtoBuf compiler plugin
+  automatically generates server and client stubs with low-level serialization
+  and communication abstractions from a service description in a ProtoBuf IDL
+  proto file. A server implements business logic under the defined and generated
+  interface. An automatically generated client implementation invokes a remote
+  service by performing a local function call
+  - ProtoBuf :: defines, serializes, and parses src_protobuf{ message {...} }
+  - gRPC :: defines and generates the server interface and the client
+    implementation src_protobuf{ service { rpc () {...} returns } }
 - gRPC communication patterns :: a client always initiates a conversation by
   sending request headers (method: POST, scheme: HTTP(S), path: /service/method,
   content-type: application/grpc, encoding: gzip, timeout: 1s, authorization:
   bearer, status: 200, x-header: custom), one or more length-prefixed messages,
-  end of stream marker
-  - Sync request-response :: a client sends a request, a server returns a
-    response e.g. src_protobuf{ rpc GetProduct(productID) returns (Product) }
-  - Server streaming :: a client sens a request, a server returns a stream of
-    responses concluding with an end of stream mark e.g. src_protobuf{ rpc
-    SearchProducts(query) returns (stream Product) }
-  - Client streaming :: a client sends a stream of messages, a server returns a
-    response after receiving one or more messages or after all messages e.g.
-    src_protobuf{ rpc updateProducts(stream Product) returns (Status) }
-  - Bidirectional streaming :: a client sends a stream of messages, a server
-    returns a stream of messages e.g. src_protobuf{ rpc getProducts(stream
-    ProductID) returns (stream Product) }. Inbound and outbound streams operate
-    independently in parallel
-- gRPC interceptors :: client and server unary and stream interceptors allow
-  access to unary request-response and stream send-receive messages for
-  cross-cutting concerns e.g. logging, metrics, tracing, authN, validation,
-  retries, rate limiting
+  end of stream marker. Either a client or a server can cancel a request at any
+  time
+  - Sync unary request-response :: a client sends a singel request, a server
+    returns a singel response e.g. src_protobuf{ rpc GetProduct(ProductID)
+    returns (Product) }
+  - Async server streaming :: a client sens a request, a server returns a stream
+    of ordered responses concluding with an end of stream marker e.g.
+    src_protobuf{ rpc SearchProducts(query) returns (stream Product) }
+  - Async client streaming :: a client sends a stream of ordered messages, a
+    server returns a response after receiving one or more messages or after all
+    messages e.g. src_protobuf{ rpc updateProducts(stream Product) returns
+    (Status) }
+  - Async bidirectional streaming :: a client sends a stream of ordered
+    messages, a server returns another independent stream of ordered messages
+    e.g. src_protobuf{ rpc getProducts(stream ProductID) returns (stream
+    Product) }. Inbound and outbound streams operate independently in parallel
 - gRPC timeouts/deadlines and cancellations :: a client initiates a request or a
   stream by providing a Go context with a specified timeout/deadline or a
   cancellation. A server should explicitly use a ~ctx.Done()~ of a
   ~stream.Context().Done()~ in a ~select~ to prevent unnecessary execution after
-  a timeout/deadline or a cancellation
-- gRPC multiplexing :: multiple gRPC services can be registered at the same gRPC
-  server; multiple client stubs can be attached to the same gRPC client
-  connection
+  a timeout/deadline or an explicit cancellation by a client
+- gRPC interceptors :: client and server unary and stream interceptors allow
+  access to unary request-response and stream send-receive messages for
+  cross-cutting concerns e.g. logging, metrics, tracing, authN, validation,
+  retries, rate limiting
 - gRPC security :: gRPC supports TLS and mTLS. gRPC supports Basic authN
   credentials and OAuth 2.0 verifiable access tokens or self-contained JWT authZ
   through client side per RPC credentials and server side interceptors that
@@ -47,3 +142,7 @@
   retrieved from a context metadata
 - gRPC server reflection :: a gRPC server exposes proto definitions of deployed
   services for clients to read and consume
+- gRPC multiplexing :: multiple gRPC services can be registered at the same gRPC
+  server; multiple client stubs can be attached to the same gRPC client
+  connection
+- gRPC metadata :: key-value pairs attached to a request
