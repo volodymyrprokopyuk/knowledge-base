@@ -126,6 +126,9 @@
     messages, a server returns another independent stream of ordered messages
     e.g. src_protobuf{ rpc getProducts(stream ProductID) returns (stream
     Product) }. Inbound and outbound streams operate independently in parallel
+- gRPC error handling :: by default a gRPC server returns a status code and a
+  description when an error occurs. Alternatively ProtoBuf messages can be used
+  to return additional error details
 - gRPC timeouts/deadlines and cancellations :: a client initiates a request or a
   stream by providing a Go context with a specified timeout/deadline or a
   cancellation. A server should explicitly use a ~ctx.Done()~ of a
