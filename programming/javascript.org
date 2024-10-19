@@ -13,7 +13,7 @@
 - Use ~===~ strict comparison instead of ~==~ implicit coercion with primitives
   =true=, =false=, =0=, =""=, =[]=
 - *Assignment expression* returns the assigned value src_js{ a = 1 // 1 }
-- Right-associative: ~=~, ~?:~
+- Right-associative: ~=~, ~?:~, =yield=
 - src_js{ continue <label> } continues a labeled outer loop src_js{ label:
   while/for (...) }
 - src_js{ break <label> } breaks out of an inner loop or a labeled block src_js{
@@ -452,242 +452,245 @@ console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
 - *Single-threaded event loop* the sequential execution *run to completion** on
   every tick
   #+BEGIN_SRC js
-    const events = [] // queue (FIFO)
-    while(true) {
-      if (events.length > 0) { // tick
-        const event = events.shift()
-        try { event() } // atomic unit of work run to completion
-        catch (e) { console.error(e) }
-      }
-    }
+const events = [] // queue (FIFO)
+while(true) {
+  if (events.length > 0) { // tick
+    const event = events.shift()
+    try { event() } // atomic unit of work run to completion
+    catch (e) { console.error(e) }
+  }
+}
   #+END_SRC
-- *Concurrency* splits two or more compound tasks into atomic steps, schedule
+- *Concurrency* splits two or more compound tasks into atomic steps, schedules
   steps from all tasks to the event loop (interleave steps from different
-  tasks), execute steps in the event loop in order to progress simultaneously on
-  all tasks
-- *Callback* strict separation between now (the current code) and later
-  (callback, control delegation). Non-linear definition of a sequential control
-  flow and error handling, *trust issues due to control delegation* and to
-  *inversion of control* (continuations). A thrown error is not automatically
-  propagated through a chain of callbacks (`throw` is not usable with callbacks)
+  tasks), executes steps in the event loop in order to progress simultaneously
+  on all tasks
+- *Callback* provides the strict separation between now (the current code) and
+  later (callback, the control delegation). Non-linear definition of a
+  sequential control flow and error handling, *trust issues due to the control
+  delegation* and to the *inversion of control* (continuations). A thrown error
+  is *not automatically propagated* through the chain of callbacks. =throw= is
+  not usable with callbacks
   #+BEGIN_SRC js
-    function timeoutify(f, timeout) {
-      let id = setTimeout(() => {
-        id = null; f(new Error("timeout"))
-      }, timeout)
-      return (...args) => {
-        if (id) { clearTimeout(id); f(null, ...args) }
-      }
-    }
-    function f(e, v) { e ? console.error(e) : console.log(v) }
-    const tf = timeoutify(f, 200)
-    setTimeout(() => tf(1), 100) // 1
+function timeoutify(f, timeout) {
+  const id = setTimeout(() => {
+    id = null; f(new Error("timeout"))
+  }, timeout)
+  return (...args) => {
+    if (id) { clearTimeout(id); f(null, ...args) }
+  }
+}
+function f(e, v) { e ? console.error(e) : console.log(v) }
+const tf = timeoutify(f, 200)
+setTimeout(() => tf(1), 100) // 1
   #+END_SRC
 - Callback testing
   #+BEGIN_SRC js
-    export function f(v, done) {
-      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
-    }
-    f(true, console.log) // null, true, control delegation = trust issue
-    f(false, console.error) // oh
-    describe("f", () => {
-      test("success", () => new Promise(done =>
-        f(true, (e, v) => { expect(v).toBe(true); done() })
-      ))
-      test("failure", () => new Promise(done =>
-        f(false, (e, v) => { expect(e.message).toBe("oh"); done() })
-      ))
-    })
+export function f(v, done) {
+  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+}
+f(true, console.log) // null, true, control delegation = trust issue
+f(false, console.error) // oh
+describe("f", () => {
+  test("success", () => new Promise(done =>
+    f(true, (e, v) => { expect(v).toBe(true); done() })
+  ))
+  test("failure", () => new Promise(done =>
+    f(false, (e, v) => { expect(e.message).toBe("oh"); done() })
+  ))
+})
   #+END_SRC
 
 ** Promise
 
-- *Promise* a placeholder/proxy for a *future eventual value** (trustable,
-  composable, time consistent, always async) that is *guaranteed to be async**
-  (both now and later are always async). `resolve` and `reject` callabcks are
-  guaranteed to be invoked *async at most once and exclusively* (even if a
-  Promise is resolved sync with a value, even if `then()` is called on an
-  already settled Promise)
+- *Promise* a placeholder/proxy for a *future eventual value** trustable,
+  composable, time consistent, that is *guaranteed to be always async**. The
+  =resolve= and =reject= callabcks are guaranteed to be invoked *async at most
+  once and exclusively* either one or the other, even if a Promise is resolved
+  sync with a value, even if ~then()~ is called on an already settled Promise
   #+BEGIN_SRC js
-    Promise.resolve(1).then(console.log) // next tick
-    console.log(2) // 2, 1
+Promise.resolve(1).then(console.log) // next tick
+console.log(2) // 2, 1
   #+END_SRC
-- *Promise* *async composable flow control** (multiple consumers subscribe
-  to a completion event of a producer) that separates consumers from a producer
-- *Thrown error* in either `resolve` or `reject` callback is *automatically
-  propagated* through a chain of Promises as a rejection (`throw` is usable
-  with Promises)
-- Once a pending promise is settled, a `resolve()`d value or a `reject()`ed
-  error becomes immutable. Repeated calls to `resolve()` and `reject()` are
-  ignored. A promise must be `return`ed to form a valid promise chain
+- *Promise* provides the *async composable flow control**. Multiple consumers
+  subscribe to a completion event of a producer that separates consumers from a
+  producer
+- *Thrown error* in either =resolve= or =reject= callback is *automatically
+  propagated* through the chain of promises as a rejection. =throw= is usable
+  with Promises
+- Once a pending promise is settled, a *resolved value* or a *rejected error*
+  becomes *immutable*. Repeated calls to ~resolve()~ and ~reject()~ are ignored.
+  A promise *must be returned* to form a valid promise chain
   #+BEGIN_SRC js
-    function timeout(timeout) {
-      return new Promise((_, reject) =>
-        setTimeout(() => reject("timeout"), timeout)
-      )
-    }
-    function f(x, timeout) {
-      return new Promise(resolve =>
-        setTimeout(() => resolve(x), timeout)
-      )
-    }
-    Promise.race([f(1, 400), timeout(500)])
-      .then(console.log).catch(console.error) // 1
+function timeout(timeout) {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject("timeout"), timeout)
+  )
+}
+function f(x, timeout) {
+  return new Promise(resolve =>
+    setTimeout(() => resolve(x), timeout)
+  )
+}
+Promise.race([f(1, 400), timeout(500)])
+  .then(console.log).catch(console.error) // 1
   #+END_SRC
 - *Promises solve the trust issues* of callbacks by *inverting the callback
-  control delegation**. Promises don't get rid of callbacks, but they *let the
-  caller to control callbacks locally* via `p.then(cb)` instead of passing
-  callabcks to a third party code as in case of callbacks only approach
-- `Promise.resolve(x)` normilizes values and misbehaving thenables to trustable
-  and compliant Promises
-- `p.then()` automatically and synchronously *creates a new Promise in a
-  chain* either resolved with a value or rejected with an error
+  control delegation*. Promises don't get rid of callbacks, but they *let the
+  caller to control callbacks locally* via the ~p.then(cb)~ instead of passing
+  callabcks to the third party code as in the case of callbacks only approach
+- ~Promise.resolve(x)~ normilizes values and misbehaving thenables to trustable
+  and compliant promises
+- ~p.then()~ automatically and synchronously *creates a new Promise in a
+  chain* either resolved with the value or rejected with an error
   #+BEGIN_SRC js
-    Promise.resolve(1)
-      .then(x => x + 1)
-      .then(x => new Promise(resolve => setTimeout(() => resolve(x * 2), 100)))
-      .then(console.log) // 4
+Promise.resolve(1)
+  .then(x => x + 1)
+  .then(x => new Promise(resolve => setTimeout(() => resolve(x * 2), 100)))
+  .then(console.log) // 4
   #+END_SRC
-- `p.catch()`ed rejection restores the Promise chain back to normal
+- ~p.catch()~ rejection restores the Promise chain back to normal
   #+BEGIN_SRC js
-    Promise.resolve(1)
-      // default rejection handler: e => { throw e } for incoming errors
-      .then(() => { throw new Error("oh") })
-      // default resolution handler: x => { return x } for incoming values
-      .catch(e => { console.error(e.message); return 2 }) // for outgoing errors
-      .then(console.log) // oh, 2 (back to normal)
+Promise.resolve(1)
+  // default rejection handler: e => { throw e } for the incoming errors
+  .then(() => { throw new Error("oh") })
+  // default resolution handler: v => { return v } for the incoming values
+  .catch(e => { console.error(e.message); return 2 }) // for outgoing errors
+  .then(console.log) // oh, 2 (back to normal)
   #+END_SRC
 - Promise testing
   #+BEGIN_SRC js
-    export function f(v) {
-      return new Promise((resolve, reject) =>
-        setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
-      )
-    }
-    f(true).then(console.log) // true, caller controls, no trust issues
-    f(false).catch(console.error) // oh
-    describe("f", () => {
-      test("success", () =>
-        f(true).then(v => expect(v).toBe(true))
-      )
-      test("failure", () =>
-        f(false).catch(e => expect(e.message).toBe("oh"))
-      )
-    })
+export function f(v) {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
+  )
+}
+f(true).then(console.log) // true, caller controls, no trust issues
+f(false).catch(console.error) // oh
+describe("f", () => {
+  test("success", () =>
+    f(true).then(v => expect(v).toBe(true))
+  )
+  test("failure", () =>
+    f(false).catch(e => expect(e.message).toBe("oh"))
+  )
+})
   #+END_SRC
-- `Promise.all([Promise])` a gate that resolves with an array of all
-  concurrently resolved Promises or rejects with the first rejected Promise
-- `Promise.race([Promise])` a latch that either resolves or rejects with the
-  first settled Promise (the other Promises cannot be canceled due to
-  immutability, hense are settled and just ignored)
+- ~Promise.all([Promise])~ a gate that resolves with an array of all
+  concurrently resolved promises or rejects with the first rejected promise
+- ~Promise.race([Promise])~ a latch that either resolves or rejects with the
+  first settled promise. The other Promises cannot be canceled due to
+  immutability, hence are settled and just ignored
 - Promises API
-    - `new Promise((resolve, reject) => {...})`
-    - `Promise.resolve(x)`, `Promise.reject(x)`
-    - `p.then(success, [failure])`, `p.catch(failure)`, `p.finally(always)`
-    - `Promise.all([]) => [all success] | first failure`
-    - `Promise.allSettled([]) => [all success | failure]`
-    - `Promise.race([]) => first success | first failure`
-    - `Promise.any([]) => first success | all failures`
+    - src_js{ new Promise((resolve, reject) => {...}) }
+    - src_js{ Promise.resolve(x) }, src_js{ Promise.reject(x) }
+    - src_js{ p.then(success, [failure]) }, src_js{ p.catch(failure) }, src_js{
+      p.finally(always) }
+    - src_js{ Promise.all([]) => [all success] | first failure }
+    - src_js{ Promise.allSettled([]) => [all success | failure] }
+    - src_js{ Promise.race([]) => first success | first failure }
+    - src_js{ Promise.any([]) => first success | all failures }
 - Callback => Promise = converts a callback-based function into a
-  `Promise`-returning function
+  promise-returning function
   #+BEGIN_SRC js
-    function f(v, done) {
-      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
-    }
-    function promisify(f) {
-      return function(...args) {
-        return new Promise((resolve, reject) => {
-          args = [...args, (e, v) => e ? reject(e) : resolve(v)]
-          f(...args)
-        })
-      }
-    }
-    const ff = promisify(f)
-    ff(true).then(console.log) // true
-    ff(false).catch(console.error) // oh
+function f(v, done) {
+  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+}
+function promisify(f) {
+  return function(...args) {
+    return new Promise((resolve, reject) => {
+      args = [...args, (e, v) => e ? reject(e) : resolve(v)]
+      f(...args)
+    })
+  }
+}
+const ff = promisify(f)
+ff(true).then(console.log) // true
+ff(false).catch(console.error) // oh
   #+END_SRC
 - Sequential composition of promises
   #+BEGIN_SRC js
-    function f(v) { return new Promise(
-      resolve => setTimeout(() => resolve(v + 1), 100)
-    )}
-    const p = [f, f].reduce((p, f) => p.then(f), Promise.resolve(1))
-    p.then(console.log) // 3
-    let r = 1
-    for (const ff of [f, f]) { r = await ff(r) }
-    console.log(r) // 3
+function f(v) { return new Promise(
+  resolve => setTimeout(() => resolve(v + 1), 100)
+)}
+const p = [f, f].reduce((p, f) => p.then(f), Promise.resolve(1))
+p.then(console.log) // 3
+let r = 1
+for (const ff of [f, f]) { r = await ff(r) }
+console.log(r) // 3
   #+END_SRC
 
 ** Generators
 
-- *Generators* a new type of function that *does not run to completion** (as a
-  regular function does), but *creates an iterator that controls execution of a
-  generator**, *suspends maintaining an iternal state* at every `yield` and
-  resumes on each iteration call to `it.next()`. `yield` is right-associative
-  like `=` and `?:`
+- *Generator* is a new type of function that *does not run to completion** as a
+  regular function does, but *creates an iterator that controls execution of the
+  generator**, *suspends maintaining the internal state* at every =yield= and
+  resumes on each iteration call to ~it.next()~. =yield= is the
+  right-associative like ~=~ and ~?:~
 - Generator use cases
-    - On demand production of series of vaules through iteration maintaining an
-      internal state
-    - Async flow control through a two-way message passing
+    - On demand production of series of values through the iteration maintaining
+      the internal state
+    - Async flow control through the two-way message passing
 - *Two-way message passing**
-    - Generator `const y = yield x` yields `x` to the caller before suspending
-      and receives `y` from the caller after resuming
-    - Caller `const { value: x } = it.next(y)` receives `x` from a suspended
-      generator, resumes the generator and passes `y` into the generator
-- Generator implements the *cooperative multitasking* by `yield`ing control,
-  (not preemptive multitasking by external context switch). Gnerator suspends
-  itself via `yield`, iterator call `it.next()` resumes the generator
+    - *Generator* src_js{ const y = yield x } yields =x= to the caller before
+      suspending and receives =y= from the caller after resuming
+    - *Caller* `src_js{ const { value: x } = it.next(y) } receives =x= from a
+      suspended generator, resumes the generator and passes =y= into the
+      generator
+- Generator implements the *cooperative multitasking* by yielding control, not
+  preemptive multitasking by external context switch. A generator suspends
+  itself via =yield=, the iterator call ~it.next()~ resumes the generator
   #+BEGIN_SRC js
-    function* g(x) {
-      console.log(x++)
-      // yield waits for a value passed by it.next(v)
-      const y = yield "a" // yield requires 2 iterations: start + resume
-      console.log(y, x) // implicitly returns undefined
-    }
-    const it = g(1) // creates a generator + receives an interator
-    // starts the generator (must always be empty)
-    const { value } = it.next() // 1
-    console.log(value) // a
-    // resumes the generator + passes message to the generator
-    const r = it.next("b") // b, 2
-    console.log(r) // { value: undefined, done: true }
+function* g(x) {
+  console.log(x++)
+  // yield waits for a value passed by it.next(v)
+  const y = yield "a" // yield requires 2 iterations: start + resume
+  console.log(y, x) // implicitly returns undefined
+}
+const it = g(1) // creates a generator + receives an interator
+// starts the generator (must always be empty)
+const { value } = it.next() // 1
+console.log(value) // a
+// resumes the generator + passes message to the generator
+const r = it.next("b") // b, 2
+console.log(r) // { value: undefined, done: true }
   #+END_SRC
-- Initial `it.next()` + `yield` + message `it.next(v)`
+- Initial ~it.next()~ + =yield= + message ~it.next(v)~
   #+BEGIN_SRC js
-    function* g() {
-      const a = yield "a"
-      const b = yield "b"
-      console.log(a, b)
-    }
-    const it = g() // creates a controlling iterator
-    const { value: a } = it.next() // starts the generator, must always be empty
-    const { value: b } = it.next(1)
-    it.next(2) // 1, 2 (finishes the generator)
-    console.log(a, b) // a, b
+function* g() {
+  const a = yield "a"
+  const b = yield "b"
+  console.log(a, b)
+}
+const it = g() // creates a controlling iterator
+const { value: a } = it.next() // starts the generator, must always be empty
+const { value: b } = it.next(1)
+it.next(2) // 1, 2 (finishes the generator)
+console.log(a, b) // a, b
   #+END_SRC
-- *Early termination* via `break`, `return`, `throw` from the `for/of` loop
-  automatically terminates generator's iterator (or manually via `it.return()`
-  or `it.throw()`)
+- *Early termination* via =break=, =return=, =throw= from the =for/of= loop
+  automatically terminates the generator's iterator, or manually via
+  ~it.return()~ or ~it.throw()~
   #+BEGIN_SRC js
-    function* g(n) {
-      let i = 0
-      while (i < n) { yield i++ }
-    }
-    for (const el of g(3)) { console.log(el) } // 0, 1, 2
+function* g(n) {
+  let i = 0
+  while (i < n) { yield i++ }
+}
+for (const el of g(3)) { console.log(el) } // 0, 1, 2
 
-    const infinite = function*() {
-      let v = 0
-      try { while (true) { yield v++ } }
-      finally { console.log("finally") }
-    }
-    const inf = infinite()
-    for (const i of inf) {
-      if (i > 1) {
-        const { value } = inf.return("return")
-        console.log(value)
-      }
-      console.log(i) // 0, 1, finally, return, 2
-    }
+const infinite = function*() {
+  let v = 0
+  try { while (true) { yield v++ } }
+  finally { console.log("finally") }
+}
+const inf = infinite()
+for (const i of inf) {
+  if (i > 1) {
+    const { value } = inf.return("return")
+    console.log(value)
+  }
+  console.log(i) // 0, 1, finally, return, 2
+}
   #+END_SRC
 - Generator expresses *async flow control* in sequential, sync-like form
   through async iteration (`it.next()`) of a generator
