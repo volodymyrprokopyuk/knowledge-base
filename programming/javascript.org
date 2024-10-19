@@ -117,7 +117,7 @@ console.log(c.a) // 2
 - Object immutability =Object.preventExtensions()=, =Object.seal()=,
   =Object.freeze()=
 - *Object concise method* src_js{ { f: function() { ... } } } becomes src_js{ {
-  f() { ... } }` } implies anonymous function expression
+  f() { ... } }= } implies anonymous function expression
 
 ** Lexical scope, closures, and variable lookup
 
@@ -134,8 +134,8 @@ console.log(c.a) // 2
   of variable, shadowing
 - *Lexical scope* (closures) is defined statically at write-time, the scope
   chain is based on the *source code*
-- *Closure* = a returned function that can access its lexical scope even when
-  the function is executing outside its lexical scope
+- *Closure* a returned function that can access its lexical scope even when the
+  function is executing outside its lexical scope
 - *Dynamic scope* =this= is defined at execution-time and depends on the
   execution path, the scope chain is based on a *call stack*
 - *Block scope* =const=, =let= declare variables as close as possible to where
@@ -162,289 +162,295 @@ console.log(m.f()) // 11
 
 ** =this= late binding, lexical =this=, and arrow functions
 
-- `this` is dynamically defined for every function call at runtime (late
-  binding, not write-time lexical scope). The value of `this` depends on the
-  location of a function call (not the location of a function declaration) and
-  how a funciton is called. `this` implicitly passes the execution context
-  object (like dynamic scope) to a function
-- Late binding rules for `this` (from the highest to the lowest precedence)
-    - `new` *binding* = construction call of a funciton with the `new`
-      operator `new f()`. `this` points to a brand new object, which is
-      automatically returned from the function (unless the function returns
-      another object). The `new` operator ignores `this` hard binding with
-      `bind()`
-    - *Explicit binding* = function invocation through `f.call(this, args,
-      ...)` or `f.apply(this, [args])` including the *hard binding* `const ff
-      = f.bind(this, args, ...)` for partial application, currying. `this`
-      points to the first argument
-    - *Implicit binding* = function invocation `o.f()` through a containing
-      context object `const o = { f }`. `this` points to the containing context
-      object
-    - *Default binding* = standalone function invocation `f()` including
-      callback invocation. `this` == `undefined` as the global object is not
-      eligible for the default binding in the `strict mode`
-- *Lexical `this`* (`bind` alternative) = *arrow function** `(...) => { ...
-  }` discards all the traditional rules for `this` binding and instead uses the
-  lexical `this` from the *immediate lexical enclosing scope**. Arrow function
-  is a syntactic replacement for `self = this` closures. Lexical `this` binding
-  of an arrow function cannot be overrided even with the `new` operator
-- *Arrow function* = anonymous (no named reference for recursion or event
-  bind/unbind) *function expressions* (there is no arrow function declaration)
-  that support parameters destructuring, default values, and spread/gather
-  operators. Inside an arrow function `this` is lexical (not dynamic). An arrow
-  function is a nicer alternative to `const self = this` or `f.bind(this)`
+- =this= is dynamically defined for every function call at runtime (the late
+  binding, not the write-time lexical scope). The value of =this= depends on the
+  location of the function call (not the location of the function declaration)
+  and how a function is called. =this= implicitly passes the execution context
+  object (like the dynamic scope) to a function
+- Late binding rules for =this= (from the highest to the lowest precedence)
+  - =new= *binding* a construction call of a function with the =new=
+    operator src_js{ new f() }. =this= points to a brand new object, which is
+    automatically returned from the function, unless the function returns
+    another object. The =new= operator ignores =this= hard binding with
+    =bind()=
+  - *Explicit binding* is the function invocation through src_js{ f.call(this,
+    args, ...) } or src_js{ f.apply(this, [args]) } including the *hard
+    binding* src_js{ const ff = f.bind(this, args, ...) } for partial
+    application, currying. =this= points to the first argument
+  - *Implicit binding* is the function invocation src_js{ o.f() } through a
+    containing context object src_js{ const o = { f } }. =this= points to the
+    containing context object
+  - *Default binding* is the standalone function invocation src_js{ f() }
+    including callback invocation. =this= is =undefined= as the global object is
+    not eligible for the default binding in the =strict mode=
+- *Lexical this* (=bind= alternative) is the *arrow function* src_js{ (async)
+  (...) => { ... } } discards all the traditional rules for =this= binding and
+  instead uses the lexical =this= from the *immediate lexical enclosing scope*.
+  The arrow function is the syntactic replacement for src_js{ const self = this }
+  closures. Lexical =this= binding of the arrow function cannot be overridden
+  even with the =new= operator
+- *Arrow function* is an *anonymous function expression* that supports
+  parameters destructuring, default values, and the spread/gather operator. The
+  arrow function has no named reference for recursion or event bind/unbind.
+  Inside the arrow function =this= is lexical, not dynamic. The arrow function
+  is a nicer alternative to src_js{ const self = this } or src_js{
+  f.bind(this) }. There is no named arrow function declaration
 
-** Prototype chain, prototypal ihneritance, and `class`
+** Prototype chain, prototypal inheritance, and =class=
 
-- *Prototype chain* = every object has an `o.[[Prototype]]` link to another
-  object ending at `Object.prototype` (kind of global scope for variables)
+- *Prototype chain* every object has the ~o.prototype~ link to another object
+  ending at ~Object.prototype~
   #+BEGIN_SRC js
-    const o = { a: 1 }
-    // new object o2.[[Prototype]] = o (prototype chain)
-    const o2 = Object.create(o)
-    console.log("a" in o2, o2.a) // true, 1
-    for (const p in o2) { console.log(p, o2[p]) } // a, 1
+const o = { a: 1 }
+// new object o2.prototype = o (prototype chain)
+const o2 = Object.create(o)
+console.log("a" in o2, o2.a) // true, 1
+for (const p in o2) { console.log(p, o2[p]) } // a, 1
   #+END_SRC
-- *Prototypal inheritance* = all functions get by default a public,
-  non-enumerable property `F.prototype` pointing to an object. Each object
-  created via `new F()` operator is linked to the `F.prototype` effectively
-  delegating access to `F.prototype` properties
+- *Prototypal inheritance* all functions get by default a public, non-enumerable
+  property ~F.prototype~ pointing to an object. Each object created via `src_js{
+  new F() } operator is linked to the ~F.prototype~ effectively delegating
+  access to ~F.prototype~ properties
   #+BEGIN_SRC js
-    function F() { this.a = 1 } // constructor, property
-    F.prototype.b = function() { return 2 } // method
-    const o = new F()
-    console.log(o.a, o.b()) // 1, 2
-    function G() { F.call(this); this.c = 3 } // call parent constructor
-    // Prototypal inheritance Option 1. Overwrite G.prototype
-    G.prototype = Object.create(F.prototype)
-    // Prototypal inheritance Option 2. Update G.prototype
-    Object.setPrototypeOf(G.prototype, F.prototype)
-    G.prototype.d = function() {
-      return F.prototype.b.call(this) + 2 // call parent method
-    }
-    const o2 = new G()
-    console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
+function F() { this.a = 1 } // constructor, property
+F.prototype.b = function() { return 2 } // method
+const o = new F()
+console.log(o.a, o.b()) // 1, 2
+function G() { F.call(this); this.c = 3 } // call parent constructor
+// Prototypal inheritance Option 1. Overwrite G.prototype
+G.prototype = Object.create(F.prototype)
+// Prototypal inheritance Option 2. Update G.prototype
+Object.setPrototypeOf(G.prototype, F.prototype)
+G.prototype.d = function() {
+  return F.prototype.b.call(this) + 2 // call parent method
+}
+const o2 = new G()
+console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
   #+END_SRC
-- Purely flat data storage without `prototype` delegation
-  `o = Object.create(null)`
-- *Prototypal behavior delegation* = objects are linked to other objects
-  forming a network of peers, not a vertical hierarchy as with classes
+- Purely flat data storage without the prototype delegation src_js{ o =
+  Object.create(null) }
+- *Prototypal behavior delegation* objects are linked to other objects forming a
+  network of peers, not a vertical hierarchy as with classes
 - Mutual delegation of two objects to each other forming a cycle is disallowed
-- `class` = syntactic sugar on top of prototypal inheritance and prototypal
-  behavior delegation
+- =class= is the syntactic sugar on top of the prototypal inheritance and
+  prototypal behavior delegation
   #+BEGIN_SRC js
-    class F {
-      constructor() { this.a = 1 } // constructor, property
-      b() { return 2 } // method
-    }
-    const o = new F()
-    console.log(o.a, o.b()) // 1, 2
-    class G extends F { // prototypal inheritance
-      constructor() { super(); this.c = 3 } // call parent constructor
-      d() { return super.b() + 2 } // call parent method
-    }
-    const o2 = new G()
-    console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
+class F {
+  constructor() { this.a = 1 } // constructor, property
+  b() { return 2 } // method
+}
+const o = new F()
+console.log(o.a, o.b()) // 1, 2
+class G extends F { // prototypal inheritance
+  constructor() { super(); this.c = 3 } // call parent constructor
+  d() { return super.b() + 2 } // call parent method
+}
+const o2 = new G()
+console.log(o2.a, o2.b(), o2.c, o2.d()) // 1, 2, 3, 4
+
+class A {
+  constructor(a) { this._a = a } // property
+  // property setter and getter
+  set a(v) { this._a = v }
+  get a() { return this._a }
+}
+class B extends A { // prototypal inheritance
+  constructor(a, b) {
+    super(a) // parent constructor
+    this.b = b
+  }
+  // statics are on the constructor function, not the prototype
+  static c = 10
+  sum() { return super.a + this.b } // parent object
+}
+const b = new B(1, 2)
+b.a += 3
+console.log(b.a, b.sum(), B.c) // 4, 6, 10
   #+END_SRC
+- *Method chaining* via src_js{ return this }
   #+BEGIN_SRC js
-    class A {
-      constructor(a) { this._a = a } // property
-      // property setter and getter
-      set a(v) { this._a = v }
-      get a() { return this._a }
-    }
-    class B extends A { // prototypal inheritance
-      constructor(a, b) {
-        super(a) // parent constructor
-        this.b = b
-      }
-      // statics are on the constructor function, not the prototype
-      static c = 10
-      sum() { return super.a + this.b } // parent object
-    }
-    const b = new B(1, 2)
-    b.a += 3
-    console.log(b.a, b.sum(), B.c) // 4, 6, 10
-  #+END_SRC
-- *Method chaining* via `return this`
-  #+BEGIN_SRC js
-    function N(x) { this.a = x }
-    N.prototype.add = function add(x) { this.a += x; return this }
-    console.log(new N(1).add(2).add(3).a) // 6
+function N(x) { this.a = x }
+N.prototype.add = function add(x) { this.a += x; return this }
+console.log(new N(1).add(2).add(3).a) // 6
   #+END_SRC
 
 ** Spread/gather, object/array destructuring/transformation
 
-- *Spread arguments* `f(...[1, 2, 3])` => `f.apply(null, [1, 2, 3])`
-- *Gather parameters* `function f(...args) { ... }` => `[args]`
+- *Spread arguments* src_js{ f.apply(null, [1, 2, 3]) } becomes src_js{ f(...[1,
+  2, 3]) }
+- *Gather parameters* src_js{ function f(...args) { ... } } becomes ~[args]~
 - *Object/array destructuring/transformation**
   #+BEGIN_SRC js
-    const o = { a: 1, b: 2, c: 3 }, a = [10, 20, 30], o2 = { }, a2 = [];
-    ({ a: o2.A, b: o2.B, c: o2.C } = o)  // object => object
-    console.log(o2); // { A: 1, B: 2, C: 3 }
-    [a2[2], a2[1], a2[0]] = a  // array => array
-    console.log(a2); // [30, 20, 10]
-    ({ a: a2[0], b: a2[1], c: a2[2] } = o) // object => array
-    console.log(a2); // [1, 2, 3]
-    [o2.A, o2.B, o2.C] = a // array => object
-    console.log(o2) // { A: 10, B: 20, C: 30 }
+const o = { a: 1, b: 2, c: 3 }, a = [10, 20, 30], o2 = { }, a2 = [];
+({ a: o2.A, b: o2.B, c: o2.C } = o)  // object => object
+console.log(o2); // { A: 1, B: 2, C: 3 }
+[a2[2], a2[1], a2[0]] = a  // array => array
+console.log(a2); // [30, 20, 10]
+({ a: a2[0], b: a2[1], c: a2[2] } = o) // object => array
+console.log(a2); // [1, 2, 3]
+[o2.A, o2.B, o2.C] = a // array => object
+console.log(o2) // { A: 10, B: 20, C: 30 }
   #+END_SRC
 - *Spread/gather object/array destructuring**
   #+BEGIN_SRC js
-    const { a, ...x } = o
-    console.log(a, x, { a, ...x }) // 1 { b: 2, c: 3 } { a: 1, b: 2, c: 3 }
-    const [x, ...y] = a
-    console.log(x, y, [x, ...y]) // 10, [ 20, 30 ], [ 10, 20, 30 ]
+const { a, ...x } = o
+console.log(a, x, { a, ...x }) // 1 { b: 2, c: 3 } { a: 1, b: 2, c: 3 }
+const [x, ...y] = a
+console.log(x, y, [x, ...y]) // 10, [ 20, 30 ], [ 10, 20, 30 ]
   #+END_SRC
 - *Default values destructuring* vs default parameters
   #+BEGIN_SRC js
-    const { a: p, d: s = 0 } = o
-    console.log(p, s) // 1, 0
-    const [p, q, r, s = 0] = a
-    console.log(p, q, r, s) // 10, 20, 30, 0
-    f({ x = 10 } = { }, { y } = { y: 10 }) { ... }
+const { a: p, d: s = 0 } = o
+console.log(p, s) // 1, 0
+const [p, q, r, s = 0] = a
+console.log(p, q, r, s) // 10, 20, 30, 0
+f({ x = 10 } = { }, { y } = { y: 10 }) { ... }
   #+END_SRC
 
 ** Modules, `export`, `import`
 
-- *Modules* = static, resolved at compile=time, read-only, *one-way live
-  bindings to exported values* (not copies). One module per file, module is a
-  *cached singleton**, there is no global scope inside a module (`this` is
-  `undefined`), circular imports are correctly handled regardless of the
-  `import` order
-- *Module identifier* (a constant string) = relative path `"../module.js"`,
-  absolute path `"/module.js"`, core modules (`node_modules`) `"core/module"`,
-  module URL `"https://module.js"`
-- Export (not `export`ed objects are private to a module)
-    - *Named exports**
-      `export var | const | let | function | class | { a, b as B }` of (re)named
-      objects defined in a module
-    - *Default export* `export default { a, b }` or `export { a as default }`
-      not mutually exclusive with the named exports `import dflt, { named } from
-      "module"` that rewards with a simpler `import dflt` syntax. Default export
-      is unnamed and can be `import`ed under any name
-    - *Re-export* from another module `export * | { a, b as B } from "module"`
-- Import (all imported bindings are immutable and hoisted)
-    - *Named import* `import { a, b as B } from "module"` binds to top-level
-      identifiers in the current scope
-    - *Default import* `import dflt | { default as dflt } from "module"`
-    - *Wildcard import* to a single namespace `import * as ns from "module"`
-- *Dynamic async import* = `import("module") => Promise` at runtime
+- *Modules* static, resolved at compile-time, read-only, *one-way live bindings
+  to exported values*, not copies. One module per file, module is a *cached
+  singleton*, there is no global scope inside a module, =this= is =undefined=
+  inside a module, *circular imports* are correctly handled regardless of the
+  =import= order
+- *Module identifier* is a constant string in the form of
+  - Relative path ~"../module.js"~
+  - Absolute path ~"/module.js"~
+  - Module path ~"core/module"~
+  = Module URL ~"https://module.js"~
+- Export (not exported objects are *private* to the module)
+    - *Named exports** src_js{ export var | const | let | function | class | {
+      a, b as B } } of (re)named objects defined in a module
+    - *Default export* src_js{ export default { a, b } } or src_js{ export { a
+      as default } } not mutually exclusive with the named exports src_js{
+      import defaultExport, { named } from "module" } that rewards with a
+      simpler src_js{ import defaultExport } syntax. Default export is unnamed
+      and can be imported under any name e.g. =defaultExport=
+    - *Re-export* from another module src_js{ export * | { a, b as B } from
+      "module" }
+- Import (all imported bindings are *immutable* and hoisted)
+    - *Named import* src_js{ import { a, b as B } from "module" } binds to the
+      top-level identifiers in the current scope
+    - *Default import* src_js{ import defaultExport | { default as defaultExport
+      } from "module" }
+    - *Wildcard import* to a single namespace src_js{ import * as ns from
+      "module" }
+- *Dynamic async import* src_js{ import("module") // Promise } at runtime
 
-** Iterator closure and iterable interface `[Symbol.iterator]`
+** Iterator closure and iterable interface ~[Symbol.iterator]~
 
-- *Iterator closure* = iterates over arrays (indexing) and objects
-  (properties). Ordered, sequential, pull-based consumption of data
-  `iterator = { next() => { value, done } }` closure over iterator state through
-  interface of `for/of`
+- *Iterator closure* iterates over arrays through indexing and objects
+  properties. Ordered, sequential, pull-based consumption of data src_js{
+  iterator = { next() => { value, done } } } closure over iterator state through
+  interface of ~for/of~
   #+BEGIN_SRC js
-    const a = [1, 2]
-    for (let i = 0; i < a.length; ++i) { console.log(a[i]) } // 1, 2
-    for (const e of a) { console.log(e) } // 1, 2
-    const o = { a: 1, b: 2 }
-    for (const p in o) { console.log(p, o[p]) } // a, 1, b, 2
-    Object.defineProperty(o, Symbol.iterator, {
-      writable: false, enumerable: false, configurable: true,
-      value: function() {
-        const o = this
-        const keys = Object.keys(o)
-        let i = 0 // iterator state
-        function next() {
-          return { value: o[keys[i++]], done: (i > keys.length) }
-        }
-        return { next }
-      }
-    })
-    for (const e of o) { console.log(e) } // 1, 2
-  #+END_SRC
-- *Iterable interface* =
-  `iteratble = { [Symbol.iterator]() { return { next() } } }` returns an
-  iterator
-  #+BEGIN_SRC js
-    function iterator(n) { // iterator configuration
-      let i = 0; // iterator state
-      const next = () => ({ value: i < n ? i : undefined, done: ++i > n })
-      // iterable object + iterator function
-      return { [Symbol.iterator]() { return this }, next }
+const a = [1, 2]
+for (let i = 0; i < a.length; ++i) { console.log(a[i]) } // 1, 2
+for (const e of a) { console.log(e) } // 1, 2
+const o = { a: 1, b: 2 }
+for (const p in o) { console.log(p, o[p]) } // a, 1, b, 2
+Object.defineProperty(o, Symbol.iterator, {
+  writable: false, enumerable: false, configurable: true,
+  value: function() {
+    const o = this
+    const keys = Object.keys(o)
+    let i = 0 // iterator state
+    function next() {
+      return { value: o[keys[i++]], done: (i > keys.length) }
     }
-    for (const i of iterator(3)) { console.log(i) } // 0, 1, 2
+    return { next }
+  }
+})
+for (const e of o) { console.log(e) } // 1, 2
   #+END_SRC
-- Array destructuring `[a, b] = it` and the spread operator `f(...it)` can
-  consume an iterator
+- *Iterable interface* src_js{ iteratble = { [Symbol.iterator]() { return {
+  next() } } } } returns an iterator
+  #+BEGIN_SRC js
+function iterator(n) { // iterator configuration
+  let i = 0; // iterator state
+  const next = () => ({ value: i < n ? i : undefined, done: ++i > n })
+  // iterable object + iterator function
+  return { [Symbol.iterator]() { return this }, next }
+}
+for (const i of iterator(3)) { console.log(i) } // 0, 1, 2
+  #+END_SRC
+- *Array destructuring* src_js{ [a, b] = it } and the spread operator src_js{
+  f(...it) } can consume an iterator
 
 ** Metaprogramming
 
-- `Proxy` + `Reflect` intercepts at the proxy, extends in the proxy and forwards
-  to the target object `get`, `set`, `delete`, `apply`, `construct` operations
+- =Proxy= + =Reflect= intercepts at the proxy, extends in the proxy and forwards
+  to the target object =get=, =set=, =delete=, =apply=, =construct= operations
   among others
 - *Proxy first* design pattern
   #+BEGIN_SRC js
-     const o = { a: 1 }
-     const handlers = {
-       get(target, key, context) {
-         if (Reflect.has(target, key)) {
-           console.log("get key", key)
-           // forward operation from context (proxy) to target (object)
-           return Reflect.get(target, key, context)
-         } else {
-           throw new Error(`${key} does not exist`)
-         }
-       }
-     }
-     const p = new Proxy(o, handlers)
-     console.log(p.a) // get key a, 1
+const o = { a: 1 }
+const handlers = {
+  get(target, key, context) {
+    if (Reflect.has(target, key)) {
+      console.log("get key", key)
+      // forward operation from context (proxy) to target (object)
+      return Reflect.get(target, key, context)
+    } else {
+      throw new Error(`${key} does not exist`)
+    }
+  }
+}
+const p = new Proxy(o, handlers)
+console.log(p.a) // get key a, 1
   #+END_SRC
 - *Proxy last* design pattern
   #+BEGIN_SRC js
-    const o = { a: 1 }
-    const handlers = {
-      get(target, key, context) { throw new Error(`${key} does not exits`) }
-    }
-    const p = new Proxy(o, handlers)
-    Object.setPrototypeOf(o, p)
-    console.log(o.a, o.b) // 1, Error
+const o = { a: 1 }
+const handlers = {
+  get(target, key, context) { throw new Error(`${key} does not exits`) }
+}
+const p = new Proxy(o, handlers)
+Object.setPrototypeOf(o, p)
+console.log(o.a, o.b) // 1, Error
   #+END_SRC
 - *Tail-call optimization* (TCO)
   #+BEGIN_SRC js
-    function rmap(a, f = e => e, r = []) {
-      if (a.length > 1) {
-        const [h, ...t] = a
-        return rmap(t, f, r.concat(f(h)))
-      } else {
-        return r.concat(f(a[0]))
-      }
-    }
-    const a = new Array(9999)
-    console.log(rmap(a.fill(0), e => e + 1)) // Maximum call stack size exceeded
+function rmap(a, f = e => e, r = []) {
+  if (a.length > 1) {
+    const [h, ...t] = a
+    return rmap(t, f, r.concat(f(h)))
+  } else {
+    return r.concat(f(a[0]))
+  }
+}
+const a = new Array(9999)
+console.log(rmap(a.fill(0), e => e + 1)) // Maximum call stack size exceeded
   #+END_SRC
 - *Trampoline* converts recursion => loop
   #+BEGIN_SRC js
-    function trampoline(f) { // factors out recursion into loop
-      // stack depth remains constant (stack frames are reused)
-      while (typeof f === "function") { f = f() }
-      return f
+function trampoline(f) { // factors out recursion into loop
+  // stack depth remains constant (stack frames are reused)
+  while (typeof f === "function") { f = f() }
+  return f
+}
+function tmap(a, f = e => e, r = []) {
+  if (a.length > 1) {
+    // no recursive call to tmap(), just return the partial() function
+    return function partial() { // executed by trampoline
+      const [h, ...t] = a
+      return tmap(t, f, r.concat(f(h)))
     }
-    function tmap(a, f = e => e, r = []) {
-      if (a.length > 1) {
-        // no recursive call to tmap(), just return the partial() function
-        return function partial() { // executed by trampoline
-          const [h, ...t] = a
-          return tmap(t, f, r.concat(f(h)))
-        }
-      } else {
-        return r.concat(f(a[0]))
-      }
-    }
-    const a = new Array(9999)
-    console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
+  } else {
+    return r.concat(f(a[0]))
+  }
+}
+const a = new Array(9999)
+console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
   #+END_SRC
 
 * Async JavaScript
 
 ** Callback
 
-- *Single-threaded event loop* = sequential execution *run to completion**
-  on every tick
+- *Single-threaded event loop* the sequential execution *run to completion** on
+  every tick
   #+BEGIN_SRC js
     const events = [] // queue (FIFO)
     while(true) {
@@ -455,11 +461,11 @@ console.log(m.f()) // 11
       }
     }
   #+END_SRC
-- *Concurrency* = split two or more compound tasks into atomic steps, schedule
+- *Concurrency* splits two or more compound tasks into atomic steps, schedule
   steps from all tasks to the event loop (interleave steps from different
   tasks), execute steps in the event loop in order to progress simultaneously on
   all tasks
-- *Callback* = strict separation between now (the current code) and later
+- *Callback* strict separation between now (the current code) and later
   (callback, control delegation). Non-linear definition of a sequential control
   flow and error handling, *trust issues due to control delegation* and to
   *inversion of control* (continuations). A thrown error is not automatically
@@ -496,7 +502,7 @@ console.log(m.f()) // 11
 
 ** Promise
 
-- *Promise* = a placeholder/proxy for a *future eventual value** (trustable,
+- *Promise* a placeholder/proxy for a *future eventual value** (trustable,
   composable, time consistent, always async) that is *guaranteed to be async**
   (both now and later are always async). `resolve` and `reject` callabcks are
   guaranteed to be invoked *async at most once and exclusively* (even if a
@@ -506,7 +512,7 @@ console.log(m.f()) // 11
     Promise.resolve(1).then(console.log) // next tick
     console.log(2) // 2, 1
   #+END_SRC
-- *Promise* = *async composable flow control** (multiple consumers subscribe
+- *Promise* *async composable flow control** (multiple consumers subscribe
   to a completion event of a producer) that separates consumers from a producer
 - *Thrown error* in either `resolve` or `reject` callback is *automatically
   propagated* through a chain of Promises as a rejection (`throw` is usable
@@ -614,11 +620,11 @@ console.log(m.f()) // 11
 
 ** Generators
 
-- *Generators* = a new type of function that *does not run to completion**
-  (as a regular function does), but *creates an iterator that controls
-  execution of a generator**, *suspends maintaining an iternal state* at
-  every `yield` and resumes on each iteration call to `it.next()`. `yield` is
-  right-associative like `=` and `?:`
+- *Generators* a new type of function that *does not run to completion** (as a
+  regular function does), but *creates an iterator that controls execution of a
+  generator**, *suspends maintaining an iternal state* at every `yield` and
+  resumes on each iteration call to `it.next()`. `yield` is right-associative
+  like `=` and `?:`
 - Generator use cases
     - On demand production of series of vaules through iteration maintaining an
       internal state
