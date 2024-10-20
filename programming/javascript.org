@@ -692,117 +692,125 @@ for (const i of inf) {
   console.log(i) // 0, 1, finally, return, 2
 }
   #+END_SRC
-- Generator expresses *async flow control* in sequential, sync-like form
-  through async iteration (`it.next()`) of a generator
+- Generator expresses the *async flow control* in the sequential, sync-like form
+  through the async iteration of a generator
   #+BEGIN_SRC js
-    function f(v, done) {
-      setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
-    }
-    function done(e, v) { if (e) { gen.throw(e) } else { gen.next(v) } }
-    function* g() {
-      try {
-        const a = yield f(true, done)
-        console.log(a)
-        const _ = yield f(false, done)
-      } catch (e) { console.error(e.message) }
-    }
-    const gen = g()
-    gen.next() // true, oh
+function f(v, done) {
+  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+}
+function done(e, v) { if (e) { gen.throw(e) } else { gen.next(v) } }
+function* g() {
+  try {
+    const a = yield f(true, done)
+    console.log(a)
+    const _ = yield f(false, done)
+  } catch (e) { console.error(e.message) }
+}
+const gen = g()
+gen.next() // true, oh
   #+END_SRC
-- *Promise-yielding generator* is a basis for `async/await`
+- *Promise-yielding generator* is the basis for =async/await=
   #+BEGIN_SRC js
-    function f(v) {
-      return new Promise((resolve, reject) =>
-        setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
-      )
-    }
-    function* g() {
-      try {
-        const a = yield f(true)
-        console.log(a)
-        const _ = yield f(false)
-      } catch (e) { console.error(e.message) }
-    }
-    const gen = g()
-    gen.next().value.then(x => gen.next(x).value.then(y => gen.next(y)))
-      .catch(e => console.log(e.message)) // true, oh
+function f(v) {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
+  )
+}
+function* g() {
+  try {
+    const a = yield f(true)
+    console.log(a)
+    const _ = yield f(false)
+  } catch (e) { console.error(e.message) }
+}
+const gen = g()
+gen.next().value.then(x => gen.next(x).value.then(y => gen.next(y)))
+  .catch(e => console.log(e.message)) // true, oh
   #+END_SRC
-- `yield*` delegation for *composition of generators**. `yield*` requires an
-  iterable `[Symbol.iterator]`, it then invokes that iterable's iterator
-  `it.next()` and delegates generator's control to that iterator until it is
+- =yield*= delegates for the *composition of generators*. =yield*= requires an
+  iterable ~[Symbol.iterator]~, it then invokes that iterable's iterator
+  ~it.next()~ and delegates generator's control to that iterator until it is
   exhausted
   #+BEGIN_SRC js
-    function* inner() { yield 2; yield 3 }
-    function* outer() { yield 1; yield* inner(); yield 4 }
-    for (const el of outer()) { console.log(el) } // 1, 2, 3, 4
+function* inner() { yield 2; yield 3 }
+function* outer() { yield 1; yield* inner(); yield 4 }
+for (const el of outer()) { console.log(el) } // 1, 2, 3, 4
   #+END_SRC
-- *Error handling* `try/catch` inside and outside of generators
+- *Error handling* =try/catch= inside and outside of generators
   #+BEGIN_SRC js
-    function* g() {
-      try { yield 1 }
-      catch (e) { console.error("inside", e.message) } // inside uh
-      throw new Error("oh")
-    }
-    const gen = g()
-    try {
-      const { value } = gen.next()
-      console.log(value) // 1, inside uh, outside oh
-      gen.throw(new Error("uh"))
-    } catch (e) { console.error("outside", e.message) } // outside oh
+function* g() {
+  try { yield 1 }
+  catch (e) { console.error("inside", e.message) } // inside uh
+  throw new Error("oh")
+}
+const gen = g()
+try {
+  const { value } = gen.next()
+  console.log(value) // 1, inside uh, outside oh
+  gen.throw(new Error("uh"))
+} catch (e) { console.error("outside", e.message) } // outside oh
   #+END_SRC
 
-** Testing (vitest)
+** Testing (bun test)
 
-- Run tests
-  #+END_SRCfish
-    pnpm exec vitest run --reporter verbose --coverage file.test.js -t 'Test'
+- *Run tests* in the =*.test.js= files
+  #+BEGIN_SRC fish
+bun test --coverage file.test.js -t reTest
   #+END_SRC
-- Assertions
+- Suites, tests, *life cycle hooks*, *assertions*
   #+BEGIN_SRC js
-    import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
-    describe("assertions", () => { // test suite, new testing context
-      test("assertions", () => { // nested local testing context
-        const o = { a: 1 }, o2 = o
-        expect(1).toBe(1) // primitive values via Object.is()
-        expect(o).toBe(o2) // same object reference via Object.is()
-        expect(0.1 + 0.2).not.toBe(0.3) // rounding error
-        expect(0.1 + 0.2).toBeCloseTo(0.3, 5) // float point assertion
-        expect(typeof 1).toBe("number") // type assertion
-        expect(new Number(1) instanceof Number).toBe(true) // instance assertion
-        expect(o).not.toBe({ a: 1 }) // not the same object reference
-        expect(o).toEqual({ a: 1 }) // recursive content for object/array
-        expect(() => { throw new Error("oh") }).toThrow(/oh/) // error function
-      })
-    })
+// The bun transpiler automatically injected the import
+// There is no need for the explicit import
+import { describe, test, expect } from "bun:test"
+describe("assertions suite", () => { // test suite, new testing context
+  // describe scope, top level file scope, --preload ./setup.js all files scope
+  beforeAll(() => console.log("before all"))
+  afterAll(() => console.log("after all"))
+  // test scope
+  beforeEach(() => console.log("before each"))
+  afterEach(() => console.log("after each"))
+  test("assertions test", () => { // nested local testing context
+    const o = { a: 1 }, o2 = o
+    expect(1).toBe(1) // primitive values via Object.is()
+    expect(o).toBe(o2) // same object reference via Object.is()
+    expect(0.1 + 0.2).not.toBe(0.3) // rounding error
+    expect(0.1 + 0.2).toBeCloseTo(0.3, 5) // float point assertion
+    expect(typeof 1).toBe("number") // type assertion
+    expect(new Number(1) instanceof Number).toBe(true) // instance assertion
+    expect(o).not.toBe({ a: 1 }) // not the same object reference
+    expect(o).toEqual({ a: 1 }) // recursive content for object/array
+    expect(() => { throw new Error("oh") }).toThrow(/oh/) // error function
+  })
+})
   #+END_SRC
-- Promise testing
+- *Promise testing*, *async testing*
   #+BEGIN_SRC js
-    describe("Promise", () => {
-      function task(v) {
-        return new Promise((resolve, reject) =>
-          setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 100)
-        )
-      }
-      // .resolves/.rejects unwraps a Promise value/error to apply sync assertions
-      // However, all assertions now return a Promise, hence => await expect(...)
-      test("resolves", async () => await expect(task(1)).resolves.toBe(1))
-      test("rejectrs", async () => await expect(task(0)).rejects.toThrow(/oh/))
-    })
+describe("promise", () => {
+  function task(v) {
+    return new Promise((resolve, reject) =>
+      setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 100)
+    )
+  }
+  // .resolves/.rejects unwraps a Promise value/error to apply sync assertions
+  // However, all assertions now return a Promise, hence => await expect(...)
+  test("resolves", async () => await expect(task(1)).resolves.toBe(1))
+  test("rejectrs", async () => await expect(task(0)).rejects.toThrow(/oh/))
+})
   #+END_SRC
-- Parameterized tests
+- *Parameterized tests*
   #+BEGIN_SRC js
-    describe("parameterized", () => {
-      test.each([
-        [1, 2, 3], [4, 5, 9]
-      ])("array sum(%i, %i) === %i", (a, b, exp) => // positional arguments
-        expect(a + b).toBe(exp)
-      )
-      test.each([
-        { a: 1, b: 2, exp: 3 }, { a: 4, b: 5, exp: 9 }
-      ])("object sum($a, $b) === $exp", ({ a, b, exp }) => // object destructuring
-        expect(a + b).toBe(exp)
-      )
-    })
+describe("parameterized", () => {
+  test.each([
+    [1, 2, 3], [4, 5, 9]
+  ])("array sum(%i, %i) === %i", (a, b, exp) => // positional arguments
+    expect(a + b).toBe(exp)
+  )
+  test.each([
+    { a: 1, b: 2, exp: 3 }, { a: 4, b: 5, exp: 9 }
+  ])("object sum($a, $b) === $exp", ({ a, b, exp }) => // object destructuring
+    expect(a + b).toBe(exp)
+  )
+})
   #+END_SRC
 - Test context
   #+BEGIN_SRC js
