@@ -785,6 +785,23 @@ describe("assertions suite", () => { // test suite, new testing context
   })
 })
   #+END_SRC
+- *Custom matchers*
+  #+BEGIN_SRC js
+// expect(v).toCustomMatcher(a, b) => toCustomMatcher(v, a, b)
+function toBeWithinRange(v, a, b) {
+  const pass = v >= a && v <= b
+  const message = () => // error message when the matcher does not pass
+    `expected ${v}${pass ? " not " : " " }to be within range ${a}..${b}`
+  return { pass, message } // return an object or a Promise to an object
+}
+expect.extend({ toBeWithinRange })
+describe("custom matcher", () => {
+  test("range matcher", () => {
+    expect(2).toBeWithinRange(1, 3)
+    expect(2).not.toBeWithinRange(3, 4)
+  })
+})
+  #+END_SRC
 - *Promise testing*, *async testing*
   #+BEGIN_SRC js
 describe("promise", () => {
@@ -825,16 +842,17 @@ describe("parameterized", () => {
   )
 })
   #+END_SRC
-- Test context
+- *Test context* through a shared variable
   #+BEGIN_SRC js
-    describe("test context", () => {
-      beforeEach(ctx => ctx.n = 10) // set up a test local context
-      afterEach(ctx => delete ctx.n) // tear down a test local context
-      test("context setup", ctx => expect(ctx.n + 1).toBe(11))
-      test("context reset", ({ n }) => expect(n - 1).toBe(9))
-    })
+describe("test context", () => {
+  let ctx = { }
+  beforeEach(() => ctx.n = 10) // set up a test local context
+  afterEach(() => delete ctx.n) // tear down a test local context
+  test("context setup", () => expect(ctx.n + 1).toBe(11))
+  test("context reset", () => expect(ctx.n - 1).toBe(9))
+})
   #+END_SRC
-- Spies and mocks
+- *Spies* and *mocks*
   #+BEGIN_SRC js
 describe("spies and mocks", () => {
   afterAll(() => mock.restore()) // restore all mocked functions, not modules
