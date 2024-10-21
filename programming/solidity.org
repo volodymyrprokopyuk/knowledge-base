@@ -1,0 +1,33 @@
+* Solidity
+
+- Public field :: A =public= field of a contract automatically generates the
+  getter method
+  #+BEGIN_SRC solidity
+contract Contract {
+  address public minter; // automatically generates
+  function minter() external view returns (address) {
+    return minter;
+  }
+  mapping(address => uint256) public balances; // automatically generates
+  function balances(address account) external view returns (uint256) {
+    return balances[account];
+  }
+}
+  #+END_SRC
+- Require function :: The =require= function conditionally reverts all changes
+  make by a method
+  #+BEGIN_SRC solidity
+error InsufficientFunds(uint256 requested, uint256 available);
+require(balances[msg.sender] >= value, "insufficient funds");
+require(balances[msg.sender] >= value, InsufficientFunds(value, balances[msg.sender]));
+  #+END_SRC
+- Revert statement :: The =revert= statement conditionally reverts all changes
+  make by a method
+  #+BEGIN_SRC solidity
+if (balances[msg.sender] >= value) {
+  revert "insufficient funds";
+}
+if (balances[msg.sender] >= value) {
+  revert InsufficientFunds(value, balances[msg.sender]);
+}
+  #+END_SRC
