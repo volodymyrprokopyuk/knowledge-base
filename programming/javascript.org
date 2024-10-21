@@ -764,7 +764,8 @@ bun test --coverage file.test.js -t reTest
 import { describe, test, expect } from "bun:test"
 import { beforeAll, beforeEach, afterAll, afterEach } from "bun:test"
 import { spyOn, mock } from "bun:test"
-describe("assertions suite", () => { // test suite, new testing context
+// test suite, new testing context, must be sync
+describe("assertions suite", () => {
   // describe scope, top level file scope, --preload ./setup.js all files scope
   beforeAll(() => console.log("before all"))
   afterAll(() => console.log("after all"))
