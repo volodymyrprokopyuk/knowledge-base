@@ -74,3 +74,102 @@
 - Proof of elapsed time PoET :: each node generates a random duration using a
   Trusted Execution Environment TEE e.g. Intel Software Guard Extension SGX. A
   node with the shortest duration wins the elections e.g. Hyperledger Sawtooth
+
+
+* EVM
+
+- EVM :: The EVM is a sandboxed runtime environment to run smart contracts. The
+  runtime environment is completely isolated from the local file system, OS
+  processes, and the network
+
+** Account
+
+- External account :: The external account is controlled by a key pair and is
+  owned by an individual. The address of an external account is derived from the
+  public key
+- Contract account :: The contract account has associated code of a smart
+  contract and does not have a private key. The address of a contract account is
+  derived from the address of the contract creator and a nonce
+- Key-value store :: Both external and contract accounts have the associated
+  key-value store on the blockchain in the form of 256-bit to 256-bit mapping
+- Account balance :: Both external and contract accounts have the associated
+  account balance in =wei = 1e-18 ether=, that can be modified by sending
+  ether-including transactions to the account
+
+** Transaction
+
+- Transaction :: The transaction is a message sent from one account to another.
+  The transaction has the binary payload and can have ether. If the target
+  account is not set, a new contract account is created. If the target
+  account is a contract account, the contract method is executed using the
+  transaction payload as the input data in the form of the EVM bytecode
+- Gas :: The execution of each EVM instruction within a transaction is charged
+  with an amount of gas that has to be paid upfront by the originator
+  =tx.origin= of the transaction to the executor of the transaction. A reverted
+  transaction consumes gas spent up to the point of revert. A ran out of gas
+  transaction is reverted, while all the supplied gas is consumed. The gas
+  incentivizes economical use of EVM
+- Method structure :: Check conditions e.g. =require=, =revert=, then perform
+  effects by updating the internal state of the current contract, finally
+  interact with external world e.g. call other contracts, transfer ether
+
+** Storage and memory
+
+- Storage :: The storage is a per account expensive persistent key-value store
+  in the form of 256-bit to 256-bit mapping
+- Transient storage :: The transient storage is less expensive and is reset at
+  the end of each transaction
+- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
+  memory cost scales quadratically
+- Stack :: The EVM is a stack-based, not register-based machine. All
+  computations are performed on a stack with max 1024 256-bit words
+
+** Message call and delegate call
+
+- Call data :: The ABI-encoded input data for a smart contract external function
+  decoded into a location specified by their declaration e.g. =memory= eager
+  decoding into memory, =calldata= lazy decoding into memory
+- Return data :: The ABI-encoded results of a smart contract external function
+- Contract code :: The immutable EVM bytecode instructions stored on the
+  blockchain and executed by the EVM
+- Message call :: The message call is an invocation of a contract function or a
+  sending of ether to an external account. A top-level message call initiates a
+  transaction and can create other message calls when a contract calls another
+  contract including itself, or sends ether to an external account. The message
+  call has a source, a target, a message payload, ether, gas, and a return data
+- Delegate call :: The delegate call is the message call executed in the context
+  of the calling contract only the code is taken from the called address. The
+  delegate call allows to dynamically load from different addresses at runtime.
+  The delegate call allows to implement libraries of Solidity code executed in
+  the constext of the calling contract
+- Self-destruct :: The now deprecated =selfdestruct= EVM instruction executed by
+  the contract itself sends the remaining contract account balance to a
+  designated account, removes the storage and the contract code from the
+  blockchain state. Ether sent to a removed contract address is lost forever.
+  The recommended way to deactivate a contract is to change the state that
+  causes all contract functions to revert
+- Pre-compiled contract :: The pre-compiled contract is implemented by the EVM
+  itself, not in Solidity
+
+
+* Foundry
+
+** Testing
+
+- Stateless test function :: The test function represents an isolated stateless
+  test executed as a single transaction with a copy of the state after =setUp()=
+  on its own standalone EVM instance. State modifications after the test run are
+  not available to other tests
+- Multi-transaction test :: The multi-transaction test executes multiple
+  transactions defined in the =beforeTestSetup()= before the main transaction of
+  the test
+- Property-based testing :: The property-based testing assets against general
+  properties and behaviors as opposed to predefined concrete scenarios of
+  conventional testing. The property-based tests take at least one parameter
+  src_solidity{ function testFuzzWithdarw(uint256 amount) external { ... } }.
+  Variable or function fixtures for fuzz testing provide a predefined set of
+  values src_solidity{ uint256[] memory public fixtureAmount = [ 1, 2, 3 ]; }
+  or src_solidity{ function fixtureAmount() public returns (uint256[] memory) }
+- Invariant testing :: The invariant testing asserts a set of invariant
+  statements after every call from a randomized sequence of predefined function
+  calls

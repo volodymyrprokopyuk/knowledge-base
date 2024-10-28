@@ -1,5 +1,79 @@
 * Solidity
 
+** Layout
+
+- File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
+  =library=, =contract=
+- Contract layout :: =enum=, =struct=, state, =event=, =error=, =modifier=,
+  =function=
+- Function modifiers layout ::
+  - Visibility :: =private=, =internal=, =public=, =external=
+  - Mutability :: =pure=, =view=
+  - Inheritance :: =virtual=, =override=
+  - Modifier :: Custom modifiers
+
+** Import
+
+- Import :: The =import= statement imports all or explicitly selected global
+  symbols from the imported file into the global scope of the current file
+  #+BEGIN_SRC solidity
+import "path"; // imports all symbols
+import { A, B as BB } "path"; // imports only selected symbols
+import * as alias from "path" // imports all symbols under the alias
+  #+END_SRC
+
+
+** Types
+
+*** Value types
+
+- Default value :: Declared, but not assigned variables automatically get
+  assigned the type-dependent default value. Undefined or null values are not
+  possible in Solidity
+- Value types :: Value types are always passed by value in function arguments
+  and assignments. Value types are always stored on the stack, hence
+  declarations of value types do not specify data location. The only exception
+  are state variables that are located in the storage, but can also be marked as
+  =transient=, =constant=, or =immutable=
+  - Checked arithmetic operations :: All arithmetic operations are checked by
+    default and revert on an underflow or an overflow
+  - Division of literals :: The division of literals results in fractional
+    values of arbitrary precision
+  - Division of integers :: The division of integers rounds towards zero
+  - Payable address :: The 20-bytes Ethereum address that accepts Ether. An
+    =address= or a =contract= with a =receive()= function or a payable
+    =fallback= function must be explicitly converted to a payable address
+  - Transfer and send :: The high-level =transfer()= function reverts on failure
+    and stops the execution of the current contract. The low-level =send()=
+    function returns =false= on failure, but the execute of the current contract
+    continues. Always check the return value of the =send()= function, or better
+    use the =transfer()= function, or better let the recipient withdraw Ether
+  | Value type                       | Operators and functions           |
+  |----------------------------------+-----------------------------------|
+  | =bool=, =true=, =false=          | ~!, &&, ¦¦, ==, !=~               |
+  | ~int = int256~, ~uint = uint256~ | ~<, <=, >=, >, ==, !=~            |
+  |                                  | =~, &, ¦, ^, <<, >>=              |
+  |                                  | ~+, -, *, /, %, **~               |
+  |                                  | ~type(int).min, type(uint).max~   |
+  | ~fixed = fixed128x18~            | Not yet supported by Solidity     |
+  | ~ufixed = ufixed128x18~          |                                   |
+  | 20 bytes =address=               | Does not accept Ether             |
+  | =address payable=                | =transfer()=, =send()=, =balance= |
+  |                                  | =payable(address)=                |
+  |                                  |                                   |
+
+*** Reference types
+
+- Reference types ::
+
+** State
+
+- State variables :: The state variables are either permanently stored in the
+  contract storage or temporarily stored in the transient storage that is
+  cleared at the end of each transaction
+
+** Visibility modifiers
+
 - Public field :: A =public= field of a contract automatically generates the
   getter method
   #+BEGIN_SRC solidity
@@ -14,6 +88,9 @@ contract Contract {
   }
 }
   #+END_SRC
+
+** Error handling
+
 - Require function :: The =require= function conditionally reverts all changes
   make by a method
   #+BEGIN_SRC solidity
