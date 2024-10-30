@@ -8,7 +8,7 @@
   =function=
 - Function modifiers layout ::
   - Visibility :: =private=, =internal=, =public=, =external=
-  - Mutability :: =pure=, =view=
+  - Mutability :: =pure=, =view=, =payable=
   - Inheritance :: =virtual=, =override=
   - Modifier :: Custom modifiers
 
@@ -27,44 +27,172 @@ import * as alias from "path" // imports all symbols under the alias
 
 *** Value types
 
-- Default value :: Declared, but not assigned variables automatically get
-  assigned the type-dependent default value. Undefined or null values are not
-  possible in Solidity
+- Default value :: Declared, but not assigned variables automatically gets
+  assigned the type-dependent default value whose byte representation is all
+  zeros. Undefined or null values are not possible in Solidity
 - Value types :: Value types are always passed by value in function arguments
   and assignments. Value types are always stored on the stack, hence
   declarations of value types do not specify data location. The only exception
   are state variables that are located in the storage, but can also be marked as
   =transient=, =constant=, or =immutable=
-  - Checked arithmetic operations :: All arithmetic operations are checked by
-    default and revert on an underflow or an overflow
-  - Division of literals :: The division of literals results in fractional
-    values of arbitrary precision
-  - Division of integers :: The division of integers rounds towards zero
-  - Payable address :: The 20-bytes Ethereum address that accepts Ether. An
-    =address= or a =contract= with a =receive()= function or a payable
-    =fallback= function must be explicitly converted to a payable address
-  - Transfer and send :: The high-level =transfer()= function reverts on failure
-    and stops the execution of the current contract. The low-level =send()=
-    function returns =false= on failure, but the execute of the current contract
-    continues. Always check the return value of the =send()= function, or better
-    use the =transfer()= function, or better let the recipient withdraw Ether
-  | Value type                       | Operators and functions           |
-  |----------------------------------+-----------------------------------|
-  | =bool=, =true=, =false=          | ~!, &&, ¦¦, ==, !=~               |
-  | ~int = int256~, ~uint = uint256~ | ~<, <=, >=, >, ==, !=~            |
-  |                                  | =~, &, ¦, ^, <<, >>=              |
-  |                                  | ~+, -, *, /, %, **~               |
-  |                                  | ~type(int).min, type(uint).max~   |
-  | ~fixed = fixed128x18~            | Not yet supported by Solidity     |
-  | ~ufixed = ufixed128x18~          |                                   |
-  | 20 bytes =address=               | Does not accept Ether             |
-  | =address payable=                | =transfer()=, =send()=, =balance= |
-  |                                  | =payable(address)=                |
-  |                                  |                                   |
+- Arbitrary precision of number literals :: Number literals retain arbitrary
+  precision until they are converted to a specific type. Computations do not
+  overflow in number literals. Most operands produce a literal expression when
+  applied to literals
+- Checked arithmetic operations :: All arithmetic operations are checked by
+  default and revert on an underflow or an overflow
+- Division of literals :: The division of literals results in fractional values
+  of arbitrary precision
+- Division of integers :: The division of integers rounds towards zero
+- Ether units :: Numbers can have the =wei=, =gwei=, and =ether= suffix to
+  identify ether value. Numbers without a suffix are assumed to be in =wei=
+| Ether unit | Value                   |
+| =1 wei=    | =1e-18 ether=           |
+| =1 gwei=   | =1e-9 ether=, =1e9 wei= |
+| =1 ether=  | =1e18 wei=, =1e9 gwei=  |
+- Payable address :: The 20-bytes Ethereum address that accepts Ether. An
+  =address= or a =contract= with a =receive()= function or a payable =fallback=
+  function must be explicitly converted to a payable address. Balance of a
+  payable contract src_solidity{ address(this).balance }
+- Transfer and send :: The high-level =transfer()= function reverts on failure
+  and stops the execution of the current contract. The low-level =send()=
+  function returns =false= on failure, but the execute of the current contract
+  continues. Always check the return value of the =send()= function, or better
+  use the =transfer()= function, or better let the recipient withdraw Ether
+- User-defined value type :: The user-defined value type creates a zero-cost
+  abstraction over the underlying value type. The user-defined value type has
+  neither operators nor attached functions, only explicit conversion to and from
+  the underlying value type is supported through wrap and unwrap
+
+| Value type                         | Operators and functions                 |
+|------------------------------------+-----------------------------------------|
+| =bool=, =true=, =false=            | ~!, &&, ¦¦, ==, !=~                     |
+| ~int = int256~, ~uint = uint256~   | ~<, <=, >=, >, ==, !=~                  |
+|                                    | =~, &, ¦, ^, <<, >>=                    |
+|                                    | ~+, -, *, /, %, **~                     |
+|                                    | ~type(int).min, type(uint).max~         |
+| ~fixed = fixed128x18~              | Not yet supported by Solidity           |
+| ~ufixed = ufixed128x18~            |                                         |
+| =address= (20 bytes)               | Does not accept Ether                   |
+| =0x123..abc=                       | Address literal                         |
+| =address payable=                  | =transfer()=, =send()=, =balance=       |
+|                                    | =payable(address)=                      |
+| =bytes1= .. =bytes32= (fixed-size) | ~<, <=, >=, >, ==, !=~                  |
+|                                    | =~, &, ¦, ^, <<, >>=                    |
+|                                    | ~arr[i], arr.length~                    |
+| ="string"=, =unicode"string"=      | ASCII and Unicode strings               |
+| =hex"1a2b"=                        | Hex literal                             |
+| ~enum State { Start, End }~        | ~type(State).min~, ~type(State).max~    |
+|                                    | ~state == State.Start~                  |
+| ~type Year is uint;~               | ~Year.wrap(2024)~, ~Year.unwarep(year)~ |
 
 *** Reference types
 
-- Reference types ::
+- Reference types :: The same memory location is accessed through multiple
+  references that point to the shared memory location. The reference data types
+  are =struct=, =array=, =mapping=
+- Data location :: The data location specifies where declared data is allocated.
+  The data location =memory=, =storage=, =calldata= must be specified for
+  declarations of reference data types. =storage= data location for state
+  variables within a contract can be omitted
+  - Call data :: The =calldata= data location stores function arguments in a
+    read-only, volatile memory-like data location that avoids unnecessary copies
+    of data
+- Fixed array :: The fixed size array ~T[k]~. Each array element is initialized
+  with the default value for the element type. A fixed size array cannot be
+  assigned to a dynamic array. A fixed arrays of different sizes cannot be
+  converted into each other
+- Dynamic array :: The dynamic array ~T[]~ with only =storage= data location
+  dynamically grows as elements are added to the array. Each array element is
+  initialized with the default value for the element type. The notation is
+  reversed e.g. ~T[][4]~ is the fixed array of 4 dynamic arrays. The access is
+  in the opposite direction of the declaration e.g. ~t[0][1]~ is the first
+  element of the second dynamic array. Dynamic array with =memory= data location
+  is not possible to resize src_solidity{ uint[] memmory arr = new uint[](k) }
+- Array literal :: The array literal is the fixed size src_solidity{ [uint(1),
+  value, f()] } with the type ~uint[3] memory~. The type of the array literal is
+  the type of the first element with all other elements implicitly convertible
+  to the type of the first element
+- Array slice :: The array slice represents a view on an array e.g.
+  ~arr[start:end]~
+- Bytes array :: The =bytes= is the special type of array with packed data for
+  storing binary data. The =bytes1[]= adds padding to each array element. Prefer
+  fixed =bytes1= .. =bytes32= over dynamic =bytes=. Bytes concatenation
+  ~bytes.concat(b1, b2)~
+- String array :: The =string= is equivalent to =bytes= for Unicode, but does
+  not allow length and index access. Low-level bytes manipulation, not Unicode
+  code points src_solidity{ bytes(s).length; bytes(s)[k] = value; }. String
+  comparison src_solidity{ keccak256(abi.encodePacked(s1)) ==
+  keccak256(abi.encodePacked(s2)) }. String concatenation ~string.concat(s1,
+  s2)~
+- Struct :: The =struct= defines a new user-defined type. Arrays and mappings
+  can have structs and vice versa. Recursive structs are not supported
+- Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but
+  single type under the keccak256 hash of the key type. The key value is not
+  stored in the mapping, hence keys cannot be enumerated, and the key must be
+  know to access the value. A mapping can have only =storage= data location,
+  hence mappings are used for state variables and as storage references in
+  functions. Mappings cannot be used as function arguments and function return
+  values
+- Delete :: The =delete= operator assigns the default value or a new default
+  reference value to a variable, an array slot, a mapping slot, a struct field.
+  The delete operator assigns an empty fixed or dynamic array to an array
+  variable. The delete operator has no effect on mappings, unless the delete
+  operator is applied to a specific key within a mapping
+| Reference type          | Fields and functions                     |
+| ~T[k]~, ~T[]~           | =length=, ~push(v)~, ~pop()~, ~arr[i]~   |
+|                         | ~delete arr;~, ~delete arr[k];~          |
+| ~mapping(key => vlaue)~ | ~map[key] = value~, ~delete map[key]~    |
+| ~struct A { uint a; }~  | ~A a = A(1);~, ~A a = A({a: 1});~, ~a.a~ |
+|                         | ~delete a;~                              |
+
+** Functions
+
+- Function type :: The function type is the first class in Solidity. Functions
+  can be assigned to variables, passed to functions as arguments, and returned
+  from functions as return values. Gas and ether can be provided when calling a
+  function src_solidity{ f{value: 1, gas: 10}(); }
+- Internal function :: The =internal= function can only be called from the
+  current contract, from the inheriting contracts, from used library functions.
+  An internal function is called directly via a simple jump in the EVM
+  preserving memory by other contract functions ~f()~
+- External function :: The =external= function can be only called by external
+  accounts and other contracts by specifying the contract address and the
+  signature of the external function. An external function provides the
+  ~f.address~ of the contract and the ABI ~f.selector~. An external function is
+  called through =this= or through a contract instance ~this.f()~, ~contr.f()~
+  via a message call, not via a jump. An external function call from one
+  contract to another does not create a new transaction, it is only a message
+  call within the current transaction. An external function call can specify the
+  amount of gas and ether that are added to the balance of the other contract
+  ~contr.f{value: 1, gas: 10}();~
+- Tuple type :: The tuple type is a fixed list of heterogeneous types. Tuple is
+  not a proper type in Solidity. Tuple is used to return multiple values from a
+  function and for destructuring assignment of returned multiple values
+  src_solidity{ return (true, 1, "a"); (bool b, uint i, string s) = f(); }
+- Named parameters :: Function arguments can be provided in any order by
+  specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
+
+** Contract
+
+- Contract creation :: A contract can be created by other contract using a salt
+  to randomize the new contract address src_solidity{ Contract c = new
+  Contract{salt: bytes32}(); }
+
+*** Interacting with contracts
+
+- Contract manual interaction :: The low-level functions =call()=,
+  =delegatecall()=, and =staticcall()= operate on an address, not a contract
+  instance and have the same signature src_solidity{ address().call{value: 1,
+  gas: 10}(bytes memory args) returns (bool success, bytes memory values); } and
+  provide fine-grained control over encoding of the input arguments and the
+  return values. Data encoding can be done with =abi.encode()=,
+  =abi.encodePacked()=, =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
+  - Delegate call :: The =delegatecall()= function implements the =library= and
+    only uses the code from the target address, while preserving the context
+    e.g. storage, accounts, from the current contract
+  - Static call :: The =staticcall()= function reverts if the called function
+    modifies the state of the current contract
 
 ** State
 
@@ -78,9 +206,13 @@ import * as alias from "path" // imports all symbols under the alias
   getter method
   #+BEGIN_SRC solidity
 contract Contract {
-  address public minter; // automatically generates
-  function minter() external view returns (address) {
-    return minter;
+  address public owner; // automatically generates
+  function owner() external view returns (address) {
+    return owner;
+  }
+  uint[] public values; // automatically generats
+  function values(uint i) external view returns (uint) {
+    return values[i];
   }
   mapping(address => uint256) public balances; // automatically generates
   function balances(address account) external view returns (uint256) {
@@ -91,20 +223,44 @@ contract Contract {
 
 ** Error handling
 
-- Require function :: The =require= function conditionally reverts all changes
-  make by a method
+- Assert function :: The =assert= function causes a ~Panic(uint)~ when a
+  condition is not met and is used only for internal checks e.g. division by
+  zero, arithmetic overflow, arithmetic underflow, out-of-bounds array access,
+  conversion error, corrupted data, explicit assert e.g. src_solidity{
+  assert(cond) }
+- Revert statement :: The =revert= statement reverts all changes when a
+  condition is not met
   #+BEGIN_SRC solidity
-error InsufficientFunds(uint256 requested, uint256 available);
-require(balances[msg.sender] >= value, "insufficient funds");
-require(balances[msg.sender] >= value, InsufficientFunds(value, balances[msg.sender]));
-  #+END_SRC
-- Revert statement :: The =revert= statement conditionally reverts all changes
-  make by a method
-  #+BEGIN_SRC solidity
-if (balances[msg.sender] >= value) {
-  revert "insufficient funds";
+error ErrInsufficientFunds(uint requested, uint available);
+if (balances[msg.sender] <= value) {
+  revert ErrInsufficientFunds(value, balances[msg.sender]);
 }
-if (balances[msg.sender] >= value) {
-  revert InsufficientFunds(value, balances[msg.sender]);
+  #+END_SRC
+- Require function :: The =require= convenience function reverts all changes
+  when a condition is not met. The =revert= statement and the =require= function
+  are equivalent, but the require function is more convenient
+  #+BEGIN_SRC solidity
+require(balances[msg.sender] <= value, "insufficient funds");
+require(
+  balances[msg.sender] <= value,
+  ErrInsufficientFunds(value, balances[msg.sender])
+);
+  #+END_SRC
+- try/catch statement :: The =try/catch= statement handles errors when an
+  external function call or a =new= contract creation has reverted
+  #+BEGIN_SRC solidity
+try this.externalCall() returns (uint returnValue) {
+  // success: returnValue
+} catch Error(string memory message) {
+  // Error message
+} catch Panic(uint code) {
+  // Panic code
+} catch (bytes memory err) {
+  bytes memory expErr = abi.encodeWithSignature(
+    "ErrOh(string)", "revert error"
+  );
+  assertEq(err, expErr);
+} catch {
+  // catch all errors
 }
   #+END_SRC

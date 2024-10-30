@@ -109,9 +109,10 @@
   transaction consumes gas spent up to the point of revert. A ran out of gas
   transaction is reverted, while all the supplied gas is consumed. The gas
   incentivizes economical use of EVM
-- Method structure :: Check conditions e.g. =require=, =revert=, then perform
-  effects by updating the internal state of the current contract, finally
-  interact with external world e.g. call other contracts, transfer ether
+- Method structure :: Structure methods to prevent the reentrancy exploit. Check
+  conditions e.g. =require=, =revert=, then perform effects by updating the
+  internal state of the current contract, finally interact with external world
+  e.g. call other contracts, transfer ether
 
 ** Storage and memory
 
