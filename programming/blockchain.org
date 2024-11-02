@@ -75,7 +75,6 @@
   Trusted Execution Environment TEE e.g. Intel Software Guard Extension SGX. A
   node with the shortest duration wins the elections e.g. Hyperledger Sawtooth
 
-
 * EVM
 
 - EVM :: The EVM is a sandboxed runtime environment to run smart contracts. The
@@ -113,17 +112,6 @@
   conditions e.g. =require=, =revert=, then perform effects by updating the
   internal state of the current contract, finally interact with external world
   e.g. call other contracts, transfer ether
-
-** Storage and memory
-
-- Storage :: The storage is a per account expensive persistent key-value store
-  in the form of 256-bit to 256-bit mapping
-- Transient storage :: The transient storage is less expensive and is reset at
-  the end of each transaction
-- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
-  memory cost scales quadratically
-- Stack :: The EVM is a stack-based, not register-based machine. All
-  computations are performed on a stack with max 1024 256-bit words
 
 ** Message call and delegate call
 

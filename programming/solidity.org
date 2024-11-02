@@ -1,28 +1,5 @@
 * Solidity
 
-** Layout
-
-- File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
-  =library=, =contract=
-- Contract layout :: =enum=, =struct=, state, =event=, =error=, =modifier=,
-  =function=
-- Function modifiers layout ::
-  - Visibility :: =private=, =internal=, =public=, =external=
-  - Mutability :: =pure=, =view=, =payable=
-  - Inheritance :: =virtual=, =override=
-  - Modifier :: Custom modifiers
-
-** Import
-
-- Import :: The =import= statement imports all or explicitly selected global
-  symbols from the imported file into the global scope of the current file
-  #+BEGIN_SRC solidity
-import "path"; // imports all symbols
-import { A, B as BB } "path"; // imports only selected symbols
-import * as alias from "path" // imports all symbols under the alias
-  #+END_SRC
-
-
 ** Types
 
 *** Value types
@@ -153,31 +130,176 @@ import * as alias from "path" // imports all symbols under the alias
   from functions as return values. Gas and ether can be provided when calling a
   function src_solidity{ f{value: 1, gas: 10}(); }
 - Internal function :: The =internal= function can only be called from the
-  current contract, from the inheriting contracts, from used library functions.
-  An internal function is called directly via a simple jump in the EVM
+  current contract, from the derived contracts, from used library functions.
+  An internal function is called directly via a simple *jump* in the EVM
   preserving memory by other contract functions ~f()~
 - External function :: The =external= function can be only called by external
-  accounts and other contracts by specifying the contract address and the
-  signature of the external function. An external function provides the
-  ~f.address~ of the contract and the ABI ~f.selector~. An external function is
-  called through =this= or through a contract instance ~this.f()~, ~contr.f()~
-  via a message call, not via a jump. An external function call from one
-  contract to another does not create a new transaction, it is only a message
-  call within the current transaction. An external function call can specify the
-  amount of gas and ether that are added to the balance of the other contract
-  ~contr.f{value: 1, gas: 10}();~
+  accounts and other contracts through a *message call* by specifying the
+  contract address the signature of the external function and the encoded
+  arguments. An external function provides the ~f.address~ of the contract and
+  the ABI ~f.selector~. An external function is called through ~this.f()~ or
+  through a contract instance ~contr.f()~ via a message call, not via a jump. An
+  external function call from one contract to another does not create a new
+  transaction, it is only a message call within the current transaction. An
+  external function call can specify the amount of gas and ether that are added
+  to the balance of the called contract ~contr.f{value: 1, gas: 10}();~
 - Tuple type :: The tuple type is a fixed list of heterogeneous types. Tuple is
   not a proper type in Solidity. Tuple is used to return multiple values from a
   function and for destructuring assignment of returned multiple values
   src_solidity{ return (true, 1, "a"); (bool b, uint i, string s) = f(); }
 - Named parameters :: Function arguments can be provided in any order by
   specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
+- Contract function visibility ::
+  - Private :: A =private= function is only accessible to the defining contract
+    and is not accessible to derived contracts
+  - Internal :: An =internal= function (default visibility) is accessible to the
+    defining contract and to derived contracts. An internal function can take
+    mappings and references to storage as parameters
+  - Public :: A =public= function is accessible to other contracts as part of
+    the public interface of the contract
+  - External :: An =external= function is accessible to other contracts as part
+    of the public interface of the contract. An external function cannot be
+    called internally ~f()~, but only through ~this.f()~
+- Free function :: The free function outside a contract has implicit internal
+  visibility, is included in all contracts that call the function, is
+  executed in the context of the calling contract, but does not have access to
+  =this= and state variables of the calling contract
+- Function state mutability :: State modifying operations: write to state
+  variables, create new contracts, send ether, emit events, call a function not
+  marked as view or pure, use low-level calls
+  - Pure function :: The =pure= function performs computations without even
+    reading state variables
+  - View function :: The =view= function reads state variables, but does not
+    modify them
+- Receive function :: Ether, sent to a contact by the =transfer()= and =send()=
+  calls, is received through the =receive()= function
+  #+BEGIN_SRC solidity
+contract Sink {
+  event Receive(address indexed from, uint value);
+  receive() external payable {
+    emit Receive(msg.sender, msg.value);
+  }
+}
+  #+END_SRC
+- Fallback function :: A contract can have at most one =fallback()= function
+  that is executed when no other contract function matches the call signature
+  #+BEGIN_SRC solidity
+contract FallbackContract {
+  fallback() external [payable] {
+  }
+  fallback(bytes calldata input) external [payable]
+    returns (bytes memory output) {
+  }
+}
+  #+END_SRC
+- Function overloading :: The function overloading takes into consideration only
+  types and order of the function parameters, not the return values
+
+*** Function modifier
+
+- Function modifier :: The function modifier is a decorator that checks
+  pre-conditions before invoking a function and handles post-conditions after
+  the function execution. Virtual modifiers can be overridden in derived
+  contracts. A modifier cannot access or change function arguments or return
+  values. Function arguments can only be passed to a modifier at the point of
+  application src_solidity{ function f(uint a) mod(a) { ... } }. A modifier can
+  decide to not execute the function at all. In this case the return values of
+  the function are set to their default values
+  #+BEGIN_SRC solidity
+contract Generocity {
+  mapping(address => bool) gifts;
+  bool transient locked;
+
+  modifier lock() {
+    require(!locked, "reentrant call");
+    lock = true;
+    _;
+    lock = false;
+  }
+
+  function claimGift() public lock {
+    require(address(this).balance >= 1 ether, "insufficient balance");
+    require(!gifts[msg.sender], "gift already claimed");
+    (bool success, ) = msg.sender.send{value: 1 ether}("");
+    require(success, "gift failed");
+    gifts[msg.sender] = true;
+  }
+}
+  #+END_SRC
+
+
+** Event
+
+- Event :: Emitted events are associated with a contract address and stored in
+  the transaction log on the blockchain. Events and logs are not accessible from
+  within the contract that emitted them
+- Event indexing :: At most three event fields can be indexed and placed into
+  topics that provide efficient search by indexed fields. The keccak256 hash of
+  the event signature is placed into the forth default topic. A topic can only
+  hold 32-byte words. A keccak256 hash of indexed reference types is stored in a
+  topic. All not indexed event fields are stored in the data part of the
+  transaction log
 
 ** Contract
 
-- Contract creation :: A contract can be created by other contract using a salt
-  to randomize the new contract address src_solidity{ Contract c = new
-  Contract{salt: bytes32}(); }
+- Contract creation :: A contract can be created either by a transaction from an
+  external account or by by another contract using a salt to randomize the new
+  contract address src_solidity{ Contract c = new Contract{salt: bytes32}(); }.
+  The contract constructor is executed only once when a contract is created.
+  Only one constructor is allowed: the constructor overloading is not supported
+- Contract code on the blockchain :: When a constructor is being executed, the
+  contract is not yet deployed. After the constructor has executed, the final
+  contract code is stored on the blockchain. The contract code includes all
+  public and external functions, as well as all private and internal functions
+  reachable from the the public interface through function calls. The deployed
+  contract code does not include the constructor code or functions only called
+  from the constructor
+- Multiple inheritance :: The contract hierarchy is complied into a single the
+  contract. All internal calls to functions defined in base contracts are
+  implemented as very efficient jumps. Shadowing of state variables generates an
+  error. Derived contracts must have distinct names for state variables.
+  Mark functions of a base contract as =virtual= to =override= them in derived
+  contracts. Virtual modifiers can be overridden in derived contracts. Multiple
+  base classes are searched in the right-to-left order of the inheritance list
+  #+BEGIN_SRC solidity
+contract Base1 {
+  constructor(uint) { }
+  modifier m() virtual { _; }
+  function f() virtual public { }
+}
+contract Base2 {
+  constructor(uint) { }
+  modifier m() virtual { _; }
+  function f() virtual public { }
+}
+// inheritance list: the most base to the most derived order
+contract Derived is Base1(1), Base2 {
+  constructor() Base2(2) { } // constructor modifier list
+  modifier m() override(Base1, Base2) { _; }
+  function f() override(Base1, Base2) public { }
+}
+  #+END_SRC
+- Abstract contract :: The abstract contract has at least one function not
+  implemented or the contract does not provides arguments to at least one base
+  contract. Abstract contracts cannot be directly created, but must be inherited
+  by deriving contracts
+- Interface :: The interface provides only signatures of implicitly virtual
+  functions, not their implementations. An interface can inherit from other
+  interfaces. All functions in an interface must be external even if the
+  functions will be public in the implementing contracts. An interface can
+  define enums and structs
+- Library :: The library is a set of internal and external functions deployed
+  once and reused in the context of the calling contract through the
+  =delegatecall= for external functions and the efficient jumps for internal
+  functions. All used internal library functions are included in the calling
+  contract during the construction, so calls to internal library functions are
+  efficient jumps
+- Using F for T :: The ~using f, g as +, L.e for t;~ directive attaches free or
+  library functions to a type within the contract or a source unit scope. The
+  ~using L for t;~ directive attaches all public library functions to a type.
+  All types are identified with =*=. The type is passed as the first argument to
+  the function. The left and right operands are passed to the function that acts
+  as an operator
 
 *** Interacting with contracts
 
@@ -185,14 +307,17 @@ import * as alias from "path" // imports all symbols under the alias
   =delegatecall()=, and =staticcall()= operate on an address, not a contract
   instance and have the same signature src_solidity{ address().call{value: 1,
   gas: 10}(bytes memory args) returns (bool success, bytes memory values); } and
-  provide fine-grained control over encoding of the input arguments and the
-  return values. Data encoding can be done with =abi.encode()=,
+  provide fine-grained control over encoding of the input arguments and decoding
+  of the return values. Data encoding can be done with =abi.encode()=,
   =abi.encodePacked()=, =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
+  - Call :: The =call()= function switches the EVM state e.g. state variables,
+    accounts from the current calling contract to the new called contract, so
+    the context of the calling contract is inaccessible
   - Delegate call :: The =delegatecall()= function implements the =library= and
     only uses the code from the target address, while preserving the context
-    e.g. storage, accounts, from the current contract
+    e.g. state variables, accounts, from the current calling contract
   - Static call :: The =staticcall()= function reverts if the called function
-    modifies the state of the current contract
+    modifies the state of the current calling contract
 
 ** State
 
@@ -200,10 +325,33 @@ import * as alias from "path" // imports all symbols under the alias
   contract storage or temporarily stored in the transient storage that is
   cleared at the end of each transaction
 
-** Visibility modifiers
+** Storage and memory
 
-- Public field :: A =public= field of a contract automatically generates the
-  getter method
+- Storage :: The storage is a per account expensive persistent key-value store
+  in the form of 256-bit to 256-bit mapping stored on the blockchain
+- Transient storage :: The transient storage is less expensive and is reset at
+  the end of each transaction. The transient storage is private to the contract.
+  Variables in the transient storage cannot be initialized in the declaration,
+  but initially are assigned default values
+- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
+  memory cost scales quadratically
+- Stack :: The EVM is a stack-based, not register-based machine. All
+  computations are performed on the stack with max 1024 256-bit words
+
+** State variables
+
+- State variable visibility :: The state variable visibility only prevents
+  derived or external contracts from reading or writing state variables, but all
+  state is publicly available for reading on the blockchain
+  - Private :: A =private= state variable is only accessible to the defining
+    contract and is not accessible to derived contracts
+  - Internal :: An =internal= state variable (default visibility) is accessible
+    to the defining contract and to derived contracts
+  - Public :: A =public= state variable is read-only accessible to other
+    contracts through automatically generated getters. Public state variables
+    allow direct access via =x= or external access through getters via =this.x=
+- Public field :: A getter view function is automatically generated for every
+  public state variable
   #+BEGIN_SRC solidity
 contract Contract {
   address public owner; // automatically generates
@@ -220,6 +368,11 @@ contract Contract {
   }
 }
   #+END_SRC
+- Constant state variable :: The value for the constant state variable must be
+  assigned at the compile time
+- Immutable state variable :: the value for the immutable state variable can
+  still be assigned at the construction time. Constant and immutable state
+  variables cannot be modified after the contract has been constructed
 
 ** Error handling
 
@@ -247,7 +400,8 @@ require(
 );
   #+END_SRC
 - try/catch statement :: The =try/catch= statement handles errors when an
-  external function call or a =new= contract creation has reverted
+  external function call or a =new= contract creation has reverted. Reverts in
+  internal function calls or inside the same function cannot be caught
   #+BEGIN_SRC solidity
 try this.externalCall() returns (uint returnValue) {
   // success: returnValue
@@ -263,4 +417,26 @@ try this.externalCall() returns (uint returnValue) {
 } catch {
   // catch all errors
 }
+  #+END_SRC
+
+** Layout
+
+- File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
+  =library=, =contract=
+- Contract layout :: =enum=, =struct=, state, =event=, =error=, =modifier=,
+  =function=
+- Function modifiers layout ::
+  - Visibility :: =private=, =internal=, =public=, =external=
+  - Mutability :: =pure=, =view=, =payable=
+  - Inheritance :: =virtual=, =override=
+  - Modifier :: Custom modifiers
+
+** Import
+
+- Import :: The =import= statement imports all or explicitly selected global
+  symbols from the imported file into the global scope of the current file
+  #+BEGIN_SRC solidity
+import "path"; // imports all symbols
+import { A, B as BB } "path"; // imports only selected symbols
+import * as alias from "path" // imports all symbols under the alias
   #+END_SRC
