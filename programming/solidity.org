@@ -64,16 +64,12 @@
 
 *** Reference types
 
-- Reference types :: The same memory location is accessed through multiple
-  references that point to the shared memory location. The reference data types
-  are =struct=, =array=, =mapping=
-- Data location :: The data location specifies where declared data is allocated.
-  The data location =memory=, =storage=, =calldata= must be specified for
-  declarations of reference data types. =storage= data location for state
-  variables within a contract can be omitted
-  - Call data :: The =calldata= data location stores function arguments in a
-    read-only, volatile memory-like data location that avoids unnecessary copies
-    of data
+- Reference types :: The reference type defines a shared memory location
+  accessible through multiple different reference names. The reference data
+  types are =array=, =bytes=, =stirng=, =mapping=, and =struct=
+
+**** Arrays
+
 - Fixed array :: The fixed size array ~T[k]~. Each array element is initialized
   with the default value for the element type. A fixed size array cannot be
   assigned to a dynamic array. A fixed arrays of different sizes cannot be
@@ -91,6 +87,9 @@
   to the type of the first element
 - Array slice :: The array slice represents a view on an array e.g.
   ~arr[start:end]~
+
+**** Bytes and string
+
 - Bytes array :: The =bytes= is the special type of array with packed data for
   storing binary data. The =bytes1[]= adds padding to each array element. Prefer
   fixed =bytes1= .. =bytes32= over dynamic =bytes=. Bytes concatenation
@@ -101,8 +100,9 @@
   comparison src_solidity{ keccak256(abi.encodePacked(s1)) ==
   keccak256(abi.encodePacked(s2)) }. String concatenation ~string.concat(s1,
   s2)~
-- Struct :: The =struct= defines a new user-defined type. Arrays and mappings
-  can have structs and vice versa. Recursive structs are not supported
+
+**** Mapping
+
 - Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but
   single type under the keccak256 hash of the key type. The key value is not
   stored in the mapping, hence keys cannot be enumerated, and the key must be
@@ -115,6 +115,11 @@
   The delete operator assigns an empty fixed or dynamic array to an array
   variable. The delete operator has no effect on mappings, unless the delete
   operator is applied to a specific key within a mapping
+
+**** Struct
+
+- Struct :: The =struct= defines a new user-defined type. Arrays and mappings
+  can have structs and vice versa. Recursive structs are not supported
 | Reference type          | Fields and functions                     |
 | ~T[k]~, ~T[]~           | =length=, ~push(v)~, ~pop()~, ~arr[i]~   |
 |                         | ~delete arr;~, ~delete arr[k];~          |
@@ -129,28 +134,35 @@
 - Local variable :: The local variable is declared and used within the scope of
   a function. The local variable is not stored on the blockchain
 - Storage variable :: The storage variable is defined and used within the
-  contract scope. The storage variable is stored on the blockchain
+  contract scope. The storage variable is stored on the blockchain. A write to a
+  storage variable must be within a transaction. A read from a storage variable
+  does not require a transaction
 - Global variable :: The global variable is implicitly provided by the EVM e.g.
   =msg.sender=, =msg.value=
 
-*** Storage types
-- Storage :: The storage is a per account expensive persistent key-value store
-  in the form of 256-bit to 256-bit mapping stored on the blockchain
-- Transient storage :: The transient storage is less expensive and is reset at
-  the end of each transaction. The transient storage is private to the contract.
-  Variables in the transient storage cannot be initialized in the declaration,
-  but initially are assigned default values
-- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
-  memory cost scales quadratically
-- Stack :: The EVM is a stack-based, not register-based machine. All
-  computations are performed on the stack with max 1024 256-bit words
+*** Storage and memory
 
-- State variables :: The state variables are either permanently stored in the
-  contract storage or temporarily stored in the transient storage that is
-  cleared at the end of each transaction
+- Data location :: The data location specifies where declared variables are
+  allocated. The data location =storage=, =transient=, =calldata=, =memory= must
+  be specified for declarations of reference data types. The =storage= data
+  location for state variables within a contract can be omitted
+- Permanent storage :: The =storage= data location is a per account expensive
+  persistent key-value store in the form of ~mapping(bytes => bytes)~ stored on
+  the blockchain
+- Transient storage :: The =transient= data location is less expensive and is
+  reset at the end of each transaction
+- Calldata :: The =calldata= data location stores function arguments in a
+  read-only, volatile, memory-like data location that avoids unnecessary copies
+  of data
+- Memory :: The memory provides 32-bytes reads and 1-byte and 32-bytes writes
+- Stack :: The EVM is a stack-based machine, not a register-based machine. All
+  computations are performed on the stack with max 1024 32-bytes words
 
 *** State variables
 
+- State variables :: The state variables are either permanently stored in the
+  contract storage or temporarily stored in the transient storage that is reset
+  at the end of each transaction
 - State variable visibility :: The state variable visibility only prevents
   derived or external contracts from reading or writing state variables, but all
   state is publicly available for reading on the blockchain
@@ -179,11 +191,24 @@ contract Contract {
   }
 }
     #+END_SRC
-- Constant state variable :: The value for the =constant= state variable must be
+- Constant state variable :: The value for a =constant= state variable must be
   assigned at the *compile time*
-- Immutable state variable :: The value for the =immutable= state variable can
-  still be assigned at the *construction time*. Constant and immutable state
-  variables cannot be modified after the contract has been deployed
+  #+BEGIN_SRC solidity
+contract Contract {
+  address public constant ADDR = 0x123;
+}
+  #+END_SRC
+- Immutable state variable :: The value for a =immutable= state variable can be
+  assigned at the *construction time* in the constructor. Constant and immutable
+  state variables cannot be modified after the contract has been deployed
+  #+BEGIN_SRC solidity
+contract Contract {
+  address public immutable addr;
+  constructor() {
+    addr = msg.sender;
+  }
+}
+  #+END_SRC
 
 ** Functions
 
@@ -256,6 +281,14 @@ contract FallbackContract {
   #+END_SRC
 - Function overloading :: The function overloading takes into consideration only
   types and order of the function parameters, not the return values
+- Gas :: Gas is the internal unit of computation on the EVM. Gas is defined of
+  each EVM instruction. Gas must be provided for a function to be executed. Not
+  consumed gas is refunded. The ether value to pay depends on the amount of gas
+  spent and the gas price that a caller is willing to pay. A caller defines the
+  - Gas limit :: The gas limit is the maximum amount of gas a caller is willing
+    to spend on a transaction
+  - Block gas limit :: The block gas limit is the maximum amount of gas set by
+    the blockchain that is allowed to be spent per block
 
 *** Function modifier
 
@@ -288,7 +321,6 @@ contract Generocity {
   }
 }
   #+END_SRC
-
 
 ** Event
 
