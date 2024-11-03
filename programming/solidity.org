@@ -4,64 +4,63 @@
 
 *** Value types
 
-- Default value :: Declared, but not assigned variables automatically gets
-  assigned the type-dependent default value whose byte representation is all
-  zeros. Undefined or null values are not possible in Solidity
-- Value types :: Value types are always passed by value in function arguments
-  and assignments. Value types are always stored on the stack, hence
-  declarations of value types do not specify data location. The only exception
-  are state variables that are located in the storage, but can also be marked as
-  =transient=, =constant=, or =immutable=
-- Arbitrary precision of number literals :: Number literals retain arbitrary
-  precision until they are converted to a specific type. Computations do not
-  overflow in number literals. Most operands produce a literal expression when
-  applied to literals
+- Value types :: The value types are always *passed by value* as function
+  arguments and in assignments. The value types are *always stored on the
+  stack*, hence declarations of value types do not specify the data location.
+  The only exception are state variables marked with the =storage= data
+  location. The value types can also be marked as =transient= cheaper than
+  storage with the transaction lifetime, =constant= compile-time without memory
+  allocation, or =immutable= construction time with memory allocation
+- Default value :: Declared, but not assigned variables automatically get
+  assigned the type-specific default value whose byte representation is *all
+  zeros*. Undefined or null values are not possible in Solidity
+- Arbitrary precision on number literals :: Number literals retain arbitrary
+  precision until they are converted into a specific type. Computations do not
+  overflow nor underflow in number literals. Most operands produce a literal
+  expression when applied to literals. The division of literals results in
+  fractional values of arbitrary precision. The division of integers rounds
+  towards zero
 - Checked arithmetic operations :: All arithmetic operations are checked by
   default and revert on an underflow or an overflow
-- Division of literals :: The division of literals results in fractional values
-  of arbitrary precision
-- Division of integers :: The division of integers rounds towards zero
 - Ether units :: Numbers can have the =wei=, =gwei=, and =ether= suffix to
-  identify ether value. Numbers without a suffix are assumed to be in =wei=
-| Ether unit | Value                   |
+  identify the ether value. Numbers without a suffix are assumed to be in =wei=
+| Ether unit | Ether value             |
 | =1 wei=    | =1e-18 ether=           |
 | =1 gwei=   | =1e-9 ether=, =1e9 wei= |
 | =1 ether=  | =1e18 wei=, =1e9 gwei=  |
-- Payable address :: The 20-bytes Ethereum address that accepts Ether. An
-  =address= or a =contract= with a =receive()= function or a payable =fallback=
-  function must be explicitly converted to a payable address. Balance of a
-  payable contract src_solidity{ address(this).balance }
+- Payable address :: An external address or a contract address with a
+  =receive()= function or a =payable fallback= function that accepts Ether
 - Transfer and send :: The high-level =transfer()= function reverts on failure
   and stops the execution of the current contract. The low-level =send()=
-  function returns =false= on failure, but the execute of the current contract
+  function returns false on failure, but the execution of the current contract
   continues. Always check the return value of the =send()= function, or better
   use the =transfer()= function, or better let the recipient withdraw Ether
-- User-defined value type :: The user-defined value type creates a zero-cost
-  abstraction over the underlying value type. The user-defined value type has
+- User-defined value type :: A user-defined value type creates the *zero-cost
+  abstraction* over the underlying value type. The user-defined value type has
   neither operators nor attached functions, only explicit conversion to and from
-  the underlying value type is supported through wrap and unwrap
-
-| Value type                         | Operators and functions                 |
-|------------------------------------+-----------------------------------------|
-| =bool=, =true=, =false=            | ~!, &&, ¦¦, ==, !=~                     |
-| ~int = int256~, ~uint = uint256~   | ~<, <=, >=, >, ==, !=~                  |
-|                                    | =~, &, ¦, ^, <<, >>=                    |
-|                                    | ~+, -, *, /, %, **~                     |
-|                                    | ~type(int).min, type(uint).max~         |
-| ~fixed = fixed128x18~              | Not yet supported by Solidity           |
-| ~ufixed = ufixed128x18~            |                                         |
-| =address= (20 bytes)               | Does not accept Ether                   |
-| =0x123..abc=                       | Address literal                         |
-| =address payable=                  | =transfer()=, =send()=, =balance=       |
-|                                    | =payable(address)=                      |
-| =bytes1= .. =bytes32= (fixed-size) | ~<, <=, >=, >, ==, !=~                  |
-|                                    | =~, &, ¦, ^, <<, >>=                    |
-|                                    | ~arr[i], arr.length~                    |
-| ="string"=, =unicode"string"=      | ASCII and Unicode strings               |
-| =hex"1a2b"=                        | Hex literal                             |
-| ~enum State { Start, End }~        | ~type(State).min~, ~type(State).max~    |
-|                                    | ~state == State.Start~                  |
-| ~type Year is uint;~               | ~Year.wrap(2024)~, ~Year.unwarep(year)~ |
+  the underlying value type is supported through the =wrap()= and =unwrap()=
+  functions
+| Value type                           | Operators and functions                |
+|--------------------------------------+----------------------------------------|
+| =bool=, =true=, =false=              | ~!, &&, ¦¦, ==, !=~                    |
+| ~int = int256~, ~uint = uint256~     | ~<, <=, >=, >, ==, !=~                 |
+|                                      | =~, &, ¦, ^, <<, >>=                   |
+|                                      | ~+, -, *, /, %, **~                    |
+|                                      | ~type(int).min, type(uint).max~        |
+| ~fixed = fixed128x18~                | Fixed point number                     |
+| ~ufixed = ufixed128x18~              | with variable precision                |
+| =address=                            | =0x123..abc= (20 bytes)                |
+| =address payable=                    | =payable(address).balance=             |
+|                                      | =transfer()=, =send()=                 |
+| =bytes1= .. =bytes32=                | Fixed-size padded array up to 32 bytes |
+|                                      | ~<, <=, >=, >, ==, !=~                 |
+|                                      | =~, &, ¦, ^, <<, >>=                   |
+|                                      | ~arr[i], arr.length~                   |
+| ="string"=, =unicode"string"=        | ASCII and Unicode strings              |
+| =hex"1a2b"=                          | Hex literal                            |
+| ~enum State { Default, Start, End }~ | ~type(State).min~, ~type(State).max~   |
+|                                      | ~state == State.Start~                 |
+| ~type Year is uint;~                 | ~Year.wrap(2024)~, ~Year.unwarp(year)~ |
 
 *** Reference types
 
@@ -122,6 +121,69 @@
 | ~mapping(key => vlaue)~ | ~map[key] = value~, ~delete map[key]~    |
 | ~struct A { uint a; }~  | ~A a = A(1);~, ~A a = A({a: 1});~, ~a.a~ |
 |                         | ~delete a;~                              |
+
+** Variables
+
+*** Variable types
+
+- Local variable :: The local variable is declared and used within the scope of
+  a function. The local variable is not stored on the blockchain
+- Storage variable :: The storage variable is defined and used within the
+  contract scope. The storage variable is stored on the blockchain
+- Global variable :: The global variable is implicitly provided by the EVM e.g.
+  =msg.sender=, =msg.value=
+
+*** Storage types
+- Storage :: The storage is a per account expensive persistent key-value store
+  in the form of 256-bit to 256-bit mapping stored on the blockchain
+- Transient storage :: The transient storage is less expensive and is reset at
+  the end of each transaction. The transient storage is private to the contract.
+  Variables in the transient storage cannot be initialized in the declaration,
+  but initially are assigned default values
+- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
+  memory cost scales quadratically
+- Stack :: The EVM is a stack-based, not register-based machine. All
+  computations are performed on the stack with max 1024 256-bit words
+
+- State variables :: The state variables are either permanently stored in the
+  contract storage or temporarily stored in the transient storage that is
+  cleared at the end of each transaction
+
+*** State variables
+
+- State variable visibility :: The state variable visibility only prevents
+  derived or external contracts from reading or writing state variables, but all
+  state is publicly available for reading on the blockchain
+  - Private :: A =private= state variable is only accessible to the defining
+    contract and is not accessible to derived contracts
+  - Internal :: An =internal= state variable (default visibility) is accessible
+    to the defining contract and to derived contracts
+  - Public :: A =public= state variable is read-only accessible to other
+    contracts through automatically generated getters. Public state variables
+    allow direct access via =x= or external access through getters via =this.x=.
+    A getter view function is automatically generated for every public state
+    variable
+    #+BEGIN_SRC solidity
+contract Contract {
+  address public owner; // automatically generates
+  function owner() external view returns (address) {
+    return owner;
+  }
+  uint[] public values; // automatically generats
+  function values(uint i) external view returns (uint) {
+    return values[i];
+  }
+  mapping(address => uint) public balances; // automatically generates
+  function balances(address account) external view returns (uint) {
+    return balances[account];
+  }
+}
+    #+END_SRC
+- Constant state variable :: The value for the =constant= state variable must be
+  assigned at the *compile time*
+- Immutable state variable :: The value for the =immutable= state variable can
+  still be assigned at the *construction time*. Constant and immutable state
+  variables cannot be modified after the contract has been deployed
 
 ** Functions
 
@@ -318,61 +380,6 @@ contract Derived is Base1(1), Base2 {
     e.g. state variables, accounts, from the current calling contract
   - Static call :: The =staticcall()= function reverts if the called function
     modifies the state of the current calling contract
-
-** State
-
-- State variables :: The state variables are either permanently stored in the
-  contract storage or temporarily stored in the transient storage that is
-  cleared at the end of each transaction
-
-** Storage and memory
-
-- Storage :: The storage is a per account expensive persistent key-value store
-  in the form of 256-bit to 256-bit mapping stored on the blockchain
-- Transient storage :: The transient storage is less expensive and is reset at
-  the end of each transaction. The transient storage is private to the contract.
-  Variables in the transient storage cannot be initialized in the declaration,
-  but initially are assigned default values
-- Memory :: The memory provides 256-bit reads and 8-bit and 256-bit writes. The
-  memory cost scales quadratically
-- Stack :: The EVM is a stack-based, not register-based machine. All
-  computations are performed on the stack with max 1024 256-bit words
-
-** State variables
-
-- State variable visibility :: The state variable visibility only prevents
-  derived or external contracts from reading or writing state variables, but all
-  state is publicly available for reading on the blockchain
-  - Private :: A =private= state variable is only accessible to the defining
-    contract and is not accessible to derived contracts
-  - Internal :: An =internal= state variable (default visibility) is accessible
-    to the defining contract and to derived contracts
-  - Public :: A =public= state variable is read-only accessible to other
-    contracts through automatically generated getters. Public state variables
-    allow direct access via =x= or external access through getters via =this.x=
-- Public field :: A getter view function is automatically generated for every
-  public state variable
-  #+BEGIN_SRC solidity
-contract Contract {
-  address public owner; // automatically generates
-  function owner() external view returns (address) {
-    return owner;
-  }
-  uint[] public values; // automatically generats
-  function values(uint i) external view returns (uint) {
-    return values[i];
-  }
-  mapping(address => uint256) public balances; // automatically generates
-  function balances(address account) external view returns (uint256) {
-    return balances[account];
-  }
-}
-  #+END_SRC
-- Constant state variable :: The value for the constant state variable must be
-  assigned at the compile time
-- Immutable state variable :: the value for the immutable state variable can
-  still be assigned at the construction time. Constant and immutable state
-  variables cannot be modified after the contract has been constructed
 
 ** Error handling
 
