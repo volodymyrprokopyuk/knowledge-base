@@ -40,6 +40,7 @@
   neither operators nor attached functions, only explicit conversion to and from
   the underlying value type is supported through the =wrap()= and =unwrap()=
   functions
+
 | Value type                           | Operators and functions                |
 |--------------------------------------+----------------------------------------|
 | =bool=, =true=, =false=              | ~!, &&, ¦¦, ==, !=~                    |
@@ -52,7 +53,7 @@
 | =address=                            | =0x123..abc= (20 bytes)                |
 | =address payable=                    | =payable(address).balance=             |
 |                                      | =transfer()=, =send()=                 |
-| =bytes1= .. =bytes32=                | Fixed-size padded array up to 32 bytes |
+| =bytes1= .. =bytes32=                | Fixed padded array up to 32 bytes      |
 |                                      | ~<, <=, >=, >, ==, !=~                 |
 |                                      | =~, &, ¦, ^, <<, >>=                   |
 |                                      | ~arr[i], arr.length~                   |
@@ -70,49 +71,50 @@
 
 **** Arrays
 
-- Fixed array :: The fixed size array ~T[k]~. Each array element is initialized
-  with the default value for the element type. A fixed size array cannot be
-  assigned to a dynamic array. A fixed arrays of different sizes cannot be
-  converted into each other
-- Dynamic array :: The dynamic array ~T[]~ with only =storage= data location
-  dynamically grows as elements are added to the array. Each array element is
-  initialized with the default value for the element type. The notation is
-  reversed e.g. ~T[][4]~ is the fixed array of 4 dynamic arrays. The access is
-  in the opposite direction of the declaration e.g. ~t[0][1]~ is the first
-  element of the second dynamic array. Dynamic array with =memory= data location
-  is not possible to resize src_solidity{ uint[] memmory arr = new uint[](k) }
-- Array literal :: The array literal is the fixed size src_solidity{ [uint(1),
-  value, f()] } with the type ~uint[3] memory~. The type of the array literal is
-  the type of the first element with all other elements implicitly convertible
-  to the type of the first element
-- Array slice :: The array slice represents a view on an array e.g.
+- Fixed array :: Each element of the fixed array ~T[k] arr;~ is initialized with
+  the default value for the element type =T=. A fixed array cannot be assigned
+  to a dynamic array. Fixed arrays of different sizes cannot be converted into
+  each other
+- Dynamic array :: Each element of the dynamic array ~T[] arr;~ is initialized
+  with the default value for the element type =T=. The dynamic array with only
+  the =storage= data location automatically grows as elements are added to the
+  array. The dynamic array with the =memory= data location is not possible to
+  resize. The notation is reversed e.g. ~T[][4]~ is the fixed array of 4 dynamic
+  arrays. The access is in the opposite direction to the declaration e.g.
+  ~t[0][1]~ is the first element of the second dynamic array
+- Array literal :: The type of the array literal is the type of the first
+  element with all other elements implicitly convertible to the type of the
+  first element
+- Array slice :: The array slice represents a view on the array e.g.
   ~arr[start:end]~
 
 **** Bytes and string
 
-- Bytes array :: The =bytes= is the special type of array with packed data for
-  storing binary data. The =bytes1[]= adds padding to each array element. Prefer
-  fixed =bytes1= .. =bytes32= over dynamic =bytes=. Bytes concatenation
-  ~bytes.concat(b1, b2)~
-- String array :: The =string= is equivalent to =bytes= for Unicode, but does
-  not allow length and index access. Low-level bytes manipulation, not Unicode
-  code points src_solidity{ bytes(s).length; bytes(s)[k] = value; }. String
-  comparison src_solidity{ keccak256(abi.encodePacked(s1)) ==
-  keccak256(abi.encodePacked(s2)) }. String concatenation ~string.concat(s1,
-  s2)~
+- Bytes array :: The =bytes= is a special type of array with packed data for
+  storing *binary data*. The =bytes1[]= adds padding to each array element.
+  Prefer a fixed array of =bytes1= .. =bytes32= over a dynamic array =bytes=.
+  Bytes concatenation ~bytes.concat(b1, b2)~
+- String array :: The =string= is equivalent to =bytes= for *Unicode*, but does
+  not allow the length and the index access. String concatenation
+  ~string.concat(s1, s2)~
+  #+BEGIN_SRC solidity
+// Comparison of strings
+keccak256(abi.encodePacked(s1)) == keccak256(abi.encodePacked(s2))
+// Low-level bytes manipulation, not Unicode code points
+bytes(s).length; bytes(s)[k] = value;
+  #+END_SRC
 
 **** Mapping
 
-- Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but
+- Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but a
   single type under the keccak256 hash of the key type. The key value is not
   stored in the mapping, hence keys cannot be enumerated, and the key must be
   know to access the value. A mapping can have only =storage= data location,
-  hence mappings are used for state variables and as storage references in
-  functions. Mappings cannot be used as function arguments and function return
-  values
-- Delete :: The =delete= operator assigns the default value or a new default
-  reference value to a variable, an array slot, a mapping slot, a struct field.
-  The delete operator assigns an empty fixed or dynamic array to an array
+  hence mappings are used for state variables and as references to passed state
+  variables in functions
+- Delete :: The =delete= operator assigns a default value or a new default
+  reference value to a variable, an array slot, a mapping slot, or a struct
+  field. The delete operator assigns an empty fixed or dynamic array to an array
   variable. The delete operator has no effect on mappings, unless the delete
   operator is applied to a specific key within a mapping
 
@@ -120,12 +122,13 @@
 
 - Struct :: The =struct= defines a new user-defined type. Arrays and mappings
   can have structs and vice versa. Recursive structs are not supported
+
 | Reference type          | Fields and functions                     |
-| ~T[k]~, ~T[]~           | =length=, ~push(v)~, ~pop()~, ~arr[i]~   |
+| ~T[k]~, ~T[]~           | =length=, ~arr[i]~, ~push(v)~, ~pop()~   |
 |                         | ~delete arr;~, ~delete arr[k];~          |
 | ~mapping(key => vlaue)~ | ~map[key] = value~, ~delete map[key]~    |
 | ~struct A { uint a; }~  | ~A a = A(1);~, ~A a = A({a: 1});~, ~a.a~ |
-|                         | ~delete a;~                              |
+|                         | ~delete a;~, ~delete a.a~                |
 
 ** Variables
 
