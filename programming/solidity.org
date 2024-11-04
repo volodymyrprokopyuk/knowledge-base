@@ -41,27 +41,27 @@
   the underlying value type is supported through the =wrap()= and =unwrap()=
   functions
 
-| Value type                           | Operators and functions                |
-|--------------------------------------+----------------------------------------|
-| =bool=, =true=, =false=              | ~!, &&, ¦¦, ==, !=~                    |
-| ~int = int256~, ~uint = uint256~     | ~<, <=, >=, >, ==, !=~                 |
-|                                      | =~, &, ¦, ^, <<, >>=                   |
-|                                      | ~+, -, *, /, %, **~                    |
-|                                      | ~type(int).min, type(uint).max~        |
-| ~fixed = fixed128x18~                | Fixed point number                     |
-| ~ufixed = ufixed128x18~              | with variable precision                |
-| =address=                            | =0x123..abc= (20 bytes)                |
-| =address payable=                    | =payable(address).balance=             |
-|                                      | =transfer()=, =send()=                 |
-| =bytes1= .. =bytes32=                | Fixed padded array up to 32 bytes      |
-|                                      | ~<, <=, >=, >, ==, !=~                 |
-|                                      | =~, &, ¦, ^, <<, >>=                   |
-|                                      | ~arr[i], arr.length~                   |
-| ="string"=, =unicode"string"=        | ASCII and Unicode strings              |
-| =hex"1a2b"=                          | Hex literal                            |
-| ~enum State { Default, Start, End }~ | ~type(State).min~, ~type(State).max~   |
-|                                      | ~state == State.Start~                 |
-| ~type Year is uint;~                 | ~Year.wrap(2024)~, ~Year.unwarp(year)~ |
+| Value type                           | Operators and functions                 |
+|--------------------------------------+-----------------------------------------|
+| =bool=, =true=, =false=              | ~!, &&, ¦¦, ==, !=~                     |
+| ~int = int256~, ~uint = uint256~     | ~<, <=, >=, >, ==, !=~                  |
+|                                      | =~, &, ¦, ^, <<, >>=                    |
+|                                      | ~+, -, *, /, %, **~                     |
+|                                      | ~type(int).min, type(uint).max~         |
+| ~fixed = fixed128x18~                | Fixed point number                      |
+| ~ufixed = ufixed128x18~              | with variable precision                 |
+| =address=                            | =0x123..abc= (20 bytes)                 |
+| =address payable=                    | =payable(address).balance=              |
+|                                      | =transfer()=, =send()=                  |
+| =bytes1= .. =bytes32=                | Fixed padded array up to 32 bytes       |
+|                                      | ~<, <=, >=, >, ==, !=~                  |
+|                                      | =~, &, ¦, ^, <<, >>=                    |
+|                                      | ~arr[i], arr.length~                    |
+| ="string"=, =unicode"string"=        | ASCII and Unicode strings               |
+| =hex"1a2b"=                          | Hex literal                             |
+| ~enum State { Default, Start, End }~ | ~type(State).min~, ~type(State).max~    |
+|                                      | ~state == State.Start~, ~delete state;~ |
+| ~type Year is uint;~                 | ~Year.wrap(2024)~, ~Year.unwarp(year)~  |
 
 *** Reference types
 
@@ -76,17 +76,28 @@
   to a dynamic array. Fixed arrays of different sizes cannot be converted into
   each other
 - Dynamic array :: Each element of the dynamic array ~T[] arr;~ is initialized
-  with the default value for the element type =T=. The dynamic array with only
-  the =storage= data location automatically grows as elements are added to the
-  array. The dynamic array with the =memory= data location is not possible to
-  resize. The notation is reversed e.g. ~T[][4]~ is the fixed array of 4 dynamic
-  arrays. The access is in the opposite direction to the declaration e.g.
-  ~t[0][1]~ is the first element of the second dynamic array
+  with the default value for the element type =T=. The =storage= dynamic array
+  automatically grows as elements are added to the array. The =memory= dynamic
+  array does not grows. The notation is reversed e.g. ~T[][4]~ is the fixed
+  array of 4 dynamic arrays. The access is in the opposite direction to the
+  declaration e.g. ~t[0][1]~ is the first element of the second dynamic array
 - Array literal :: The type of the array literal is the type of the first
   element with all other elements implicitly convertible to the type of the
   first element
 - Array slice :: The array slice represents a view on the array e.g.
   ~arr[start:end]~
+  #+BEGIN_SRC solidity
+uint[4] memory arr; // initialized with default values
+arr[0] = 10;
+uint[] memory arr = new uint[](4); // memory dynamic array does not grow
+uint[] storage arr = [1, 2, 3]; // explicit initialization
+arr.push(4); // only storage dynamic arrays can grow automatically
+if (arr.length > 0) {
+  delete arr[0]; // reset the first element to the default value
+  arr.pop(); // remove the last element
+  delete arr; // reset the array to a new empty array
+}
+  #+END_SRC
 
 **** Bytes and string
 
@@ -107,28 +118,36 @@ bytes(s).length; bytes(s)[k] = value;
 **** Mapping
 
 - Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but a
-  single type under the keccak256 hash of the key type. The key value is not
-  stored in the mapping, hence keys cannot be enumerated, and the key must be
-  know to access the value. A mapping can have only =storage= data location,
-  hence mappings are used for state variables and as references to passed state
+  single type under the keccak256 hash of the key type. Mappings can be nested.
+  The key value is not stored in the mapping, hence keys cannot be enumerated,
+  and the key must be know to access the value. The default value is returned
+  for unset keys. The mapping can have only =storage= data location, hence
+  mappings are used for state variables and as references to passed state
   variables in functions
-- Delete :: The =delete= operator assigns a default value or a new default
-  reference value to a variable, an array slot, a mapping slot, or a struct
-  field. The delete operator assigns an empty fixed or dynamic array to an array
-  variable. The delete operator has no effect on mappings, unless the delete
-  operator is applied to a specific key within a mapping
+- Delete :: The =delete= operator assigns the default value to a variable, an
+  array slot, a mapping slot, or a struct field. The delete operator assigns an
+  empty fixed or dynamic array to an array variable. The delete operator has no
+  effect on mappings, unless the delete operator is applied to a specific key
+  within the mapping
+  #+BEGIN_SRC solidity
+mapping(address => uint) balances;
+balances[acc] = 1; // set value for the key
+if (balances[acc] > 0) {
+  delete balances[acc]; // reset the default value for the key
+}
+  #+END_SRC
 
 **** Struct
 
 - Struct :: The =struct= defines a new user-defined type. Arrays and mappings
   can have structs and vice versa. Recursive structs are not supported
 
-| Reference type          | Fields and functions                     |
-| ~T[k]~, ~T[]~           | =length=, ~arr[i]~, ~push(v)~, ~pop()~   |
-|                         | ~delete arr;~, ~delete arr[k];~          |
-| ~mapping(key => vlaue)~ | ~map[key] = value~, ~delete map[key]~    |
-| ~struct A { uint a; }~  | ~A a = A(1);~, ~A a = A({a: 1});~, ~a.a~ |
-|                         | ~delete a;~, ~delete a.a~                |
+| Reference type          | Fields and functions                                 |
+| ~T[k]~, ~T[]~           | =arr.length=, ~arr[i]~, ~arr.push(v);~, ~arr.pop();~ |
+|                         | ~delete arr;~, ~delete arr[k];~                      |
+| ~mapping(key => vlaue)~ | ~map[key] = value;~, ~delete map[key];~              |
+| ~struct A { uint a; }~  | ~A a = A(1);~, ~A a = A({a: 1});~, ~A a; a.a = 1;~   |
+|                         | ~delete a;~, ~delete a.a;~                           |
 
 ** Variables
 
