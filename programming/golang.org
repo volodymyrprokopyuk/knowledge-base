@@ -52,7 +52,7 @@ fmt.Println(year) // Year 2024, using the String() method
 #+BEGIN_SRC go
 type BayanModel int
 const (
-  Nextra BayanModel = iota + 1 // start from 1, not 0
+  Nextra BayanModel = iota + 1 // start from 1, 0 is the default
   Omnia; Selecta
   Prime; Spectrum
 )
@@ -1519,7 +1519,6 @@ func BenchmarkReduce(b *testing.B) {
 - Call ~os.Exit()~ at most once only in ~main()~. All other functions should
   return errors to signal a failure or multiple exist scenarios. ~defer~
   functions are not executed when ~os.Exit()~ is called
-
 
 *** Go proverbs
 

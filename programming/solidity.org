@@ -5,41 +5,43 @@
 *** Value types
 
 - Value types :: The value types are always *passed by value* as function
-  arguments and in assignments. The value types are *always stored on the
-  stack*, hence declarations of value types do not specify the data location.
-  The only exception are state variables marked with the =storage= data
-  location. The value types can also be marked as =transient= cheaper than
-  storage with the transaction lifetime, =constant= compile-time without memory
-  allocation, or =immutable= construction time with memory allocation
-- Default value :: Declared, but not assigned variables automatically get
+  arguments and in the assignment. The value types are *always stored on the
+  stack*, hence the declarations of value types do not specify the data
+  location. The only exception are state variables of value types marked with
+  the =storage= data location. The value types can also be marked as =transient=
+  cheaper than storage with the transaction lifetime, =constant= compile-time
+  without memory allocation, or =immutable= construction time with memory
+  allocation
+- Default value :: Declared, but not initialized variables automatically get
   assigned the type-specific default value whose byte representation is *all
   zeros*. Undefined or null values are not possible in Solidity
-- Arbitrary precision on number literals :: Number literals retain arbitrary
-  precision until they are converted into a specific type. Computations do not
-  overflow nor underflow in number literals. Most operands produce a literal
-  expression when applied to literals. The division of literals results in
-  fractional values of arbitrary precision. The division of integers rounds
-  towards zero
+- Arbitrary precision arithmetic on number literals :: The number literals
+  retain the arbitrary precision until they are converted into a specific value
+  type. Computations do not overflow nor underflow when performed in number
+  literals. Most operands produce a literal expression when applied to literals.
+  The division of literals results in the fractional values of the arbitrary
+  precision. The division of integers rounds towards zero
 - Checked arithmetic operations :: All arithmetic operations are checked by
   default and revert on an underflow or an overflow
-- Ether units :: Numbers can have the =wei=, =gwei=, and =ether= suffix to
-  identify the ether value. Numbers without a suffix are assumed to be in =wei=
+- Ether units :: Numbers can have the =wei=, the =gwei=, and the =ether= suffix
+  to identify the ether value. Numbers without a suffix are assumed to be in
+  =wei=
 | Ether unit | Ether value             |
 | =1 wei=    | =1e-18 ether=           |
 | =1 gwei=   | =1e-9 ether=, =1e9 wei= |
 | =1 ether=  | =1e18 wei=, =1e9 gwei=  |
 - Payable address :: An external address or a contract address with a
   =receive()= function or a =payable fallback= function that accepts Ether
-- Transfer and send :: The high-level =transfer()= function reverts on failure
+- Transfer and send :: The high-level =transfer()= function reverts on a failure
   and stops the execution of the current contract. The low-level =send()=
-  function returns false on failure, but the execution of the current contract
+  function returns false on a failure, but the execution of the current contract
   continues. Always check the return value of the =send()= function, or better
-  use the =transfer()= function, or better let the recipient withdraw Ether
+  use the =transfer()= function, or better let the recipient to withdraw Ether
 - User-defined value type :: A user-defined value type creates the *zero-cost
-  abstraction* over the underlying value type. The user-defined value type has
-  neither operators nor attached functions, only explicit conversion to and from
-  the underlying value type is supported through the =wrap()= and =unwrap()=
-  functions
+  abstraction* over the underlying built-in value type. The user-defined value
+  type has neither operators nor attached functions, only explicit conversion to
+  and from the underlying value type is supported through the =wrap()= and
+  =unwrap()= functions
 
 | Value type                           | Operators and functions                 |
 |--------------------------------------+-----------------------------------------|
@@ -72,14 +74,14 @@
 **** Arrays
 
 - Fixed array :: Each element of the fixed array ~T[k] arr;~ is initialized with
-  the default value for the element type =T=. A fixed array cannot be assigned
+  the default value for the element type =T=. The fixed array cannot be assigned
   to a dynamic array. Fixed arrays of different sizes cannot be converted into
   each other
 - Dynamic array :: Each element of the dynamic array ~T[] arr;~ is initialized
   with the default value for the element type =T=. The =storage= dynamic array
   automatically grows as elements are added to the array. The =memory= dynamic
-  array does not grows. The notation is reversed e.g. ~T[][4]~ is the fixed
-  array of 4 dynamic arrays. The access is in the opposite direction to the
+  array does not grow. The notation is reversed e.g. ~T[][4]~ is the fixed array
+  of 4 dynamic arrays. The element access is in the opposite direction to the
   declaration e.g. ~t[0][1]~ is the first element of the second dynamic array
 - Array literal :: The type of the array literal is the type of the first
   element with all other elements implicitly convertible to the type of the
@@ -91,7 +93,7 @@ uint[4] memory arr; // initialized with default values
 arr[0] = 10;
 uint[] memory arr = new uint[](4); // memory dynamic array does not grow
 uint[] storage arr = [1, 2, 3]; // explicit initialization
-arr.push(4); // only storage dynamic arrays can grow automatically
+arr.push(4); // only storage dynamic arrays grow automatically
 if (arr.length > 0) {
   delete arr[0]; // reset the first element to the default value
   arr.pop(); // remove the last element
@@ -101,7 +103,7 @@ if (arr.length > 0) {
 
 **** Bytes and string
 
-- Bytes array :: The =bytes= is a special type of array with packed data for
+- Bytes array :: The =bytes= is a special type of array with *packed data* for
   storing *binary data*. The =bytes1[]= adds padding to each array element.
   Prefer a fixed array of =bytes1= .. =bytes32= over a dynamic array =bytes=.
   Bytes concatenation ~bytes.concat(b1, b2)~
@@ -120,20 +122,20 @@ bytes(s).length; bytes(s)[k] = value;
 - Mapping :: The ~mapping(keyType => valueType)~ stores values of any, but a
   single type under the keccak256 hash of the key type. Mappings can be nested.
   The key value is not stored in the mapping, hence keys cannot be enumerated,
-  and the key must be know to access the value. The default value is returned
-  for unset keys. The mapping can have only =storage= data location, hence
-  mappings are used for state variables and as references to passed state
+  and the key must be know in order to access the value. The default value is
+  returned for unset keys. The mapping can have only =storage= data location,
+  hence mappings are used for state variables and as references to passed state
   variables in functions
 - Delete :: The =delete= operator assigns the default value to a variable, an
-  array slot, a mapping slot, or a struct field. The delete operator assigns an
-  empty fixed or dynamic array to an array variable. The delete operator has no
-  effect on mappings, unless the delete operator is applied to a specific key
+  array position, a mapping slot, or a struct field. The delete operator assigns
+  an empty fixed or dynamic array to an array variable. The delete operator has
+  no effect on mappings, unless the delete operator is applied to a specific key
   within the mapping
   #+BEGIN_SRC solidity
 mapping(address => uint) balances;
 balances[acc] = 1; // set value for the key
 if (balances[acc] > 0) {
-  delete balances[acc]; // reset the default value for the key
+  delete balances[acc]; // reset the key with the default value
 }
   #+END_SRC
 
@@ -155,28 +157,29 @@ if (balances[acc] > 0) {
 
 - Local variable :: The local variable is declared and used within the scope of
   a function. The local variable is not stored on the blockchain
-- Storage variable :: The storage variable is defined and used within the
-  contract scope. The storage variable is stored on the blockchain. A write to a
+- Storage variable :: The storage variable is defined and used within the scope
+  of a contract. The storage variable is stored on the blockchain. A write to a
   storage variable must be within a transaction. A read from a storage variable
   does not require a transaction
-- Global variable :: The global variable is implicitly provided by the EVM e.g.
-  =msg.sender=, =msg.value=
+- Global variable :: The global variables are implicitly provided by the EVM
+  e.g. =msg.sender=, =msg.value=
 
 *** Storage and memory
 
-- Data location :: The data location specifies where declared variables are
-  allocated. The data location =storage=, =transient=, =calldata=, =memory= must
-  be specified for declarations of reference data types. The =storage= data
+- Data location :: The data location specifies where the declared variables are
+  allocated. The data location =storage=, =transient=, =calldata=, and =memory=
+  must be specified for declarations of reference data types. The =storage= data
   location for state variables within a contract can be omitted
-- Permanent storage :: The =storage= data location is a per account expensive
+- Permanent storage :: The =storage= data location is a per contract expensive
   persistent key-value store in the form of ~mapping(bytes => bytes)~ stored on
   the blockchain
-- Transient storage :: The =transient= data location is less expensive and is
-  reset at the end of each transaction
+- Transient storage :: The =transient= data location is less expensive then the
+  storage data location and is reset at the end of each transaction
 - Calldata :: The =calldata= data location stores function arguments in a
   read-only, volatile, memory-like data location that avoids unnecessary copies
   of data
-- Memory :: The memory provides 32-bytes reads and 1-byte and 32-bytes writes
+- Memory :: The memory is accessible within the scope of a function, and
+  provides 32-bytes reads, and 1-byte and 32-bytes writes
 - Stack :: The EVM is a stack-based machine, not a register-based machine. All
   computations are performed on the stack with max 1024 32-bytes words
 
@@ -185,18 +188,18 @@ if (balances[acc] > 0) {
 - State variables :: The state variables are either permanently stored in the
   contract storage or temporarily stored in the transient storage that is reset
   at the end of each transaction
-- State variable visibility :: The state variable visibility only prevents
-  derived or external contracts from reading or writing state variables, but all
-  state is publicly available for reading on the blockchain
+- State variable visibility :: The visibility of state variables only prevents
+  the derived or external contracts from reading or writing state variables, but
+  all state is publicly available for reading on the blockchain
   - Private :: A =private= state variable is only accessible to the defining
-    contract and is not accessible to derived contracts
+    contract and is not accessible to the derived contracts
   - Internal :: An =internal= state variable (default visibility) is accessible
-    to the defining contract and to derived contracts
+    to the defining contract and to the derived contracts
   - Public :: A =public= state variable is read-only accessible to other
-    contracts through automatically generated getters. Public state variables
-    allow direct access via =x= or external access through getters via =this.x=.
-    A getter view function is automatically generated for every public state
-    variable
+    contracts through the automatically generated getters. Public state
+    variables allow direct access via the direct reference =x= or external
+    access through the getters via =this.x=. A getter view function is
+    automatically generated for every public state variable
     #+BEGIN_SRC solidity
 contract Contract {
   address public owner; // automatically generates
@@ -220,7 +223,7 @@ contract Contract {
   address public constant ADDR = 0x123;
 }
   #+END_SRC
-- Immutable state variable :: The value for a =immutable= state variable can be
+- Immutable state variable :: The value for an =immutable= state variable can be
   assigned at the *construction time* in the constructor. Constant and immutable
   state variables cannot be modified after the contract has been deployed
   #+BEGIN_SRC solidity
@@ -231,6 +234,85 @@ contract Contract {
   }
 }
   #+END_SRC
+
+** Contract
+
+- Contract creation :: A contract can be created either by a transaction from an
+  external account or by by another contract using a salt to randomize the new
+  contract address src_solidity{ Contract c = new Contract{salt: bytes32}(); }.
+  The contract constructor is executed only once when a contract is created.
+  Only one constructor is allowed: the constructor overloading is not supported
+- Contract code on the blockchain :: When a constructor is being executed, the
+  contract is not yet deployed. After the constructor has executed, the final
+  contract code is stored on the blockchain. The contract code includes all
+  public and external functions, as well as all private and internal functions
+  reachable from the the public interface through function calls. The deployed
+  contract code does not include the constructor code or functions only called
+  from the constructor
+- Multiple inheritance :: The contract hierarchy is complied into a single the
+  contract. All internal calls to functions defined in base contracts are
+  implemented as very efficient jumps. Shadowing of state variables generates an
+  error. Derived contracts must have distinct names for state variables.
+  Mark functions of a base contract as =virtual= to =override= them in derived
+  contracts. Virtual modifiers can be overridden in derived contracts. Multiple
+  base classes are searched in the right-to-left order of the inheritance list
+  #+BEGIN_SRC solidity
+contract Base1 {
+  constructor(uint) { }
+  modifier m() virtual { _; }
+  function f() virtual public { }
+}
+contract Base2 {
+  constructor(uint) { }
+  modifier m() virtual { _; }
+  function f() virtual public { }
+}
+// inheritance list: the most base to the most derived order
+contract Derived is Base1(1), Base2 {
+  constructor() Base2(2) { } // constructor modifier list
+  modifier m() override(Base1, Base2) { _; }
+  function f() override(Base1, Base2) public { }
+}
+  #+END_SRC
+- Abstract contract :: The abstract contract has at least one function not
+  implemented or the contract does not provides arguments to at least one base
+  contract. Abstract contracts cannot be directly created, but must be inherited
+  by deriving contracts
+- Interface :: The interface provides only signatures of implicitly virtual
+  functions, not their implementations. An interface can inherit from other
+  interfaces. All functions in an interface must be external even if the
+  functions will be public in the implementing contracts. An interface can
+  define enums and structs
+- Library :: The library is a set of internal and external functions deployed
+  once and reused in the context of the calling contract through the
+  =delegatecall= for external functions and the efficient jumps for internal
+  functions. All used internal library functions are included in the calling
+  contract during the construction, so calls to internal library functions are
+  efficient jumps
+- Using F for T :: The ~using f, g as +, L.e for t;~ directive attaches free or
+  library functions to a type within the contract or a source unit scope. The
+  ~using L for t;~ directive attaches all public library functions to a type.
+  All types are identified with =*=. The type is passed as the first argument to
+  the function. The left and right operands are passed to the function that acts
+  as an operator
+
+*** Interacting with contracts
+
+- Contract manual interaction :: The low-level functions =call()=,
+  =delegatecall()=, and =staticcall()= operate on an address, not a contract
+  instance and have the same signature src_solidity{ address().call{value: 1,
+  gas: 10}(bytes memory args) returns (bool success, bytes memory values); } and
+  provide fine-grained control over encoding of the input arguments and decoding
+  of the return values. Data encoding can be done with =abi.encode()=,
+  =abi.encodePacked()=, =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
+  - Call :: The =call()= function switches the EVM state e.g. state variables,
+    accounts from the current calling contract to the new called contract, so
+    the context of the calling contract is inaccessible
+  - Delegate call :: The =delegatecall()= function implements the =library= and
+    only uses the code from the target address, while preserving the context
+    e.g. state variables, accounts, from the current calling contract
+  - Static call :: The =staticcall()= function reverts if the called function
+    modifies the state of the current calling contract
 
 ** Functions
 
@@ -356,85 +438,6 @@ contract Generocity {
   topic. All not indexed event fields are stored in the data part of the
   transaction log
 
-** Contract
-
-- Contract creation :: A contract can be created either by a transaction from an
-  external account or by by another contract using a salt to randomize the new
-  contract address src_solidity{ Contract c = new Contract{salt: bytes32}(); }.
-  The contract constructor is executed only once when a contract is created.
-  Only one constructor is allowed: the constructor overloading is not supported
-- Contract code on the blockchain :: When a constructor is being executed, the
-  contract is not yet deployed. After the constructor has executed, the final
-  contract code is stored on the blockchain. The contract code includes all
-  public and external functions, as well as all private and internal functions
-  reachable from the the public interface through function calls. The deployed
-  contract code does not include the constructor code or functions only called
-  from the constructor
-- Multiple inheritance :: The contract hierarchy is complied into a single the
-  contract. All internal calls to functions defined in base contracts are
-  implemented as very efficient jumps. Shadowing of state variables generates an
-  error. Derived contracts must have distinct names for state variables.
-  Mark functions of a base contract as =virtual= to =override= them in derived
-  contracts. Virtual modifiers can be overridden in derived contracts. Multiple
-  base classes are searched in the right-to-left order of the inheritance list
-  #+BEGIN_SRC solidity
-contract Base1 {
-  constructor(uint) { }
-  modifier m() virtual { _; }
-  function f() virtual public { }
-}
-contract Base2 {
-  constructor(uint) { }
-  modifier m() virtual { _; }
-  function f() virtual public { }
-}
-// inheritance list: the most base to the most derived order
-contract Derived is Base1(1), Base2 {
-  constructor() Base2(2) { } // constructor modifier list
-  modifier m() override(Base1, Base2) { _; }
-  function f() override(Base1, Base2) public { }
-}
-  #+END_SRC
-- Abstract contract :: The abstract contract has at least one function not
-  implemented or the contract does not provides arguments to at least one base
-  contract. Abstract contracts cannot be directly created, but must be inherited
-  by deriving contracts
-- Interface :: The interface provides only signatures of implicitly virtual
-  functions, not their implementations. An interface can inherit from other
-  interfaces. All functions in an interface must be external even if the
-  functions will be public in the implementing contracts. An interface can
-  define enums and structs
-- Library :: The library is a set of internal and external functions deployed
-  once and reused in the context of the calling contract through the
-  =delegatecall= for external functions and the efficient jumps for internal
-  functions. All used internal library functions are included in the calling
-  contract during the construction, so calls to internal library functions are
-  efficient jumps
-- Using F for T :: The ~using f, g as +, L.e for t;~ directive attaches free or
-  library functions to a type within the contract or a source unit scope. The
-  ~using L for t;~ directive attaches all public library functions to a type.
-  All types are identified with =*=. The type is passed as the first argument to
-  the function. The left and right operands are passed to the function that acts
-  as an operator
-
-*** Interacting with contracts
-
-- Contract manual interaction :: The low-level functions =call()=,
-  =delegatecall()=, and =staticcall()= operate on an address, not a contract
-  instance and have the same signature src_solidity{ address().call{value: 1,
-  gas: 10}(bytes memory args) returns (bool success, bytes memory values); } and
-  provide fine-grained control over encoding of the input arguments and decoding
-  of the return values. Data encoding can be done with =abi.encode()=,
-  =abi.encodePacked()=, =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
-  - Call :: The =call()= function switches the EVM state e.g. state variables,
-    accounts from the current calling contract to the new called contract, so
-    the context of the calling contract is inaccessible
-  - Delegate call :: The =delegatecall()= function implements the =library= and
-    only uses the code from the target address, while preserving the context
-    e.g. state variables, accounts, from the current calling contract
-  - Static call :: The =staticcall()= function reverts if the called function
-    modifies the state of the current calling contract
-
 ** Error handling
 
 - Assert function :: The =assert= function causes a ~Panic(uint)~ when a
@@ -480,6 +483,16 @@ try this.externalCall() returns (uint returnValue) {
 }
   #+END_SRC
 
+** Import
+
+- Import :: The =import= statement imports all or explicitly selected global
+  symbols from the imported file into the global scope of the current file
+  #+BEGIN_SRC solidity
+import "path"; // imports all symbols
+import { A, B as BB } "path"; // imports only selected symbols
+import * as alias from "path" // imports all symbols under the alias
+  #+END_SRC
+
 ** Layout
 
 - File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
@@ -491,13 +504,3 @@ try this.externalCall() returns (uint returnValue) {
   - Mutability :: =pure=, =view=, =payable=
   - Inheritance :: =virtual=, =override=
   - Modifier :: Custom modifiers
-
-** Import
-
-- Import :: The =import= statement imports all or explicitly selected global
-  symbols from the imported file into the global scope of the current file
-  #+BEGIN_SRC solidity
-import "path"; // imports all symbols
-import { A, B as BB } "path"; // imports only selected symbols
-import * as alias from "path" // imports all symbols under the alias
-  #+END_SRC
