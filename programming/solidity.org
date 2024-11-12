@@ -32,11 +32,6 @@
 | =1 ether=  | =1e18 wei=, =1e9 gwei=  |
 - Payable address :: An external address or a contract address with a
   =receive()= function or a =payable fallback= function that accepts Ether
-- Transfer and send :: The high-level =transfer()= function reverts on a failure
-  and stops the execution of the current contract. The low-level =send()=
-  function returns false on a failure, but the execution of the current contract
-  continues. Always check the return value of the =send()= function, or better
-  use the =transfer()= function, or better let the recipient to withdraw Ether
 - User-defined value type :: A user-defined value type creates the *zero-cost
   abstraction* over the underlying built-in value type. The user-defined value
   type has neither operators nor attached functions, only explicit conversion to
@@ -158,9 +153,9 @@ if (balances[acc] > 0) {
 - Local variable :: The local variable is declared and used within the scope of
   a function. The local variable is not stored on the blockchain
 - Storage variable :: The storage variable is defined and used within the scope
-  of a contract. The storage variable is stored on the blockchain. A write to a
-  storage variable must be within a transaction. A read from a storage variable
-  does not require a transaction
+  of a contract. The storage variable is stored on the blockchain. The storage
+  variable cannot be external. A write to a storage variable must be within a
+  transaction. A read from a storage variable does not require a transaction
 - Global variable :: The global variables are implicitly provided by the EVM
   e.g. =msg.sender=, =msg.value=
 
@@ -238,24 +233,28 @@ contract Contract {
 ** Contract
 
 - Contract creation :: A contract can be created either by a transaction from an
-  external account or by by another contract using a salt to randomize the new
-  contract address src_solidity{ Contract c = new Contract{salt: bytes32}(); }.
-  The contract constructor is executed only once when a contract is created.
-  Only one constructor is allowed: the constructor overloading is not supported
-- Contract code on the blockchain :: When a constructor is being executed, the
-  contract is not yet deployed. After the constructor has executed, the final
-  contract code is stored on the blockchain. The contract code includes all
-  public and external functions, as well as all private and internal functions
-  reachable from the the public interface through function calls. The deployed
-  contract code does not include the constructor code or functions only called
-  from the constructor
-- Multiple inheritance :: The contract hierarchy is complied into a single the
-  contract. All internal calls to functions defined in base contracts are
-  implemented as very efficient jumps. Shadowing of state variables generates an
-  error. Derived contracts must have distinct names for state variables.
-  Mark functions of a base contract as =virtual= to =override= them in derived
-  contracts. Virtual modifiers can be overridden in derived contracts. Multiple
-  base classes are searched in the right-to-left order of the inheritance list
+  external account or by an external call from another contract using a salt to
+  randomize the address of the new contract src_solidity{ Contract c = new
+  Contract{salt: bytes32}(); }. The contract constructor is executed only once
+  when a contract is created. Only one constructor is allowed. The constructor
+  overloading is not supported
+- Contract deployment :: When a constructor is being executed, the contract is
+  not yet deployed. After the constructor has executed, the final contract code
+  is stored on the blockchain. The contract code includes all public and
+  external functions, as well as all private and internal functions reachable
+  from the the public interface of the contract through function calls. The
+  deployed contract code does not include the constructor code or functions only
+  called from the constructor
+- Multiple inheritance :: The inheritance hierarchy of the contract is complied
+  into a single contract. All internal calls to functions defined in base
+  contracts are implemented as very efficient jumps inside EVM. Shadowing of
+  state variables generates an error. Derived contracts must have distinct names
+  for state variables. Mark functions of a base contract as =virtual= to
+  =override= them in derived contracts. Virtual modifiers can be overridden in
+  derived contracts. Multiple base classes are searched in the right-to-left
+  revers order of the inheritance. Parent constructors are called in the
+  left-to-right order of inheritance. Functions from base contracts can be
+  called either ~Base.f()~ or ~super.f()~
   #+BEGIN_SRC solidity
 contract Base1 {
   constructor(uint) { }
@@ -267,44 +266,46 @@ contract Base2 {
   modifier m() virtual { _; }
   function f() virtual public { }
 }
-// inheritance list: the most base to the most derived order
-contract Derived is Base1(1), Base2 {
-  constructor() Base2(2) { } // constructor modifier list
+// Constructors are called in the left-to-right -> order of inheritance:
+// from the most base class to the most derived class
+contract Derived is Base1(1), Base2(2) { // static args for base constructors
+  // Dynamic args for base constructors
+  constructor(uint arg1, uint arg2) Base1(arg1) Base2(arg2) { }
   modifier m() override(Base1, Base2) { _; }
-  function f() override(Base1, Base2) public { }
+  // Functions are searched in the right-to-left <- reverse order of inheritance
+  function f() override(Base1, Base2) public { } // Base2.f is overridden
 }
   #+END_SRC
-- Abstract contract :: The abstract contract has at least one function not
-  implemented or the contract does not provides arguments to at least one base
+- Abstract contract :: The =abstract= contract has at least one function not
+  implemented or the contract does not provide arguments to at least one base
   contract. Abstract contracts cannot be directly created, but must be inherited
-  by deriving contracts
-- Interface :: The interface provides only signatures of implicitly virtual
-  functions, not their implementations. An interface can inherit from other
-  interfaces. All functions in an interface must be external even if the
-  functions will be public in the implementing contracts. An interface can
-  define enums and structs
-- Library :: The library is a set of internal and external functions deployed
-  once and reused in the context of the calling contract through the
-  =delegatecall= for external functions and the efficient jumps for internal
-  functions. All used internal library functions are included in the calling
-  contract during the construction, so calls to internal library functions are
-  efficient jumps
-- Using F for T :: The ~using f, g as +, L.e for t;~ directive attaches free or
-  library functions to a type within the contract or a source unit scope. The
-  ~using L for t;~ directive attaches all public library functions to a type.
-  All types are identified with =*=. The type is passed as the first argument to
-  the function. The left and right operands are passed to the function that acts
-  as an operator
-
-*** Interacting with contracts
-
+  by deriving contracts that implement not implemented functions from the
+  abstract contract
+- Interface :: The =interface= provides only signatures of implicitly virtual
+  functions, not their implementations. The interface can inherit from other
+  interfaces. All functions in the interface must be explicitly marked as
+  =external= even if the functions will be public in the implementing contracts.
+  The interface can define enums and structs
+- Library :: The =library= is a set of internal and external functions deployed
+  once and reused in the context of the calling contracts through the
+  =delegatecall= for the external functions and the efficient jumps inside EVM
+  for the internal functions. All referenced internal library functions are
+  included in the calling contract during the construction, so calls to internal
+  library functions are efficient jumps inside EVM
+- Using F for T :: The ~using f, g as +, Lib.e for typ;~ directive attaches free
+  functions or library functions to the type within the scope of the contract or
+  the scope of a source file. The ~using L for typ;~ directive attaches all
+  public library functions to the type. All types are identified with =*=. The
+  type is passed as the first argument to the library functions. The left and
+  right operands are passed to the library functions that act as operators
 - Contract manual interaction :: The low-level functions =call()=,
   =delegatecall()=, and =staticcall()= operate on an address, not a contract
-  instance and have the same signature src_solidity{ address().call{value: 1,
-  gas: 10}(bytes memory args) returns (bool success, bytes memory values); } and
-  provide fine-grained control over encoding of the input arguments and decoding
-  of the return values. Data encoding can be done with =abi.encode()=,
-  =abi.encodePacked()=, =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
+  instance and all three have the same signature src_solidity{
+  address(this).call{value: 1, gas: 10}(bytes memory args) returns (bool
+  success, bytes memory retValues); } and provide fine-grained control over
+  encoding of the input arguments and decoding of the return values. Data
+  encoding can be done with =abi.encode()=, =abi.encodePacked()=,
+  =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
   - Call :: The =call()= function switches the EVM state e.g. state variables,
     accounts from the current calling contract to the new called contract, so
     the context of the calling contract is inaccessible
@@ -314,96 +315,128 @@ contract Derived is Base1(1), Base2 {
   - Static call :: The =staticcall()= function reverts if the called function
     modifies the state of the current calling contract
 
+*** Inbound payable
+
+- Payable function :: The balance of the contract is automatically updated when
+  the =payable= constructor or the =payable= function is executed
+- Receive function :: Ether, sent to a contact, is received by the =receive()=
+  payable function. The receive function is called if =msg.data= is empty,
+  otherwise the payable fallback function is called
+- Fallback function :: A contract can have at most one =fallback()= function
+  that is executed when no other contract function matches the call signature
+  #+BEGIN_SRC solidity
+contract Receive {
+  event EvReceive(address indexed from, uint value);
+
+  function deposit() external payable {
+    console.log("<== deposit %s", msg.value);
+    emit EvReceive(msg.sender, msg.value);
+  }
+
+  receive() external payable {
+    console.log("<== receive %s", msg.value);
+    emit EvReceive(msg.sender, msg.value);
+  }
+
+  fallback() external payable {
+    console.log("<== fallback %s", msg.value);
+    emit EvReceive(msg.sender, msg.value);
+  }
+}
+  #+END_SRC
+
+*** Outbound payable
+
+- Outbound payable :: The =payable= address state variables can send ether via
+  the =transfer()=, the =send()=, and the =call()= functions. The high-level
+  =transfer()= function reverts on a failure and stops the execution of the
+  current contract. The low-level =send()= function returns false on a failure,
+  but the execution of the current contract continues. Always check the return
+  value of the =send()= function, or better use the =transfer()= function, or
+  better let the recipient to withdraw Ether. The recommended way to send ether
+  is the =call()= function
+  #+BEGIN_SRC solidity
+contract Send {
+  function send(address payable to) public payable {
+    Receive(to).deposit{value: msg.value}();
+    to.transfer(msg.value); // not recommended
+    bool success = to.send(msg.value); // not recommended
+    require(success, "send failure");
+    (bool success, ) = to.call{value: msg.value}(""); // recommended
+    require(success, "call failure");
+  }
+}
+  #+END_SRC
+- Gas :: Gas is the internal unit of computation on the EVM. Gas consumption is
+  defined for each EVM instruction. Gas must be provided for a function to be
+  executed. Not consumed gas is refunded. The ether value to pay depends on the
+  amount of gas spent and the gas price that a caller is willing to pay
+  - Transaction as limit :: The gas limit is the maximum amount of gas a caller
+    is willing to spend on a transaction
+  - Block gas limit :: The block gas limit is the maximum amount of gas set by
+    the blockchain that is allowed to be spent on a block
+
 ** Functions
 
+- Free function :: The free function outside a contract has implicit =internal=
+  visibility, is included in all contracts that call the function. The free
+  function is executed in the context of the calling contract, but does not have
+  access to =this= and state variables of the calling contract
+- Named parameters :: Function arguments can be provided in any order by
+  specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
+- Tuple type :: The tuple type is a fixed list of heterogeneous types. The tuple
+  is not a proper type in Solidity. The tuple is used to return multiple values
+  from a function and for *destructuring assignment* of returned multiple values
+  src_solidity{ return (true, 1, "a"); (bool b, uint i, string s) = f(); }
+- Function overloading :: The function overloading takes into consideration only
+  the types and order of the function parameters, not the return values
 - Function type :: The function type is the first class in Solidity. Functions
   can be assigned to variables, passed to functions as arguments, and returned
   from functions as return values. Gas and ether can be provided when calling a
   function src_solidity{ f{value: 1, gas: 10}(); }
-- Internal function :: The =internal= function can only be called from the
-  current contract, from the derived contracts, from used library functions.
-  An internal function is called directly via a simple *jump* in the EVM
-  preserving memory by other contract functions ~f()~
-- External function :: The =external= function can be only called by external
-  accounts and other contracts through a *message call* by specifying the
-  contract address the signature of the external function and the encoded
-  arguments. An external function provides the ~f.address~ of the contract and
-  the ABI ~f.selector~. An external function is called through ~this.f()~ or
-  through a contract instance ~contr.f()~ via a message call, not via a jump. An
-  external function call from one contract to another does not create a new
-  transaction, it is only a message call within the current transaction. An
-  external function call can specify the amount of gas and ether that are added
-  to the balance of the called contract ~contr.f{value: 1, gas: 10}();~
-- Tuple type :: The tuple type is a fixed list of heterogeneous types. Tuple is
-  not a proper type in Solidity. Tuple is used to return multiple values from a
-  function and for destructuring assignment of returned multiple values
-  src_solidity{ return (true, 1, "a"); (bool b, uint i, string s) = f(); }
-- Named parameters :: Function arguments can be provided in any order by
-  specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
-- Contract function visibility ::
-  - Private :: A =private= function is only accessible to the defining contract
-    and is not accessible to derived contracts
-  - Internal :: An =internal= function (default visibility) is accessible to the
-    defining contract and to derived contracts. An internal function can take
-    mappings and references to storage as parameters
-  - Public :: A =public= function is accessible to other contracts as part of
+
+*** Function visibility and mutability
+
+- Function visibility ::
+  - Private :: The =private= function is only accessible to the defining
+    contract and is not accessible to the derived contracts
+  - Internal :: The =internal= function (default visibility) is accessible to
+    the defining contract and to the derived contracts. An internal function can
+    take mappings and references to storage variables as parameters. The
+    internal function is called by other contract functions directly ~f()~ via a
+    simple *jump* in the EVM preserving the memory layout
+  - Public :: The =public= function is accessible to other contracts as part of
     the public interface of the contract
-  - External :: An =external= function is accessible to other contracts as part
-    of the public interface of the contract. An external function cannot be
-    called internally ~f()~, but only through ~this.f()~
-- Free function :: The free function outside a contract has implicit internal
-  visibility, is included in all contracts that call the function, is
-  executed in the context of the calling contract, but does not have access to
-  =this= and state variables of the calling contract
-- Function state mutability :: State modifying operations: write to state
+  - External :: The =external= function is accessible to other contracts as part
+    of the public interface of the contract. The external function cannot be
+    called internally ~f()~ via a simple jump, but must be called through a
+    message call via ~this.f()~. The external function can be only called by
+    external accounts and other contracts through a *message call* by specifying
+    the contract address, the signature of the external function, and the
+    encoded arguments. The external function provides the ~f.address~ of the
+    contract and the ABI ~f.selector~. The external function call from one
+    contract to another does not create a new transaction, it is only a message
+    call within the current transaction. The external function call can specify
+    the amount of gas and ether that are added to the balance of the called
+    contract ~contr.f{value: 1, gas: 10}();~
+- Function state mutability :: The state modifying operations: write to state
   variables, create new contracts, send ether, emit events, call a function not
-  marked as view or pure, use low-level calls
+  marked as view or pure, use low-level calls e.g. ~send()~
   - Pure function :: The =pure= function performs computations without even
-    reading state variables
-  - View function :: The =view= function reads state variables, but does not
-    modify them
-- Receive function :: Ether, sent to a contact by the =transfer()= and =send()=
-  calls, is received through the =receive()= function
-  #+BEGIN_SRC solidity
-contract Sink {
-  event Receive(address indexed from, uint value);
-  receive() external payable {
-    emit Receive(msg.sender, msg.value);
-  }
-}
-  #+END_SRC
-- Fallback function :: A contract can have at most one =fallback()= function
-  that is executed when no other contract function matches the call signature
-  #+BEGIN_SRC solidity
-contract FallbackContract {
-  fallback() external [payable] {
-  }
-  fallback(bytes calldata input) external [payable]
-    returns (bytes memory output) {
-  }
-}
-  #+END_SRC
-- Function overloading :: The function overloading takes into consideration only
-  types and order of the function parameters, not the return values
-- Gas :: Gas is the internal unit of computation on the EVM. Gas is defined of
-  each EVM instruction. Gas must be provided for a function to be executed. Not
-  consumed gas is refunded. The ether value to pay depends on the amount of gas
-  spent and the gas price that a caller is willing to pay. A caller defines the
-  - Gas limit :: The gas limit is the maximum amount of gas a caller is willing
-    to spend on a transaction
-  - Block gas limit :: The block gas limit is the maximum amount of gas set by
-    the blockchain that is allowed to be spent per block
+    reading the state variables
+  - View function :: The =view= function reads the state variables, but does not
+    modify the state variables
 
 *** Function modifier
 
 - Function modifier :: The function modifier is a decorator that checks
-  pre-conditions before invoking a function and handles post-conditions after
-  the function execution. Virtual modifiers can be overridden in derived
-  contracts. A modifier cannot access or change function arguments or return
-  values. Function arguments can only be passed to a modifier at the point of
-  application src_solidity{ function f(uint a) mod(a) { ... } }. A modifier can
-  decide to not execute the function at all. In this case the return values of
-  the function are set to their default values
+  pre-conditions before invoking the decorated function and handles
+  post-conditions after the function execution. Virtual modifiers can be
+  overridden in derived contracts. A modifier cannot access or change function
+  arguments or return values. Function arguments can only be passed to a
+  modifier at the point of application src_solidity{ function f(uint a) mod(a) {
+  ... } }. A modifier can decide to not execute the function at all. In this
+  case the return values of the function are set to default values
   #+BEGIN_SRC solidity
 contract Generocity {
   mapping(address => bool) gifts;
@@ -428,34 +461,36 @@ contract Generocity {
 
 ** Event
 
-- Event :: Emitted events are associated with a contract address and stored in
+- Event :: Emitted events are associated with the contract address and stored in
   the transaction log on the blockchain. Events and logs are not accessible from
-  within the contract that emitted them
+  within the emitting contract
 - Event indexing :: At most three event fields can be indexed and placed into
   topics that provide efficient search by indexed fields. The keccak256 hash of
   the event signature is placed into the forth default topic. A topic can only
   hold 32-byte words. A keccak256 hash of indexed reference types is stored in a
   topic. All not indexed event fields are stored in the data part of the
-  transaction log
+  transaction log. Event emitting functions cannot be pure or view functions, as
+  they alter the blockchain by storing logs
 
 ** Error handling
 
 - Assert function :: The =assert= function causes a ~Panic(uint)~ when a
-  condition is not met and is used only for internal checks e.g. division by
-  zero, arithmetic overflow, arithmetic underflow, out-of-bounds array access,
-  conversion error, corrupted data, explicit assert e.g. src_solidity{
-  assert(cond) }
-- Revert statement :: The =revert= statement reverts all changes when a
-  condition is not met
+  condition is not met. The assert function is used only for checking internal
+  invariants e.g. division by zero, arithmetic overflow, arithmetic underflow,
+  out-of-bounds array access, data conversion error, corrupted data, explicit
+  assert e.g. src_solidity{ assert(cond) }
+- Revert statement :: The =revert= statement reverts all changes to the state
+  when a condition is not met. The revert statement is used for complex
+  conditions
   #+BEGIN_SRC solidity
 error ErrInsufficientFunds(uint requested, uint available);
 if (balances[msg.sender] <= value) {
   revert ErrInsufficientFunds(value, balances[msg.sender]);
 }
   #+END_SRC
-- Require function :: The =require= convenience function reverts all changes
-  when a condition is not met. The =revert= statement and the =require= function
-  are equivalent, but the require function is more convenient
+- Require function :: The =require= convenience function reverts all changes to
+  the state when a condition is not met. The =revert= statement and the
+  =require= function are equivalent, but the require function is more convenient
   #+BEGIN_SRC solidity
 require(balances[msg.sender] <= value, "insufficient funds");
 require(
