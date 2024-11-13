@@ -298,14 +298,12 @@ contract Derived is Base1(1), Base2(2) { // static args for base constructors
   public library functions to the type. All types are identified with =*=. The
   type is passed as the first argument to the library functions. The left and
   right operands are passed to the library functions that act as operators
-- Contract manual interaction :: The low-level functions =call()=,
+- Calling contract function :: The low-level functions =call()=,
   =delegatecall()=, and =staticcall()= operate on an address, not a contract
   instance and all three have the same signature src_solidity{
-  address(this).call{value: 1, gas: 10}(bytes memory args) returns (bool
+  address(contract).call{value: 1, gas: 10}(bytes memory args) returns (bool
   success, bytes memory retValues); } and provide fine-grained control over
-  encoding of the input arguments and decoding of the return values. Data
-  encoding can be done with =abi.encode()=, =abi.encodePacked()=,
-  =abi.encodeWithSelector()=, =abi.encodeWithSignature()=.
+  encoding of the input arguments and decoding of the return values
   - Call :: The =call()= function switches the EVM state e.g. state variables,
     accounts from the current calling contract to the new called contract, so
     the context of the calling contract is inaccessible
@@ -314,6 +312,18 @@ contract Derived is Base1(1), Base2(2) { // static args for base constructors
     e.g. state variables, accounts, from the current calling contract
   - Static call :: The =staticcall()= function reverts if the called function
     modifies the state of the current calling contract
+  #+BEGIN_SRC solidity
+function callFunction(Counter counter) internal {
+  bytes memory data = abi.encodeWithSignature("get()");
+  bytes4 selector = bytes4(keccak256("get()"));
+  bytes memory data = abi.encodeWithSelector(selector);
+  bytes memory data = abi.encodeWithSelector(counter.get.selector);
+  bytes memory data = abi.encodeCall(counter.get, ());
+  (bool success, bytes memory result) = address(counter).call(getData);
+  require(success, "get failure");
+  (uint value) = abi.decode(result, (uint));
+}
+  #+END_SRC
 
 *** Inbound payable
 
@@ -322,8 +332,10 @@ contract Derived is Base1(1), Base2(2) { // static args for base constructors
 - Receive function :: Ether, sent to a contact, is received by the =receive()=
   payable function. The receive function is called if =msg.data= is empty,
   otherwise the payable fallback function is called
-- Fallback function :: A contract can have at most one =fallback()= function
-  that is executed when no other contract function matches the call signature
+- Fallback function :: A contract can have at most one =fallback()= external
+  function that is executed when no other contract function matches the call
+  signature. The payable fallback function is executed when the =receive()=
+  function is not defined or the =msg.data= is not empty
   #+BEGIN_SRC solidity
 contract Receive {
   event EvReceive(address indexed from, uint value);
@@ -394,6 +406,11 @@ contract Send {
   can be assigned to variables, passed to functions as arguments, and returned
   from functions as return values. Gas and ether can be provided when calling a
   function src_solidity{ f{value: 1, gas: 10}(); }
+- Function selector :: The function selector is the first 4 bytes of the
+  Keccak256 hash of the function signature. The function selector identifies a
+  public or an external function in a contract during a message call. The
+  function selector is located at the first 4 bytes of the call data.
+  src_solidity{ bytes4 setSelector = bytes4(keccak256("set(uint256)")); }
 
 *** Function visibility and mutability
 
