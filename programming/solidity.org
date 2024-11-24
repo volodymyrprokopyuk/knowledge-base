@@ -22,7 +22,8 @@
   The division of literals results in the fractional values of the arbitrary
   precision. The division of integers rounds towards zero
 - Checked arithmetic operations :: All arithmetic operations are checked by
-  default and revert on an underflow or an overflow
+  default and revert on an underflow or an overflow. ~unchecked { ... }~
+  disables the arithmetic checks ans saves gas
 - Ether units :: Numbers can have the =wei=, the =gwei=, and the =ether= suffix
   to identify the ether value. Numbers without a suffix are assumed to be in
   =wei=
@@ -172,7 +173,7 @@ if (balances[acc] > 0) {
   storage data location and is reset at the end of each transaction
 - Calldata :: The =calldata= data location stores function arguments in a
   read-only, volatile, memory-like data location that avoids unnecessary copies
-  of data
+  of data to save gas
 - Memory :: The memory is accessible within the scope of a function, and
   provides 32-bytes reads, and 1-byte and 32-bytes writes
 - Stack :: The EVM is a stack-based machine, not a register-based machine. All
@@ -285,13 +286,14 @@ contract Derived is Base1(1), Base2(2) { // static args for base constructors
   functions, not their implementations. The interface can inherit from other
   interfaces. All functions in the interface must be explicitly marked as
   =external= even if the functions will be public in the implementing contracts.
-  The interface can define enums and structs
+  The interface can define enums, structs, and events
 - Library :: The =library= is a set of internal and external functions deployed
   once and reused in the context of the calling contracts through the
   =delegatecall= for the external functions and the efficient jumps inside EVM
   for the internal functions. All referenced internal library functions are
   included in the calling contract during the construction, so calls to internal
-  library functions are efficient jumps inside EVM
+  library functions are efficient jumps inside EVM. A library cannot define
+  state variables
 - Using F for T :: The ~using f, g as +, Lib.e for typ;~ directive attaches free
   functions or library functions to the type within the scope of the contract or
   the scope of a source file. The ~using L for typ;~ directive attaches all
@@ -515,8 +517,8 @@ require(
   ErrInsufficientFunds(value, balances[msg.sender])
 );
   #+END_SRC
-- try/catch statement :: The =try/catch= statement handles errors when an
-  external function call or a =new= contract creation has reverted. Reverts in
+- try/catch statement :: The =try/catch= statement handles errors when only
+  external function calls or a =new= contract creation has reverted. Reverts in
   internal function calls or inside the same function cannot be caught
   #+BEGIN_SRC solidity
 try this.externalCall() returns (uint returnValue) {
@@ -530,6 +532,9 @@ try this.externalCall() returns (uint returnValue) {
     "ErrOh(string)", "revert error"
   );
   assertEq(err, expErr);
+}
+try new Contract() returns (Contract contract) {
+  // success: contract
 } catch {
   // catch all errors
 }
@@ -550,9 +555,65 @@ import * as alias from "path" // imports all symbols under the alias
 - File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
   =library=, =contract=
 - Contract layout :: =enum=, =struct=, state, =event=, =error=, =modifier=,
-  =function=
+  =constructor=, =function=
 - Function modifiers layout ::
   - Visibility :: =private=, =internal=, =public=, =external=
   - Mutability :: =pure=, =view=, =payable=
   - Inheritance :: =virtual=, =override=
   - Modifier :: Custom modifiers
+
+
+* Security
+
+** Security principles
+
+- Keep it simple
+  - Design modular and composable functions and contracts
+  - Prefer clarity over performance
+  - Only use the blockchain for critical data and operations
+- Blockchain properties
+  - The private data of a contract is publicly viewable
+  - The public interface of a contract can be called maliciously
+  - Calls to external contracts that may execute malicious code
+  - Timestamps are imprecise on a blockchain
+  - Randomness is non-trivial on a blockchain
+- Graceful error handling
+  - Prepare a smart contract to gracefully handle bugs and vulnerabilities
+  - Use a circuit breaker to pause the failing contract
+  - Use a rate limiter and quotas to limit the value at risk
+  - Set up an effective upgrade path for fixes and improvements
+
+** Development recommendations
+
+*** External calls
+
+- External calls :: Treat external contract calls ~contract.function()~ and
+  external raw calls ~address.function()~ calls as a potential security risk
+- Handle errors in low-level raw calls :: Explicitly handle the bool return
+  value of low-level raw calls operating on addresses e.g. ~address.call()`,
+  ~address.staticcall()~. Contract calls ~contract.function()~ automatically
+  revert
+- Checks-effects-interactions :: First perform all checks using the =require()=.
+  Then make state changes by modifying state variables. Only then call external
+  contracts. Avoid state changes after external calls
+- Prefer call over transfer and send :: Prefer the =call()= over the
+  =transfer()= and =send()=. The transfer and the send functions forward only
+  2300 gas, which may not be enough if the recipient is a contract or the cost
+  of EVM instructions changes. The call function forwards all available gas
+  #+BEGIN_SRC solidity
+// avoid
+msg.sender.transfer(value);
+// prefer
+(bool success, ) = msg.sender.call{value: value}("");
+require(success, ErrTransfer());
+  #+END_SRC
+- Prefer pull over push for external calls :: Minimize damage of a failure of an
+  external call by isolating the external call into its own transaction
+  initiated by the recipient. E.g. let users withdraw funds rather then pushing
+  funds to them automatically, avoid combining multiple transactions into a
+  single transaction
+- Do not delegate call to untrusted code :: ~address.delegatecall()~ executes
+  functions from external contracts in the context of the calling contract. The
+  untrusted external contract may change the state of the calling contract.
+  Delegate calls only to trusted contracts. Never delegate calls to a
+  user-supplied address
