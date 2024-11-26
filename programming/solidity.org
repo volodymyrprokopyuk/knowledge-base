@@ -31,8 +31,12 @@
 | =1 wei=    | =1e-18 ether=           |
 | =1 gwei=   | =1e-9 ether=, =1e9 wei= |
 | =1 ether=  | =1e18 wei=, =1e9 gwei=  |
+- Address :: Identifies an external address or a contract address. Prefer a
+  contract reference src_solidity{ Contract c; } over a contract address with a
+  cast src_solidity{ address c; }
 - Payable address :: An external address or a contract address with a
   =receive()= function or a =payable fallback= function that accepts Ether
+- Payable function :: A function that receives ether must be payable
 - User-defined value type :: A user-defined value type creates the *zero-cost
   abstraction* over the underlying built-in value type. The user-defined value
   type has neither operators nor attached functions, only explicit conversion to
@@ -240,12 +244,12 @@ contract Contract {
   when a contract is created. Only one constructor is allowed. The constructor
   overloading is not supported
 - Contract deployment :: When a constructor is being executed, the contract is
-  not yet deployed. After the constructor has executed, the final contract code
-  is stored on the blockchain. The contract code includes all public and
-  external functions, as well as all private and internal functions reachable
-  from the the public interface of the contract through function calls. The
-  deployed contract code does not include the constructor code or functions only
-  called from the constructor
+  not yet deployed. After the constructor has executed, the final immutable
+  contract code is stored on the blockchain. The contract code includes all
+  public and external functions, as well as all private and internal functions
+  reachable from the the public interface of the contract through function
+  calls. The deployed contract code does not include the constructor code or
+  functions only called from the constructor
 - Multiple inheritance :: The inheritance hierarchy of the contract is complied
   into a single contract. All internal calls to functions defined in base
   contracts are implemented as very efficient jumps inside EVM. Shadowing of
@@ -338,6 +342,10 @@ function callFunction(Counter counter) internal {
   function that is executed when no other contract function matches the call
   signature. The payable fallback function is executed when the =receive()=
   function is not defined or the =msg.data= is not empty
+- Relying on exact contract balance is unreliable :: Reverting from the receive
+  function and the payable fallback function cannot prevent a contract from
+  receiving ether. The actual contract balance can be higher than the internally
+  accounted balance
   #+BEGIN_SRC solidity
 contract Receive {
   event EvReceive(address indexed from, uint value);
@@ -413,19 +421,45 @@ contract Send {
   public or an external function in a contract during a message call. The
   function selector is located at the first 4 bytes of the call data.
   src_solidity{ bytes4 setSelector = bytes4(keccak256("set(uint256)")); }
+- API encoding ::
+  - ~abi.encode()~ more secure because not ambiguous, larger, more gas expensive
+  - ~abi.encodePacked()~ more probable hash collisions in mapping keys when
+    hashing and encoding multiple variable-length values, smaller, gas cheaper
+  #+BEGIN_SRC solidity
+bytes32 h1 = keccak256(abi.encodePacked([addr1], [addr2, addr3]));
+bytes32 h2 = keccak256(abi.encodePacked([addr1, addr2], [addr3]));
+require(h1 == h2); // true
+  #+END_SRC
+- Ambiguous evaluation order :: The order of evaluation of node children in an
+  expression tree is not specified. All children are evaluated in an unspecified
+  order before the parent node. Short-circuiting of boolean expressions is done.
+  Evaluation of functions is not fully deterministic. The evaluation order is
+  deterministic for a specific Solidity compiler version, but may not remain
+  consistent across different versions. Problem: multiple functions updating the
+  same state in a single statement. Solution: avoid expressions and store
+  intermediate results in temporary variables
+  #+BEGIN_SRC solidity
+uint i = 5;
+return i * i++; // 25 or 30
+return f(g(i), h(i)); // evaluation order of arguments is unspecified
+  #+END_SRC
 
 *** Function visibility and mutability
 
 - Function visibility ::
   - Private :: The =private= function is only accessible to the defining
-    contract and is not accessible to the derived contracts
+    contract and is not accessible to the derived contracts. All blockchain data
+    including the private state of a contract are visible to external objservers
   - Internal :: The =internal= function (default visibility) is accessible to
     the defining contract and to the derived contracts. An internal function can
     take mappings and references to storage variables as parameters. The
     internal function is called by other contract functions directly ~f()~ via a
     simple *jump* in the EVM preserving the memory layout
   - Public :: The =public= function is accessible to other contracts as part of
-    the public interface of the contract
+    the public interface of the contract. A public function can be called either
+    internally via a simple jump ~f()~ or externally via a message call
+    ~contract.f()~. Public getters are automatically generated for public state
+    variables
   - External :: The =external= function is accessible to other contracts as part
     of the public interface of the contract. The external function cannot be
     called internally ~f()~ via a simple jump, but must be called through a
@@ -450,12 +484,13 @@ contract Send {
 
 - Function modifier :: The function modifier is a decorator that checks
   pre-conditions before invoking the decorated function and handles
-  post-conditions after the function execution. Virtual modifiers can be
-  overridden in derived contracts. A modifier cannot access or change function
-  arguments or return values. Function arguments can only be passed to a
-  modifier at the point of application src_solidity{ function f(uint a) mod(a) {
-  ... } }. A modifier can decide to not execute the function at all. In this
-  case the return values of the function are set to default values
+  post-conditions after the function execution. Use modifiers to check for the
+  same conditions in multiple functions. A modifier cannot access or change
+  function arguments or return values. Function arguments can only be passed to
+  a modifier at the point of application src_solidity{ function f(uint a) mod(a)
+  { ... } }. A modifier can decide to not execute the function at all. In this
+  case the return values of the function are set to default values. Virtual
+  modifiers can be overridden in derived contracts
   #+BEGIN_SRC solidity
 contract Generocity {
   mapping(address => bool) gifts;
@@ -478,18 +513,20 @@ contract Generocity {
 }
   #+END_SRC
 
-** Event
+** Events
 
-- Event :: Emitted events are associated with the contract address and stored in
-  the transaction log on the blockchain. Events and logs are not accessible from
-  within the emitting contract
-- Event indexing :: At most three event fields can be indexed and placed into
-  topics that provide efficient search by indexed fields. The keccak256 hash of
-  the event signature is placed into the forth default topic. A topic can only
-  hold 32-byte words. A keccak256 hash of indexed reference types is stored in a
-  topic. All not indexed event fields are stored in the data part of the
-  transaction log. Event emitting functions cannot be pure or view functions, as
-  they alter the blockchain by storing logs
+- Event :: Emitted events are stored and indexed in the transaction log on the
+  blockchain to be consumed by the off-chain infrastructure. Events and logs are
+  associated with the contract address, but are not accessible from within the
+  emitting contract. Events should be emitted to log all significant changes in
+  a smart contract e.g. deposits, withdrawals, configuration changes
+- Event indexing :: At most three event fields can be =indexed= and placed into
+  topics that provide efficient search by exact match on the indexed fields. The
+  keccak256 hash of the event signature is placed into the first default topic.
+  A topic can only hold 32-byte words. A keccak256 hash of indexed reference
+  types is stored in a topic. All not indexed event fields are stored in the
+  data part of the transaction log. Event emitting functions cannot be pure or
+  view functions, as they alter the blockchain by storing logs
 
 ** Error handling
 
@@ -567,21 +604,151 @@ import * as alias from "path" // imports all symbols under the alias
 
 ** Security principles
 
+- Principle of least privilege :: A system should grant only the minimum
+  necessary rights to a subject to perform the required function
+  - Enforce authorization with Solidity access control modifiers e.g.
+    OpenZeppeling Owneable abstract contract
+  - Minimize the amount of data a function can access and modify
+- Defensive programming :: Validate data and check for unsatisfied conditions as
+  soon as possible before executing an action
 - Keep it simple
   - Design modular and composable functions and contracts
   - Prefer clarity over performance
   - Only use the blockchain for critical data and operations
 - Blockchain properties
-  - The private data of a contract is publicly viewable
+  - The *private data of a contract is publicly viewable* on a blockchain. To
+    preserve data privacy on a blockchain use a *commit-reveal scheme* where the
+    salted hash of a private data is stored on the blockchain, and later the
+    data and the salt matching the published hash are revealed
   - The public interface of a contract can be called maliciously
   - Calls to external contracts that may execute malicious code
-  - Timestamps are imprecise on a blockchain
+  - Timestamps are imprecise on a blockchain. If the contract logic maintains
+    integrity with the 15 seconds margin, that it is safe to use
+    =block.timestamp= which can be manipuated by a miner
   - Randomness is non-trivial on a blockchain
-- Graceful error handling
+- Prepare for failure, graceful error handling
   - Prepare a smart contract to gracefully handle bugs and vulnerabilities
-  - Use a circuit breaker to pause the failing contract
-  - Use a rate limiter and quotas to limit the value at risk
-  - Set up an effective upgrade path for fixes and improvements
+  - Circuit breaker :: Use a circuit breaker to stop programmatically or on
+    demand the failing contract when certain conditions are met
+    #+BEGIN_SRC solidity
+contract C {
+  bool stopped;
+  function stop() public only(owner) isStopped(false) {
+    stopped = true;
+  }
+  function deposit() isStopped(false) { }
+  function withdraw() only(owner) isStopped(true) { }
+}
+    #+END_SRC
+  - Rate limiter :: Use a rate limiter and quotas to limit the frequency of
+    requests and the value at risk by introducing deliberate delays in contract
+    actions e.g. deferred withdrawals, deferred activation of configuration
+    changes
+    #+BEGIN_SRC solidity
+contract C {
+  struct Withdrawal { uint value; uint timestamp; }
+  mapping(address => uint) balances;
+  mapping(address => Withdrawal) withdrawals;
+  function requestWithdrawal() public {
+    address withdrawer = msg.sender;
+    uint value = balances[withdrawer];
+    require(value > 0, ErrNothingToWithdraw(withdrawer));
+    balances[withdrawer] = 0;
+    withdrawals[withdrawer] = Withdrawal(value, block.timestamp + 7 days);
+  }
+  function withdraw() public {
+    address withdrawer = msg.sender;
+    Withdrawal storage withdrawal = withdrawals[withdrawer];
+    require(withdrawal.value > 0, ErrNothingToWithdraw(withdrawer));
+    require(block.timestamp > withdrawal.timestamp, ErrTooEarly(withdrawer));
+    uint value = withdrawal.value;
+    withdrawal.value = 0;
+    (bool success, ) = withdrawer.call{value: value}("");
+    require(success, ErrWithdraw(withdrawer));
+  }
+}
+    #+END_SRC
+  - Contract upgrade :: Set up an effective upgrade path for fixes and
+    improvements. Code of deployed contracts is immutable. A contract upgrade
+    implies a single owner or a multisig authority with the power to trigger an
+    update (some centralization)
+    - Registry contract :: Use a registry contract that holds the address of the
+      latest version of the contract. Users must always lookup the latest
+      address
+      #+BEGIN_SRC solidity
+contract Registry {
+  address current;
+  function upgrade(address next) external only(owner) {
+    require(next != address(0) && next != current, ErrInvalidContract(next));
+    current = next;
+    emit EvUpgrade(next);
+  }
+}
+      #+END_SRC
+    - Relay contract, transparent proxy :: A relay contract stores all state
+      across multiple versions of delegated logic contracts. The relay contract
+      forwards calls via the =delegatecall= in the =fallback()= function to the
+      latest version of the logic contract. The called logic contract must have
+      the same storage layout as the calling relay contract. The relay contract
+      only forwards calls, but does not return values from the logic contract.
+      Admin calls are not forwarded to the logic contract, but executed directly
+      on the relay contract to update its configuration
+      #+BEGIN_SRC solidity
+contract Relay is Registry {
+  fallback() external payable {
+    (bool success, ) = current.delegatecall(msg.data);
+    require(success, ErrRelay(msg.data));
+  }
+}
+      #+END_SRC
+- Testing strategy :: Fixes bugs, introduces performance optimizations,
+  integrates quality-of-life features
+  - Isolated testing :: Local linting, unit, integration, and property-based
+    fuzzy testing with 100% coverage
+  - Local testnet :: Deploy to a local testnet forked from the mainnet for the
+    private on-chain testing in realistic conditions. Use Foundry cheatcodes to
+    simulate unexpected and failure conditions
+  - Public testnet :: Deploy to a public testnet for the volume testing in a
+    more unpredictable environment, bug bounties and external beta testers
+  - Mainnet in beta :: Deploy to the mainnet in beta with the limited value at
+    risk and extensive monitoring of the activity of a smart contract
+  - Mainnet release :: Mainnet release
+- Frontrunning :: Every pending transaction is visible in the mempool before
+  execution. The public knowledge of already submitted, but not yet executed
+  transactions allows to submit another transaction with higher fees targeting
+  the same assets, before the original transaction is included into a block
+  - Displacement :: The original transaction is processed on an already invalid
+    state after the malicious transaction with higher fees has been processed
+  - Insertion :: The original transaction is processed on a modified state after
+    the malicious transaction with higher fees has been processed
+  - Suppression, block stuffing :: The execution of ordinary transactions e.g.
+    oracle updates is significantly delayed by placing other transactions with
+    high fees
+  - Mitigation of frontrunning :: Reduce the benefits of frontrunning in the
+    contract by minimizing the importance of transaction ordering or transaction
+    timing e.g. a commit-reveal scheme
+- Reentrancy :: A called external function performs an unanticipated call into
+  the calling original function initiating multiple half-completed executions of
+  the original function leading to a cascade of state changes. Mitigation: use
+  the checks-effects-interactions design pattern. No state change must occur
+  after an external call. State changes after an external call enable the
+  vulnerability
+  #+BEGIN_SRC solidity
+contract Reentrancy {
+  mapping(address => unit) balances;
+  // An attacker repeatedly calls back the function until all funds of the
+  // contract are drained. The attacker must stop when the contact balnce or the
+  // gas left is zero, otherwise the whole operation will be reverted
+  function withdraw() external {
+    address withdrawer = msg.sender;
+    uint value = balances[withdrawer];
+    balances[withdrawer] = 0; // SAFE state change BEFORE the external call
+    (bool success, ) = withdrawer.call{value: value}("");
+    require(success, ErrWithdraw(withdrawer));
+    balances[withdrawer] = 0; // UNSAFE state change AFTER the external call
+  }
+}
+  #+END_SRC
 
 ** Development recommendations
 
@@ -611,9 +778,22 @@ require(success, ErrTransfer());
   external call by isolating the external call into its own transaction
   initiated by the recipient. E.g. let users withdraw funds rather then pushing
   funds to them automatically, avoid combining multiple transactions into a
-  single transaction
+  single transaction, avoid looping over an arbitrary large array whose
+  processing may reach the block gas limit and revert the whole transaction.
+  Split a large array into multiple blocks processed in isolated transactions
 - Do not delegate call to untrusted code :: ~address.delegatecall()~ executes
   functions from external contracts in the context of the calling contract. The
   untrusted external contract may change the state of the calling contract.
   Delegate calls only to trusted contracts. Never delegate calls to a
   user-supplied address
+- msg.sender vs tx.origin :: If a contact =A= calls a contract =B= and a
+  contract =B= calls a contract =C=, then in the contract =C= =tx.origin= is =A=
+  and =msg.sender= is =B=. Always use =msg.sender= for authorization. Never use
+  =tx.origin= for authorization
+- Prevent transferring tokens to the contract's own address
+  #+BEGIN_SRC solidity
+modifier validRecipient(address to) {
+  require(to != address && to != address(this), ErrInvalidRecipient(to));
+  _;
+}
+  #+END_SRC
