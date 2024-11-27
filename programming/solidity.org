@@ -490,7 +490,8 @@ return f(g(i), h(i)); // evaluation order of arguments is unspecified
   a modifier at the point of application src_solidity{ function f(uint a) mod(a)
   { ... } }. A modifier can decide to not execute the function at all. In this
   case the return values of the function are set to default values. Virtual
-  modifiers can be overridden in derived contracts
+  modifiers can be overridden in derived contracts. A modifier should not update
+  state, except the reentrancy lock, or perform external calls
   #+BEGIN_SRC solidity
 contract Generocity {
   mapping(address => bool) gifts;
