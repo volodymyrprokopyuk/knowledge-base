@@ -1,0 +1,37 @@
+* Nushell
+
+** Data types
+
+- Any :: The =any= type is a super type of all types. The any type matches
+  values of any type. A variable of the any type takes the type of its currently
+  assigned value
+  #+BEGIN_SRC nushell
+mut v: any = 1 # 1 int
+$v = true # true bool
+let lst: list<any> = [true 1 2.3 "a"]
+def desc [v: any] -> string {
+  $v | describe
+}
+desc 1 # int
+desc true # bool
+  #+END_SRC
+- Bool :: The =bool= type represents two logical values =true= and =false=
+- Integer :: The =int= type represents 64-bit 0, positive, and negative numbers
+  without a fractional part
+- Float :: The =float= type represents 64-bit numbers with a fractional part
+  with a limited precision
+- Date time :: The =datetime= type TODO
+- Duration :: The =duration= type represents an integer or decimal time span
+  internally stored as a number of nanoseconds e.g. =ns=, =us=, =ms=, =sec=,
+  =min=, =hr=, =day=, =wk=
+- Closure ::
+  #+BEGIN_SRC nushell
+def id [] any -> any { # in -> out
+  $in
+}
+{||} | id | describe # closure
+def id2 [v: any] -> any { # arg -> out
+  $v
+}
+{||} | id2 $in | describe # closure
+  #+END_SRC
