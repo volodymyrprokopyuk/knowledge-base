@@ -2,7 +2,6 @@
 
 ** Data types
 
-
 - Type signature :: The type signature explicitly declares a type of a language
   construct
   #+BEGIN_SRC nushell
