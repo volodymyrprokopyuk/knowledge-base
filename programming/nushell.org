@@ -2,6 +2,56 @@
 
 ** Data types
 
+
+- Type signature :: The type signature explicitly declares a type of a language
+  construct
+  #+BEGIN_SRC nushell
+# Variable declaration
+let v: int = 1
+# Closure parameters
+do {|lst: list<int>| $lst } [1, 2, 3]
+# Custom command parameters
+def cmd [opt?: int = -1] # optional parameter with a default value
+def cmd [rec: record<i: int, s: string>] { $rec }
+# Custom command input and output streams
+def cmd [] nothing -> list { }
+# Custom command input andn output streams multi signature
+def cmd [] [nothing -> list, range -> list] { }
+  #+END_SRC
+
+*** Primitive data types
+
+- Bool :: The =bool= type represents two logical values =true= and =false=
+- Integer :: The =int= type represents 64-bit 0, positive, and negative numbers
+  without a fractional part
+- Float :: The =float= type represents 64-bit numbers with a fractional part
+  with a limited precision
+- String :: The =string= type represents a sequence of UTF-8 code points
+- Binary :: The =binary= type represents a sequence of bytes e.g. ~0x[1234 abcd]~
+- Date time :: The =datetime= type represents a specific point in time e.g.
+  =2024-12-06T13:35:00+01:00= =2024-12-06=
+- Duration :: The =duration= type represents an integer or decimal time span
+  internally stored as a number of nanoseconds e.g. =ns=, =us=, =ms=, =sec=,
+  =min=, =hr=, =day=, =wk=
+- Cell path :: The =cell-path= type represents an expression to navigate a
+  structured data type. A cell path is a dot-separated list of integer row
+  indices and string column names with and optional leading =$= for
+  disambiguation
+  #+BEGIN_SRC nushell
+let v = {a: [1, {b: 2}]}
+let p = $.a.1.b
+$v | get $p # 2
+  #+END_SRC
+- Glob :: The =blog= type represents a pattern to match file paths. A glob is a
+  string interpreted as a glob by the calling command
+  #+BEGIN_SRC nushell
+open *.txt # is glob
+open `*.txt` # is glob
+open "*.txt" # is text
+open '*.txt' # is text
+  #+END_SRC
+- Path :: The =path= type represents a string intended to be used as a fully
+  qualified path e.g. =.=, =..=, =~=, are automatically expanded into a path
 - Any :: The =any= type is a super type of all types. The any type matches
   values of any type. A variable of the any type takes the type of its currently
   assigned value
@@ -15,23 +65,89 @@ def desc [v: any] -> string {
 desc 1 # int
 desc true # bool
   #+END_SRC
-- Bool :: The =bool= type represents two logical values =true= and =false=
-- Integer :: The =int= type represents 64-bit 0, positive, and negative numbers
-  without a fractional part
-- Float :: The =float= type represents 64-bit numbers with a fractional part
-  with a limited precision
-- Date time :: The =datetime= type TODO
-- Duration :: The =duration= type represents an integer or decimal time span
-  internally stored as a number of nanoseconds e.g. =ns=, =us=, =ms=, =sec=,
-  =min=, =hr=, =day=, =wk=
-- Closure ::
+- Nothing :: The =nothing= type with the =null= value represents the absence of
+  a value and is used to explicitly indicate in a command signature that a
+  command does not accept an input stream or does not returns an output stream
+
+*** Structured data types
+
+- Range :: The =range= type represents a sequence of values with an optional
+  stride e.g. an inclusive range ~1..9~,  ~1..2..9~.
   #+BEGIN_SRC nushell
-def id [] any -> any { # in -> out
+# Inclusive range
+let v = 1..5 # 1 2 3 4 5
+# The first and the second values
+let v = 1..3..10 # 1 3 5 7 9
+# Exclusive range
+let v = 1..<5 # 1 2 3 4
+# Backward range
+let v = 5..1 # 5 4 3 2 1
+# Open ended range
+let v = ..5 # 0 1 2 3 4 5
+let v = 1.. | take 5 # 1 2 3 4 5
+  #+END_SRC
+- List :: The =list= type represents a sequence of values of potentially
+  different types e.g. ~[1, 2, 3]~
+- Record :: The =record= type represents an ordered set of associations between
+  string keys and values of different types e.g. ~{a: 1, b: true}~
+- Table :: The =table= type represents a two-dimensional container of rows with
+  columns, where each cell can hold primitive of a structured data type. A table
+  is a list of records
+  #+BEGIN_SRC nushell
+let t = [[a, b]; [1, 2], [3, 4]]
+let t = [{a: 1, b: 2}, {a: 3, b: 4}]
+  #+END_SRC
+- Closure :: The =closure= type represents an anonymous first-class function
+  that closes over variables from the outside scope. Only immutable variables
+  =let= and command parameters can be captured into a closure. Mutable variables
+  =mul= cannot be captured into a closure
+  #+BEGIN_SRC nushell
+# Direct invocation of a closure
+do {|a, b| $a + $b} 1 2 # 3
+# Return a closure from a custom command
+def makeGreet [greet: string] -> closure {
+  {|name| $"($greet) ($name)"}
+}
+let hello: closure = makeGreet "Hello"
+do $hello "Nu"
+# Closure explicit parameter
+[1, 2, 3] | each {|v| print $v} # 1 2 3
+# Closure implicit $in
+[1, 2, 3] | each { print $in } # 1 2 3
+# Pass a closure into a pipeline
+{|a, b| $a + $b} | do $in 1 2 # 3
+# in -> out streams
+def id [] any -> any {
   $in
 }
 {||} | id | describe # closure
-def id2 [v: any] -> any { # arg -> out
+# args -> out stream
+def id2 [v: any] -> any {
   $v
 }
 {||} | id2 $in | describe # closure
+  #+END_SRC
+- Block :: The block is a non-declarable language construct that creates a new
+  scope, does not have parameters, can access and modify mutable variables from
+  the outside scope, does not close over immutable variables and parameters from
+  the outside scope. A block is not a data type like a closure. A closure with
+  no parameters may look like a block, but is actually a closure. Blocks are
+  used in =if/else=, =loop=, =while=, =for=, =try=, the body of =catch= is a
+  closure
+  #+BEGIN_SRC nushell
+let v = 1
+mut m = 1
+if true {
+  let v = 2 # New scope
+  print $v # 2
+  $m += 1 # Access a mutable variable
+}
+print $v # 1
+print $m # 2
+do {|| $m += 1 } # error capture of a mutable variable in a closure
+print $m
+# Block-looking closure
+{ $in } | describe # closure
+# Alternative: a closure with empty parameters
+{|| $in } | describe # closure
   #+END_SRC
