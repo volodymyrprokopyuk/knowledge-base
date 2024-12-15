@@ -2,6 +2,9 @@
 
 ** Data types
 
+- Variables :: The variable gives a name to a typed memory location
+  #+BEGIN_SRC nushell
+  #+END_SRC
 - Type signature :: The type signature explicitly declares a type of a language
   construct
   #+BEGIN_SRC nushell
@@ -13,9 +16,9 @@ do {|lst: list<int>| $lst } [1, 2, 3]
 def cmd [opt?: int = -1] # optional parameter with a default value
 def cmd [rec: record<i: int, s: string>] { $rec }
 # Custom command input and output streams
-def cmd [] nothing -> list { }
+def cmd []: nothing -> list { }
 # Custom command input andn output streams multi signature
-def cmd [] [nothing -> list, range -> list] { }
+def cmd []: [nothing -> list, range -> list] { }
   #+END_SRC
 
 *** Primitive data types
@@ -25,7 +28,18 @@ def cmd [] [nothing -> list, range -> list] { }
   without a fractional part
 - Float :: The =float= type represents 64-bit numbers with a fractional part
   with a limited precision
-- String :: The =string= type represents a sequence of UTF-8 code points
+- String :: The =string= type represents a sequence of UTF-8 code points. String
+  interpolation
+  #+BEGIN_SRC nushell
+# Literal string: escape sequences are not interpreted
+let s = 'a
+b'
+# Regular string: escape sequences are interpreted
+let s = "a\nb"
+# String interpolation
+let v = {a: 1}
+$"Record ($v)" # Record {a: 1}
+  #+END_SRC
 - Binary :: The =binary= type represents a sequence of bytes e.g. ~0x[1234 abcd]~
 - Date time :: The =datetime= type represents a specific point in time e.g.
   =2024-12-06T13:35:00+01:00= =2024-12-06=
@@ -86,15 +100,52 @@ let v = ..5 # 0 1 2 3 4 5
 let v = 1.. | take 5 # 1 2 3 4 5
   #+END_SRC
 - List :: The =list= type represents a sequence of values of potentially
-  different types e.g. ~[1, 2, 3]~
+  different types e.g. ~[1, 2, 3]~. A list is equivalent to a table with an
+  anonymous single column
+  #+BEGIN_SRC nushell
+# Indexing and filtering
+let lst = ["a", "b", "c"]
+$lst.0 # a
+$lst | get 1 # b
+$lst | where $it =~ '^c$' # c
+# Concatenation and spread
+let a = [1, 2]
+let b = ["a", "b"]
+$a ++ $b # 1 2 a b
+[...$a, ...[true], ...$b] # 1 2 true a b
+  #+END_SRC
 - Record :: The =record= type represents an ordered set of associations between
-  string keys and values of different types e.g. ~{a: 1, b: true}~
-- Table :: The =table= type represents a two-dimensional container of rows with
-  columns, where each cell can hold primitive of a structured data type. A table
-  is a list of records
+  string keys and values of different types e.g. ~{a: 1, b: true}~. A record is
+  equivalent to a table with an single row
+  #+BEGIN_SRC nushell
+# Access fields
+let rec = {a: 1, b: 2, c: 3}
+$rec.a # 1
+$rec | get b # 2
+# Spread
+let a = {a: 1}
+let b = {b: "b"}
+{...$a, ...$b, ...{c: 1.2}} # {a: 1, b: b, c: 1.2}
+  #+END_SRC
+- Table :: The =table= type represents a two-dimensional container of numbered
+  rows with named columns, where each cell can hold primitive of a structured
+  data type. A table is a list of records
   #+BEGIN_SRC nushell
 let t = [[a, b]; [1, 2], [3, 4]]
 let t = [{a: 1, b: 2}, {a: 3, b: 4}]
+# Cell path
+$t.0.a # 1
+$t.a.0 # 1
+# Optional component
+$t.0.c? # null
+$t.0.c? | default 5 # 5
+# Get value
+$t | get 0.a 1.b # 1 4
+let p = $.0.a
+$t | get $p # 1
+# Select structure
+$t | select 0 a # 1
+$t | select 0 a b # 1 2
   #+END_SRC
 - Closure :: The =closure= type represents an anonymous first-class function
   that closes over variables from the outside scope. Only immutable variables
@@ -104,10 +155,10 @@ let t = [{a: 1, b: 2}, {a: 3, b: 4}]
 # Direct invocation of a closure
 do {|a, b| $a + $b} 1 2 # 3
 # Return a closure from a custom command
-def makeGreet [greet: string] -> closure {
+def make-greet [greet: string] -> closure {
   {|name| $"($greet) ($name)"}
 }
-let hello: closure = makeGreet "Hello"
+let hello: closure = make-greet "Hello"
 do $hello "Nu"
 # Closure explicit parameter
 [1, 2, 3] | each {|v| print $v} # 1 2 3
@@ -149,4 +200,148 @@ print $m
 { $in } | describe # closure
 # Alternative: a closure with empty parameters
 {|| $in } | describe # closure
+  #+END_SRC
+
+** Flow control
+
+- Expressions vs statements :: Expressions e.g. =each= return a value and can be
+  combined into pipelines. Expressions cannot modify mutable variables from the
+  outside scope. Statements e.g. =for= do not return a value and cannot be
+  combined into pipelines. Statements can modify mutable variables from the
+  outside scope
+- If/else :: The =if/else= expression is ~if <cond> { <block> } [else {
+  <expr|block> }]~
+  #+BEGIN_SRC nushell
+if false { 1 } else { 2 } # 2
+  #+END_SRC
+- Match :: The =match= expression is ~match <value> { <match> => { <block> },
+  ... }~
+  #+BEGIN_SRC nushell
+# Match against a value
+match 2 {
+  1 => { "one" }
+  2 => { "two" } # 2
+  _ => { "any" }
+}
+# Match against a range
+match 2 {
+  1..5 => { "within range" } # within range
+  _ => { "out of range" }
+}
+# Array destructuring
+match [1, 2, 3] {
+  [$a, $b, $c] => { $a + $b + $c } # 6
+  _ => 0
+}
+# Record destructuring
+match { a: 1 } {
+  {a: $v} => { $v } # 1
+  _ => 0
+}
+  #+END_SRC
+- Loop :: The =loop= statement is ~loop { <block> }~
+  #+BEGIN_SRC nushell
+mut m = 1
+loop {
+  print $m # 1 2 3
+  $m += 1
+  if $m > 3 {
+    break
+  }
+}
+  #+END_SRC
+- While :: The =while= statement is ~while <cond> { <block }~
+  #+BEGIN_SRC nushell
+mut m = 1
+while $m < 4 {
+  print $m # 1 2 3
+  $m += 1
+}
+  #+END_SRC
+- For :: The =for= statement is ~for <var> in <range> { <block> }~
+  #+BEGIN_SRC nushell
+for v in [1, 2, 3] { print $v } # 1 2 3
+  #+END_SRC
+- Try/catch :: The =try/catch= statement is ~try { <block> } catch { <closure> }~
+  #+BEGIN_SRC nushell
+# Cathch built-in error
+try {
+  1 / 0
+} catch {
+  |err| $err.msg # division by zero
+}
+# Finally is always executed
+try {
+  1 / 0
+}
+print "finally" # finally
+# Custom error
+try {
+  error make {msg: "oh"}
+} catch {
+  |err| $err.msg # oh
+}
+  #+END_SRC
+
+** Commands
+
+- Custom command :: The custom command encapsulates and parameterizes pipelines
+  and expressions. Command arguments (parameters) are positional and required,
+  unless a default value is specified. Command options (flags) are optional.
+  Command arguments and options can be optionally marked with type annotations
+  #+BEGIN_SRC nushell
+# Mandatory positional arguments
+def "greet name" [name1, name2] { # Custom command with a subcommand
+  $"Hello ($name1) ($name2)" # implicit return
+}
+greet name "Nushell" "Wezterm" # Hello Nushell Wezterm
+# Optional positional arguments
+def "greet name" [name1, name2?] {
+  $"Hello ($name1) ($name2 | default 'Wezterm')"
+}
+greet name "Nushell" # Hello Nushell Wezterm
+# Positional argument with a default value
+def "greet name" [name1, name2 = "Wezterm"] {
+  $"Hello ($name1) ($name2)"
+}
+greet name "Nushell" # Hello Nushell Wezterm
+# Variadic arguments
+def "greet name" [...names] {
+  $"Hellow ($names)"
+}
+greet name "Nushell" "Wezterm" # Hello [Nushell, Wezterm]
+let names = ["Nushell", "Wezterm"]
+greet name ...$names # Hello [Nushell, Wezterm]
+# Typed arguments and options
+def greet [name: string, --greet-word (-g): string] {
+  $"($greet_word) ($name)"
+}
+greet --greet-word "Hello" "Nushell" # Hello Nushell
+# Typed input and output streams
+def greet [--greet: string]: string -> string {
+  $"($greet) ($in)"
+}
+"Nushell" | greet --greet "Hello" # Hello Nushell
+  #+END_SRC
+
+** Modules
+
+- Module :: The module is a file with exported definitions
+- Use module :: =use= a module by importing its definitions into the current
+  scope
+  #+BEGIN_SRC nushell
+use ~/.nushell/modules/trace.nu # Import an aboslut or a relative path
+trace start # A module is imported as a command with subcommands
+use std/log # Import from a virtual directory
+log info "ok" # A module subcommand
+use std/log * # Import all module definitions into the current scope
+info "ok" # A module subcommand is directly accessible
+use std/log [info, warn] # Explicit import of module definitions
+  #+END_SRC
+- Module exports :: =export= module definitions to be accessible from the
+  outside of a module
+  #+BEGIN_SRC nushell
+export def inc [v: int] -> int {
+  $v + 1
+}
   #+END_SRC
