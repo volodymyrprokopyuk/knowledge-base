@@ -202,6 +202,21 @@ print $m
 {|| $in } | describe # closure
   #+END_SRC
 
+** Operators
+
+- Environment ::
+  - Read environment ~$env.PATH~
+  - Write environment ~$env.PATH = ($env.PATH | append path)~
+  - One-time environment ~ENV=val cmd~
+- Subcommand :: ~cmd1 (cmd2)~
+- Redirection ::
+  - Save to a file ~o> file~, ~e> file~, ~o+e> file~
+  - Append to a file ~o>> file~,
+  - Pipe to a command ~o+e>| cmd~
+  - Discard output ~o+e>| ignore~
+  - Tee output ~cmd1 | tee { save file } | cmd2~
+- Alias :: ~alias ll = eza --all --long~
+
 ** Flow control
 
 - Expressions vs statements :: Expressions e.g. =each= return a value and can be
@@ -327,21 +342,20 @@ def greet [--greet: string]: string -> string {
 ** Modules
 
 - Module :: The module is a file with exported definitions
-- Use module :: =use= a module by importing its definitions into the current
-  scope
-  #+BEGIN_SRC nushell
-use ~/.nushell/modules/trace.nu # Import an aboslut or a relative path
-trace start # A module is imported as a command with subcommands
-use std/log # Import from a virtual directory
-log info "ok" # A module subcommand
-use std/log * # Import all module definitions into the current scope
-info "ok" # A module subcommand is directly accessible
-use std/log [info, warn] # Explicit import of module definitions
-  #+END_SRC
 - Module exports :: =export= module definitions to be accessible from the
   outside of a module
   #+BEGIN_SRC nushell
-export def inc [v: int] -> int {
+export def "integer inc" [v: int]: nothing -> int {
   $v + 1
 }
+  #+END_SRC
+- Use module :: =use= a module by importing its definitions into the current
+  scope
+  #+BEGIN_SRC nushell
+use math.nu # Import an aboslut or a relative path
+math integer inc 9 # A module is imported as a command with subcommands
+use math.nu * # Import all module definitions into the current scope
+integer inc 9 # A module subcommands are directly accessible
+use math.nu ["integer inc"] # Explicit import of module definitions
+integer inc 9 # A module subcommands are directly accessible
   #+END_SRC
