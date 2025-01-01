@@ -85,6 +85,8 @@ b, i, f, r, s := true, 1, 1.2, 'a', `ok` // raw string
     pointers from a function and sending pointers to a channel
   - *Sharing down stays on the stack*. Forward pointers to local variables to
     function calls
+ - Nil :: The =nil= built-in identifier represents the zero value for a pointer,
+   a channel, a functions, an interface, a map, or a slice
 
 #+BEGIN_SRC go
 var i int = 1
@@ -253,8 +255,6 @@ fmt.Println(p.Model, p.Price, p.Bayan.Year) // Nextra, 16e3, 2020
 
 ** Operators
 
-** Operators
-
 *** Bitwise operators
 
 - Bitwise and :: The ~a & b~ operator is 1, when both =a= and =b= are 1,
@@ -289,6 +289,43 @@ print(a ^ 0x0f) // xor flips 1s 11111100
 print(a ^ a) // xor itself clears all 00000000
 print(^a) // not flips all 00001100
   #+END_SRC
+
+*** Built-in functions
+
+- Make a slice, a map, a channel :: The =make()= function allocates and
+  initializes a slice, a map, a channel. The make function, like =new=, accepts
+  a type as its first argument, and, unlike =new=, returns a zero value of the
+  requested type, not a pointer. The capacity is optional
+  #+BEGIN_SRC go
+slc := make([]int, len, cap) // initialize len elements with the zero value
+htb := make(map[string]int, cap) // allocate cap slots
+ch := make(chan int, cap) // unbuffered cap = 0, buffered cap > 0
+  #+END_SRC
+- New :: The =new()= function allocates and initializes a type. The new function
+  accepts a type as its first argument and returns a pointer to the allocated
+  zero value of the requested type
+- Capacity and length :: The =cap()= and the =len()= functions returns the
+  provisioned capacity and the actual length of an array, a slice, a string, or
+  a channel
+- Append to a slice :: The =append()= function appends elements to the end of a
+  slice and returns the updated slice, the must be assigned. The append function
+  resizes the underlying slice if necessary
+  #+BEGIN_SRC go
+slc := []int{1}
+slc = append(slc, 2, 3) // 1, 2, 3
+slc = append(slc, []int{4, 5}...) // 1, 2, 3, 4, 5
+  #+END_SRC
+- Copy a slice :: The =copy()= function copies elements from a source slice into
+  a destination slice
+- Clear a slice or a map :: The =clear()= function sets all slice elements to
+  the zero value and deletes all entries from a map
+- Delete from a map :: The =delete()= function deletes an entry from a map
+- Close a channel :: The =close()= function closes a bidirectional or a
+  send-only channel. Sending to a closed channel returns an error. Receiving
+  from a closed channel is non-blocking and immediately returns the zero value.
+  The close function should be executed only by a sender, never by a receiver
+- Min and max :: The =max()= and the =min()= variadic functions return the max
+  or the min value of their arguments
 
 ** Flow control
 
@@ -539,15 +576,16 @@ if err != nil {
 
 *** panic/recover
 
-- Panic :: The =panic()= function signals the termination of a program due to an
-  unrecoverable situation. On panic the execution of functions in the call stack
-  stops, *all defer functions are executed* up until the top of the current
-  goroutine, and then the program terminates. A panic only unwinds the stack of
-  the current goroutine. For this reason, the =recover()= function must be
-  within the scope of the current goroutine. The =recover()= function must be
-  called *only inside a defer*, as only defer functions are executed on panic.
-  An application uses a recover to gracefully handle a shutdown. A library uses
-  a recover to convert a panic into an error at the API boundary
+- Panic :: The =panic()= built-in function signals the termination of a program
+  due to an unrecoverable situation. On panic the execution of functions in the
+  call stack stops, *all defer functions are executed* up until the top of the
+  current goroutine, and then the program terminates with a non-zero exit code.
+  A panic only unwinds the stack of the current goroutine. For this reason, the
+  =recover()= built-in function must be within the scope of the current
+  goroutine. The =recover()= built-in function must be called *only inside a
+  defer*, as only defer functions are executed on panic. An application uses a
+  recover to gracefully handle a shutdown. A library uses a recover to convert a
+  panic into an error at the API boundary
   #+BEGIN_SRC go
 func panicRecover() {
   defer func() {
