@@ -443,116 +443,124 @@ for _, v := range []int{1, 2, 3} {
 
 *** Error wrapping
 
-- Error :: a type that signals an unexpected yet recoverable situation and
-  implements the src_go{ type error interface { Error() string } } interface
-  - *Sentinel error* an error value that signals an expected outcome e.g. EOF
-  - *Error wrapping* builds a chain of error types that convey additional
-    context. Place the ~%w~ formatting verb at the end of a wrapping error
-  - By returning the ~error~ interface a function can return different error
-    types without modifying its signature
-
-#+BEGIN_SRC go
-// var sentinel error
-var ErrInsufficientFunds = errors.New("Insufficient funds")
-// const sentinel error
-type WalletError string
-func (we WalletError) Error() string {
-  return string(we)
+- Error :: An error is a type that signals an unexpected, yet recoverable
+  situation. An error implements the src_go{ type error interface { Error()
+  string } } interface
+  - Sentinel error :: A sentinel error is a value that signals an expected
+    result. A sentinel error value can be directly compared via ~==~ or
+    ~errors.Is()~
+    #+BEGIN_SRC go
+// A var sentinel error
+var ErrInsufficientFunds = errors.New("insufficient funds")
+// A const sentinel error
+type InsufficientFundsError string
+func (e InsufficientFundsError) Error() string {
+  return string(e)
 }
-const ErrInsufficientFunds = WalletError("Insufficient funds")
-#+END_SRC
-
-#+BEGIN_SRC go
+const ErrInsufficientFunds = InsufficientFundsError("insufficient funds")
+    #+END_SRC
+  - Custom error :: A custom error conveys extra details about an error. A
+    custom error can be cast to the custom error type via ~errors.As()~
+    #+BEGIN_SRC go
+// A sentinel error
 var ErrOh = errors.New("sentinel oh")
-// custom error
+// A custom error
 type OhError struct {
-  Msg string
+  msg string
 }
-// custom error must implement the error interface
+// A custom error must implement the error interface
 func (e OhError) Error() string {
-  return e.Msg
+  return e.msg
 }
 err := func() error {
-  return ErrOh // sentinel error
-  return OhError{"custom oh"} // custom error
+  return ErrOh // A sentinel error
+  return OhError{"custom oh"} // A custom error
 }()
-if errors.Is(err, ErrOh) {
+if errors.Is(err, ErrOh) { // Compare the err with the ErrOh value
   fmt.Println(err) // sentinel oh
 }
 var oh OhError
-if errors.As(err, &oh) { // casts err into OhError
-  fmt.Println(oh.Msg) // custom oh
+if errors.As(err, &oh) { // Cast the err into the OhError type
+  fmt.Println(oh) // custom oh
 }
-#+END_SRC
-
-#+BEGIN_SRC go
-// sentinel error
+    #+END_SRC
+  - Error wrapping :: Error wrapping builds a chain of error types that convey
+    extra details about an error context. The ~fmt.Errorf()~ wraps an error by
+    using the ~%w~ formatting verb. The ~errors.Is()~ (error value equality
+    check) and the ~errors.As()~ (error type reflection) functions inspect an
+    error tree by unwrapping each error in the depth-first traversal
+    - Prefer ~errors.Is(err, ErrOh)~ over ~err == ErrOh~, as the former
+      correctly handles a wrapped =ErrOh= value
+    - Prefer ~var oh OhError; errors.As(err, &oh)~ over ~oh, assert :=
+      err.(*OhError); assert~, as the former correctly handles a wrapped
+      =OhError= type
+    #+BEGIN_SRC go
+// A sentinel error
 var ErrDivideByZero = errors.New("divide by zero")
 func quoteRem(a, b int) (int, int, error) {
   if b == 0 {
-    // return zero values for non-error return types
+    // Return zero values for non-error return types
     return 0, 0, ErrDivideByZero
   }
-  // return nil for the error return type
+  // Return nil for the error return type
   return a / b, a % b, nil
 }
-// custom error type
+// A custom error type
 type CustomError struct {
-  Msg string
+  msg string
 }
-// implements the built-in error interface
-func (ce CustomError) Error() string {
-  return fmt.Sprintf("custom error: %v", ce.Msg)
+// A custom error type must implement the error interface
+func (e CustomError) Error() string {
+  return fmt.Sprintf("custom error: %s", e.msg)
 }
-// error wrapping
 func wrapError(sentinel bool) error {
   if sentinel {
-    // sentinel error: expected outcome
+    // A sentinel error: an expected result
     return ErrDivideByZero
   }
-  // error wrapping: additional error context
+  // Error wrapping: an additional error context
   return fmt.Errorf("wrapped error: %w", CustomError{"oh"})
 }
 err := wrapError(false)
 if err != nil {
-  // check for a sentinel error value in a wrapped chain of errors (==)
+  // Check for a sentinel error value in a wrapped chain of errors (==)
   if errors.Is(err, ErrDivideByZero) {
     fmt.Println("sentinel error:", err)
   }
   var ce CustomError
-  // check for a custom error type in a wrapped chain of errors (reflection)
+  // Check for a custom error type in a wrapped chain of errors (reflection)
   if errors.As(err, &ce) {
     fmt.Println("custom error:", ce.Msg)
   }
 }
-#+END_SRC
+    #+END_SRC
+  - Return error interface :: By returning the =error= interface a function can
+    return different error types without modifying the function signature
 
 *** panic/recover
 
-- Panic :: signals termination of a program due to an unrecoverable situation.
-  On panic execution of functions in a call stack stops, *all defer functions
-  are executed* up until the top of the current goroutine, and then a program
-  terminates. A panic unwinds the stack only to the top of the current
-  goroutine, so a recover must be within the scope of the current goroutine.
-  Recover must be called only inside a defer as only defer functions are
-  executed on panic
-  - An application uses a recover to gracefully handle a shutdown
-  - A library uses a recover to convert a panic into an error at boundary of a
-    public API
-
-#+BEGIN_SRC go
+- Panic :: The =panic()= function signals the termination of a program due to an
+  unrecoverable situation. On panic the execution of functions in the call stack
+  stops, *all defer functions are executed* up until the top of the current
+  goroutine, and then the program terminates. A panic only unwinds the stack of
+  the current goroutine. For this reason, the =recover()= function must be
+  within the scope of the current goroutine. The =recover()= function must be
+  called *only inside a defer*, as only defer functions are executed on panic.
+  An application uses a recover to gracefully handle a shutdown. A library uses
+  a recover to convert a panic into an error at the API boundary
+  #+BEGIN_SRC go
 func panicRecover() {
   defer func() {
-    // call recover only in defer
+    // Call a recover function only inside a defer block
     if msg := recover(); msg != nil {
       fmt.Println("panic:", msg)
     }
   }()
-  panic("oh") // unrecoverable situation
+  panic("oh") // An unrecoverable situation
 }
 panicRecover()
 fmt.Println("continue") // panic: oh, continue
-#+END_SRC
+  #+END_SRC
 
 ** Functions and methods
 
