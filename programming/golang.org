@@ -327,6 +327,49 @@ slc = append(slc, []int{4, 5}...) // 1, 2, 3, 4, 5
 - Min and max :: The =max()= and the =min()= variadic functions return the max
   or the min value of their arguments
 
+*** Formatting verbs
+
+- Printing and scanning :: The printing formats ~fmt.Printf()~ ~Fprintf()~,
+  ~Sprintf()~. The scanning parses ~fmt.Scanf()~, ~fmt.Fscanf()~,
+  ~fmt.Sscanf()~. Input processed by verbs is implicitly space-delimited.
+  Leading spaces are discarded by each verb
+  #+BEGIN_SRC go
+s := "12345"
+i1, _ := strconv.Atoi(s)
+i2, _ := strconv.ParseInt(s, 10, 32)
+var i3 int32
+_, _ = fmt.Sscanf(s, "%d", &i3)
+fmt.Printf("%d %d %d\n", i1, i2, i3)
+
+i := 12345
+s1 := strconv.Itoa(i)
+s2 := strconv.FormatInt(int64(i), 10)
+s3 := fmt.Sprintf("%d", i)
+fmt.Printf("%s %s %s\n", s1, s2, s3)
+
+slc := []byte("abc") // A byte slice is special
+fmt.Printf("%v\n", slc) // [97 98 99]
+fmt.Printf("%d\n", slc) // [97 98 99]
+fmt.Printf("%x\n", slc) // 616263
+fmt.Printf("% x\n", slc) // 61 62 63
+fmt.Printf("% s\n", slc) // abc
+  #+END_SRC
+
+| Verb                   | Description                                     |
+|------------------------+-------------------------------------------------|
+| ~%v~                   | The default format of a value                   |
+| ~%+v~                  | Field names to structs                          |
+| ~%[1]v~                | Explicit argument index                         |
+| ~%T~                   | The type of a value                             |
+| ~%t~                   | True and false booleans                         |
+| ~%b~, ~%o~, ~%d~, ~%x~ | Binary, octal, decimal, hexadecimal integers    |
+| ~%f~, ~%e~, ~%g~       | Float, scientific, either float or scientific   |
+| ~%c~                   | A Unicode character from an integer (rune)      |
+| ~%s~                   | Uninterpreted bytes of a string or a byte slice |
+| ~%x~                   | Two hex characters per string or slice byte     |
+| ~%09.2f~               | Width 9, precision 2, pad with 0 on the left    |
+| ~%-09.2f~              | Width 9, precision 2, pad with 0 on the right   |
+
 ** Flow control
 
 *** if/else
