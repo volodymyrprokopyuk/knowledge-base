@@ -238,6 +238,175 @@ contract Contract {
 }
   #+END_SRC
 
+** Functions
+
+*** Function type
+
+- Function type :: A function type is the *first class* in Solidity. Functions
+  can be assigned to variables, passed to functions as arguments, and returned
+  from functions as return values. *Ether and gas* can be provided when calling
+  a function src_solidity{ f{value: 1, gas: 10}(); }
+- Function overloading :: The function overloading takes into consideration only
+  the types and the order of function parameters, not return values
+- Function selector :: A function selector is the first 4 bytes of the Keccak256
+  hash of the function signature. A function selector identifies a public or an
+  external function in a contract during a message call. A function selector is
+  located at the first 4 bytes of the call data follower by ABI-encoded
+  arguments. src_solidity{ bytes4 selector = bytes4(keccak256("set(uint256)"));
+  }
+- ABI encoding ::
+  - ~abi.encode()~ not ambiguous, larger, more gas expensive
+  - ~abi.encodePacked()~ ambiguous, because of hash collisions when encoding and
+    hashing multiple variable-length values, smaller, more gas efficient
+    #+BEGIN_SRC solidity
+  bytes32 h1 = keccak256(abi.encodePacked([addr1], [addr2, addr3]));
+  bytes32 h2 = keccak256(abi.encodePacked([addr1, addr2], [addr3]));
+  require(h1 == h2); // true
+    #+END_SRC
+- Named parameters :: Function arguments can be provided in any order by
+  specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
+- Tuple type :: A tuple type is a fixed list of heterogeneous types. The tuple
+  is not a proper type in Solidity. The tuple is only used to *return multiple
+  values* from a function and for *destructuring assignment* of returned
+  multiple values src_solidity{ return (true, 1, "a"); (bool b, uint i,
+  string s) = f(); }
+- Free function :: A free function outside a contract has implicit =internal=
+  visibility, and is included in all contracts that call the function. A free
+  function is executed in the context of the calling contract, but does not have
+  access to =this= and state variables of the calling contract
+- Ambiguous evaluation order :: The order of evaluation of node children in an
+  expression tree is not specified. All children are evaluated in an unspecified
+  order before the parent node. Short-circuiting of boolean expressions is done.
+  Evaluation of functions is not fully deterministic in Solidity. The evaluation
+  order is deterministic for a specific Solidity compiler version, but may not
+  remain consistent across different versions. Problem: multiple functions
+  updating the same state in a single statement may be executed in different
+  order by different Solidity compiler versions. Solution: avoid expressions
+  that involve multiple functions and *store intermediate results in temporary
+  variables*
+  #+BEGIN_SRC solidity
+uint i = 5;
+return i * i++; // 25 or 30
+return f(g(i), h(i)); // The evaluation order of arguments is unspecified
+  #+END_SRC
+
+*** Function visibility
+
+- Private :: A =private= function is only accessible to the defining contract
+  and is not accessible to derived contracts. All blockchain data including the
+  private state of a contract are visible to external observers
+- Internal :: An =internal= function (default visibility) is accessible to the
+  defining contract and to derived contracts. An internal function is called by
+  other contract functions directly ~f()~ via a simple jump in the EVM
+  preserving the memory layout. An internal function can take mappings and
+  references to storage variables as parameters
+- Public :: A =public= function is accessible to other contracts as part of the
+  public interface of the contract. A public function can be called either
+  internally via a simple jump ~f()~ or externally via a message call ~ctr.f()~.
+  Public getter functions are automatically generated for public state variables
+- External :: An =external= function is only accessible to other contracts as
+  part of the public interface of the contract through a message call via
+  ~ctr.f()~. An external function call from one contract to another contract
+  *does not create a new transaction*, it is only a message call within the same
+  transaction. An external function call can specify *ether and gas* that are
+  added to the balance of the called contract ~ctr.f{value: 1, gas: 10}();~
+
+*** Function mutability
+
+- Function state mutability :: The state modifying operations: write to state
+  variables, create new contracts, call a function not marked as view or pure,
+  emit events, send ether, use low-level calls
+  - Pure function :: A =pure= function performs computations only with function
+    arguments without reading state variables
+  - View function :: A =view= function only reads state variables, but does not
+    modify state variables
+
+*** Function modifier
+
+- Function modifier :: A function modifier is a function decorator that checks
+  pre-conditions before invoking the decorated function, and handles
+  post-conditions after the execution of the function. Use modifiers to check
+  for the same conditions in multiple functions. A modifier cannot access or
+  change function arguments or return values. Function arguments can be
+  explicitly passed to a modifier at the point of application src_solidity{
+  function f(uint a) mod(a) { ... } }. A modifier can decide to not execute the
+  function at all. In this case the return values of the function are set to the
+  default zero values. Virtual modifiers can be overridden in derived contracts.
+  A modifier should not have side effects e.g. update state, except the
+  reentrancy lock, or perform external calls
+  #+BEGIN_SRC solidity
+contract Gifts {
+  mapping(address addr => bool claimed) claims;
+  bool transient locked;
+
+  modifier lock() {
+    require(!locked, "reentrant call");
+    lock = true;
+    _;
+    lock = false;
+  }
+
+  function claim() public lock {
+    require(address(this).balance >= 1 ether, "insufficient funds");
+    address claimer = msg.sender
+    require(!claims[claimer], "already claimed");
+    claims[claimer] = true;
+    (bool succ, ) = claimer.send{value: 1 ether}("");
+    require(succ, "claim failed");
+  }
+}
+  #+END_SRC
+
+*** Error handling
+
+- Assert function :: The =assert= function causes a ~Panic(uint)~ when a
+  condition is not met. The assert function is used only for checking internal
+  invariants e.g. division by zero, arithmetic overflow, arithmetic underflow,
+  out-of-bounds array access, data conversion error, corrupted data, explicit
+  assert e.g. ~assert(cond)~
+- Revert statement :: The =revert= statement reverts all changes to the state
+  when a condition is not met. The revert statement inside the if statement is
+  used for complex conditions
+  #+BEGIN_SRC solidity
+error ErrInsufficientFunds(uint requested, uint available);
+if (balances[msg.sender] < value) {
+  revert ErrInsufficientFunds(value, balances[msg.sender]);
+}
+  #+END_SRC
+- Require function :: The =require= convenience function reverts all changes to
+  the state when a condition is not met. The =revert= statement and the
+  =require= function are equivalent, but the require function is more convenient
+  #+BEGIN_SRC solidity
+require(balances[msg.sender] < value, "insufficient funds");
+require(
+  balances[msg.sender] < value,
+  ErrInsufficientFunds(value, balances[msg.sender])
+);
+  #+END_SRC
+- try/catch statement :: The =try/catch= statement handles errors only when
+  external function calls ~ctr.f()~ or a =new= contract creation has reverted.
+  Reverts in internal function calls or inside the same function cannot be
+  caught
+  #+BEGIN_SRC solidity
+try this.externalCall() returns (uint returnValue) {
+  // success: returnValue
+} catch Error(string memory message) {
+  // Error message
+} catch Panic(uint code) {
+  // Panic code
+} catch (bytes memory err) {
+  bytes memory expErr = abi.encodeWithSignature(
+    "ErrOh(string)", "revert error"
+  );
+  assertEq(err, expErr);
+}
+try new Contract() returns (Contract contract) {
+  // success: contract
+} catch {
+  // catch all errors
+}
+  #+END_SRC
+
 ** Contract
 
 *** Inheritance
@@ -285,34 +454,33 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
   explicitly marked as =external=, even if the functions will be =public= in the
   implementing contracts. An interface can define =enum=, =struct=, =event=, and
   inherit from other interfaces.
-- Library :: The =library= is a set of internal and external functions deployed
-  once and reused in the context of the calling contracts through the
-  =delegatecall= for the external functions and the efficient jumps inside EVM
-  for the internal functions. All referenced internal library functions are
+- Library :: A =library= is a set of internal and external functions deployed
+  once and reused in the context of calling contracts through the =delegatecall=
+  for the external functions and the efficient jumps inside EVM for the internal
+  functions. All internal library functions referenced by a calling contract are
   included in the calling contract during the construction, so calls to internal
   library functions are efficient jumps inside EVM. A library cannot define
   state variables
 - Using F for T :: The ~using f, g as +, Lib.e for typ;~ directive attaches free
   functions or library functions to the type within the scope of the contract or
-  the scope of a source file. The ~using L for typ;~ directive attaches all
+  the scope of a source file. The ~using Lib for typ;~ directive attaches all
   public library functions to the type. All types are identified with =*=. The
-  type is passed as the first argument to the library functions. The left and
-  right operands are passed to the library functions that act as operators
+  type is passed as the first argument to a library function. The left and right
+  operands are passed to a library function that acts as an operator
 
 *** Contract calls
 
-- Calling contract function :: The low-level functions =call()=,
-  =delegatecall()=, and =staticcall()= operate on an address, not a contract
-  instance and all three have the same signature src_solidity{
-  address(contract).call{value: 1, gas: 10}(bytes memory args) returns (bool
-  success, bytes memory retValues); } and provide fine-grained control over
-  encoding of the input arguments and decoding of the return values
-  - Call :: The =call()= function switches the EVM state e.g. state variables,
-    accounts from the current calling contract to the new called contract, so
-    the context of the calling contract is inaccessible
-  - Delegate call :: The =delegatecall()= function implements the =library= and
-    only uses the code from the target address, while preserving the context
-    e.g. state variables, accounts, from the current calling contract
+- Low-level calls :: The low-level functions =call()=, =delegatecall()=, and
+  =staticcall()= operate on an address, not a contract instance and all three
+  have the same signature src_solidity{ address(contract).call{value: 1, gas:
+  10}(bytes memory args) returns (bool success, bytes memory retValues); } and
+  provide fine-grained control over encoding of the input arguments and decoding
+  of the return values
+  - Call :: The =call()= function switches the EVM state to the new called
+    contract, so the context of the calling contract is inaccessible
+  - Delegate call :: The =delegatecall()= function implements the =library=
+    feature, preserves the context of the current calling contract, and only
+    uses the code from the target address
   - Static call :: The =staticcall()= function reverts if the called function
     modifies the state of the current calling contract
     #+BEGIN_SRC solidity
@@ -322,8 +490,8 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
     bytes memory data = abi.encodeWithSelector(selector);
     bytes memory data = abi.encodeWithSelector(counter.get.selector);
     bytes memory data = abi.encodeCall(counter.get, ());
-    (bool success, bytes memory result) = address(counter).call(getData);
-    require(success, "get failure");
+    (bool succ, bytes memory result) = address(counter).call(data);
+    require(succ, "get failure");
     (uint value) = abi.decode(result, (uint));
   }
     #+END_SRC
@@ -347,8 +515,8 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
 
 *** Inbound payable
 
-- Payable function :: The balance of the contract is automatically updated when
-  the =payable= constructor or the =payable= function is executed
+- Payable function :: The balance of a contract is automatically updated when a
+  =payable= constructor or a =payable= function is executed
 - Receive function :: Ether, sent to a contact, is received by the =receive()=
   payable function. The receive function is called if =msg.data= is empty,
   otherwise the payable fallback function is called
@@ -356,10 +524,10 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
   function that is executed when no other contract function matches the call
   signature. The payable fallback function is executed when the =receive()=
   function is not defined or the =msg.data= is not empty
-- Relying on exact contract balance is unreliable :: Reverting from the receive
-  function and the payable fallback function cannot prevent a contract from
-  receiving ether. The actual contract balance can be higher than the internally
-  accounted balance
+- Exact contract balance is unreliable :: Reverting from the receive function
+  and the payable fallback function cannot prevent a contract from receiving
+  ether. The actual contract balance can be higher than the internally accounted
+  balance
   #+BEGIN_SRC solidity
 contract Receive {
   event EvReceive(address indexed from, uint value);
@@ -383,14 +551,13 @@ contract Receive {
 
 *** Outbound payable
 
-- Outbound payable :: The =payable= address state variables can send ether via
-  the =transfer()=, the =send()=, and the =call()= functions. The high-level
-  =transfer()= function reverts on a failure and stops the execution of the
-  current contract. The low-level =send()= function returns false on a failure,
-  but the execution of the current contract continues. Always check the return
-  value of the =send()= function, or better use the =transfer()= function, or
-  better let the recipient to withdraw Ether. The recommended way to send ether
-  is the =call()= function
+- Outbound payable :: A =payable= address can send ether via the =transfer()=,
+  the =send()=, and the =call()= functions. The high-level =transfer()= function
+  reverts on a failure and stops the execution of the current contract. The
+  low-level =send()= function returns false on a failure, but the execution of
+  the current contract continues. Always check the return value of the =send()=
+  function, or better use the =transfer()= function, or better let the recipient
+  to withdraw Ether. The recommended way to send ether is the =call()= function
   #+BEGIN_SRC solidity
 contract Send {
   function send(address payable to) public payable {
@@ -407,213 +574,55 @@ contract Send {
   defined for each EVM instruction. Gas must be provided for a function to be
   executed. Not consumed gas is refunded. The ether value to pay depends on the
   amount of gas spent and the gas price that a caller is willing to pay
-  - Transaction as limit :: The gas limit is the maximum amount of gas a caller
+  - Transaction gas limit :: The gas limit is the maximum amount of gas a caller
     is willing to spend on a transaction
   - Block gas limit :: The block gas limit is the maximum amount of gas set by
     the blockchain that is allowed to be spent on a block
 
-** Functions
+*** Events
 
-- Free function :: The free function outside a contract has implicit =internal=
-  visibility, is included in all contracts that call the function. The free
-  function is executed in the context of the calling contract, but does not have
-  access to =this= and state variables of the calling contract
-- Named parameters :: Function arguments can be provided in any order by
-  specifying parameter names src_solidity{ f({p1: v1, p2: v2}); }
-- Tuple type :: The tuple type is a fixed list of heterogeneous types. The tuple
-  is not a proper type in Solidity. The tuple is used to return multiple values
-  from a function and for *destructuring assignment* of returned multiple values
-  src_solidity{ return (true, 1, "a"); (bool b, uint i, string s) = f(); }
-- Function overloading :: The function overloading takes into consideration only
-  the types and order of the function parameters, not the return values
-- Function type :: The function type is the first class in Solidity. Functions
-  can be assigned to variables, passed to functions as arguments, and returned
-  from functions as return values. Gas and ether can be provided when calling a
-  function src_solidity{ f{value: 1, gas: 10}(); }
-- Function selector :: The function selector is the first 4 bytes of the
-  Keccak256 hash of the function signature. The function selector identifies a
-  public or an external function in a contract during a message call. The
-  function selector is located at the first 4 bytes of the call data.
-  src_solidity{ bytes4 setSelector = bytes4(keccak256("set(uint256)")); }
-- API encoding ::
-  - ~abi.encode()~ more secure because not ambiguous, larger, more gas expensive
-  - ~abi.encodePacked()~ more probable hash collisions in mapping keys when
-    hashing and encoding multiple variable-length values, smaller, gas cheaper
-  #+BEGIN_SRC solidity
-bytes32 h1 = keccak256(abi.encodePacked([addr1], [addr2, addr3]));
-bytes32 h2 = keccak256(abi.encodePacked([addr1, addr2], [addr3]));
-require(h1 == h2); // true
-  #+END_SRC
-- Ambiguous evaluation order :: The order of evaluation of node children in an
-  expression tree is not specified. All children are evaluated in an unspecified
-  order before the parent node. Short-circuiting of boolean expressions is done.
-  Evaluation of functions is not fully deterministic. The evaluation order is
-  deterministic for a specific Solidity compiler version, but may not remain
-  consistent across different versions. Problem: multiple functions updating the
-  same state in a single statement. Solution: avoid expressions and store
-  intermediate results in temporary variables
-  #+BEGIN_SRC solidity
-uint i = 5;
-return i * i++; // 25 or 30
-return f(g(i), h(i)); // evaluation order of arguments is unspecified
-  #+END_SRC
-
-*** Function visibility and mutability
-
-- Function visibility ::
-  - Private :: The =private= function is only accessible to the defining
-    contract and is not accessible to the derived contracts. All blockchain data
-    including the private state of a contract are visible to external objservers
-  - Internal :: The =internal= function (default visibility) is accessible to
-    the defining contract and to the derived contracts. An internal function can
-    take mappings and references to storage variables as parameters. The
-    internal function is called by other contract functions directly ~f()~ via a
-    simple *jump* in the EVM preserving the memory layout
-  - Public :: The =public= function is accessible to other contracts as part of
-    the public interface of the contract. A public function can be called either
-    internally via a simple jump ~f()~ or externally via a message call
-    ~contract.f()~. Public getters are automatically generated for public state
-    variables
-  - External :: The =external= function is accessible to other contracts as part
-    of the public interface of the contract. The external function cannot be
-    called internally ~f()~ via a simple jump, but must be called through a
-    message call via ~this.f()~. The external function can be only called by
-    external accounts and other contracts through a *message call* by specifying
-    the contract address, the signature of the external function, and the
-    encoded arguments. The external function provides the ~f.address~ of the
-    contract and the ABI ~f.selector~. The external function call from one
-    contract to another does not create a new transaction, it is only a message
-    call within the current transaction. The external function call can specify
-    the amount of gas and ether that are added to the balance of the called
-    contract ~contr.f{value: 1, gas: 10}();~
-- Function state mutability :: The state modifying operations: write to state
-  variables, create new contracts, send ether, emit events, call a function not
-  marked as view or pure, use low-level calls e.g. ~send()~
-  - Pure function :: The =pure= function performs computations without even
-    reading the state variables
-  - View function :: The =view= function reads the state variables, but does not
-    modify the state variables
-
-*** Function modifier
-
-- Function modifier :: The function modifier is a decorator that checks
-  pre-conditions before invoking the decorated function and handles
-  post-conditions after the function execution. Use modifiers to check for the
-  same conditions in multiple functions. A modifier cannot access or change
-  function arguments or return values. Function arguments can only be passed to
-  a modifier at the point of application src_solidity{ function f(uint a) mod(a)
-  { ... } }. A modifier can decide to not execute the function at all. In this
-  case the return values of the function are set to default values. Virtual
-  modifiers can be overridden in derived contracts. A modifier should not update
-  state, except the reentrancy lock, or perform external calls
-  #+BEGIN_SRC solidity
-contract Generocity {
-  mapping(address => bool) gifts;
-  bool transient locked;
-
-  modifier lock() {
-    require(!locked, "reentrant call");
-    lock = true;
-    _;
-    lock = false;
-  }
-
-  function claimGift() public lock {
-    require(address(this).balance >= 1 ether, "insufficient balance");
-    require(!gifts[msg.sender], "gift already claimed");
-    (bool success, ) = msg.sender.send{value: 1 ether}("");
-    require(success, "gift failed");
-    gifts[msg.sender] = true;
-  }
-}
-  #+END_SRC
-
-** Events
-
-- Event :: Emitted events are stored and indexed in the transaction log on the
-  blockchain to be consumed by the off-chain infrastructure. Events and logs are
-  associated with the contract address, but are not accessible from within the
-  emitting contract. Events should be emitted to log all significant changes in
-  a smart contract e.g. deposits, withdrawals, configuration changes
+- Event :: Events emitted during the contract execution are stored in the chain
+  data associated with the contract address as *transaction receipts* under the
+  *logs section*. *Indexed* event fields are stored in *topics* for efficient
+  search. Events should be emitted to log all significant changes in a smart
+  contract e.g. deposits, withdrawals, configuration changes
 - Event indexing :: At most three event fields can be =indexed= and placed into
-  topics that provide efficient search by exact match on the indexed fields. The
-  keccak256 hash of the event signature is placed into the first default topic.
-  A topic can only hold 32-byte words. A keccak256 hash of indexed reference
-  types is stored in a topic. All not indexed event fields are stored in the
-  data part of the transaction log. Event emitting functions cannot be pure or
-  view functions, as they alter the blockchain by storing logs
-
-** Error handling
-
-- Assert function :: The =assert= function causes a ~Panic(uint)~ when a
-  condition is not met. The assert function is used only for checking internal
-  invariants e.g. division by zero, arithmetic overflow, arithmetic underflow,
-  out-of-bounds array access, data conversion error, corrupted data, explicit
-  assert e.g. src_solidity{ assert(cond) }
-- Revert statement :: The =revert= statement reverts all changes to the state
-  when a condition is not met. The revert statement is used for complex
-  conditions
-  #+BEGIN_SRC solidity
-error ErrInsufficientFunds(uint requested, uint available);
-if (balances[msg.sender] <= value) {
-  revert ErrInsufficientFunds(value, balances[msg.sender]);
-}
-  #+END_SRC
-- Require function :: The =require= convenience function reverts all changes to
-  the state when a condition is not met. The =revert= statement and the
-  =require= function are equivalent, but the require function is more convenient
-  #+BEGIN_SRC solidity
-require(balances[msg.sender] <= value, "insufficient funds");
-require(
-  balances[msg.sender] <= value,
-  ErrInsufficientFunds(value, balances[msg.sender])
-);
-  #+END_SRC
-- try/catch statement :: The =try/catch= statement handles errors when only
-  external function calls or a =new= contract creation has reverted. Reverts in
-  internal function calls or inside the same function cannot be caught
-  #+BEGIN_SRC solidity
-try this.externalCall() returns (uint returnValue) {
-  // success: returnValue
-} catch Error(string memory message) {
-  // Error message
-} catch Panic(uint code) {
-  // Panic code
-} catch (bytes memory err) {
-  bytes memory expErr = abi.encodeWithSignature(
-    "ErrOh(string)", "revert error"
-  );
-  assertEq(err, expErr);
-}
-try new Contract() returns (Contract contract) {
-  // success: contract
-} catch {
-  // catch all errors
-}
-  #+END_SRC
+  topics that provide efficient search by the exact match on the indexed fields.
+  The keccak256 hash of the event signature is placed into the first default
+  topic. All not indexed event fields are stored in the data part of the
+  transaction log
 
 ** Import
 
 - Import :: The =import= statement imports all or explicitly selected global
-  symbols from the imported file into the global scope of the current file
+  symbols from the imported file into the scope of the current file
   #+BEGIN_SRC solidity
-import "path"; // imports all symbols
-import { A, B as BB } "path"; // imports only selected symbols
-import * as alias from "path" // imports all symbols under the alias
+import "path"; // Import all symbols
+import { A, B as BB } "path"; // Import only selected symbols, with a rename
+import * as alias from "path"; // Import all symbols under an alias
   #+END_SRC
 
-** Layout
+** Layouts
 
-- File layout :: SPDX license, =pragma=, =import=, =event=, =error=, =interface=,
-  =library=, =contract=
-- Contract layout :: =enum=, =struct=, state, =event=, =error=, =modifier=,
-  =constructor=, =function=
+- File layout ::
+   - SPDX license, =pragma= Solidity compiler version
+   - =import= dependencies
+   - =event=, =error= global scope
+   - =interface= function signatures, events
+   - =library= reusable functions, events, errors
+   - =contract= main building blocks
+- Contract layout ::
+  - =enum=, =struct= user-defined data types
+  - State variables
+  - =event=, =error= contract scope
+  - =modifier= mostly around decorators e.g. reentrancy lock
+  - =constructor=, =receive=, =fallback= singleton contract functions
+  - =function= main building blocks
 - Function modifiers layout ::
   - Visibility :: =private=, =internal=, =public=, =external=
   - Mutability :: =pure=, =view=, =payable=
   - Inheritance :: =virtual=, =override=
   - Modifier :: Custom modifiers
-
 
 * Security
 
