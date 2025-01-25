@@ -498,9 +498,15 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
 
 *** Contract creation
 
-- Contract creation :: A contract can be deployed at a contract address by a
+- Smart contract :: A smart contract has associated an immutable contract code,
+  a contract storage, and a contract balance. The contract balance is controlled
+  by the code, not a private key. A contract does not have a private key. In
+  contrast an externally owned account is controlled by a private key managed by
+  a wallet. The immutable contract code is deterministically executed on the EVM
+  causing state transitions on the global Ethereum state machine
+- Contract creation :: A contract can be deployed to a contract address by a
   transaction from an external account. A contract can also be locally
-  instantiated by another contract using a *salt* to randomize the address of a
+  instantiated by another contract using a salt to randomize the address of a
   new contract src_solidity{ Contract ctr = new Contract{salt: bytes32}(); }.
   The contract constructor is executed only once when a contract is created.
   Only one constructor is allowed
@@ -570,12 +576,16 @@ contract Send {
   }
 }
   #+END_SRC
-- Gas :: Gas is the internal unit of computation on the EVM. Gas consumption is
-  defined for each EVM instruction. Gas must be provided for a function to be
-  executed. Not consumed gas is refunded. The ether value to pay depends on the
-  amount of gas spent and the gas price that a caller is willing to pay
+- Gas :: Gas is a virtual currency of Ethereum with a variable exchange rante
+  against ether. Gas is the internal unit of computation and storage on the EVM.
+  Gas consumption is defined for each EVM instruction. Gas must be provided for
+  a function to be executed. Not consumed gas is refunded to the sender. The
+  ether value to pay depends on the amount of gas spent and the gas price that a
+  caller is willing to pay
+  - Gas price :: The gas price a sender is willing to pay to prioritize
+    inclusion of a transaction
   - Transaction gas limit :: The gas limit is the maximum amount of gas a caller
-    is willing to spend on a transaction
+    is willing to spend on a transaction. The gas limit prevents DoS
   - Block gas limit :: The block gas limit is the maximum amount of gas set by
     the blockchain that is allowed to be spent on a block
 
@@ -628,32 +638,25 @@ import * as alias from "path"; // Import all symbols under an alias
 
 ** Security principles
 
-- Principle of least privilege :: A system should grant only the minimum
-  necessary rights to a subject to perform the required function
-  - Enforce authorization with Solidity access control modifiers e.g.
-    OpenZeppeling Owneable abstract contract
-  - Minimize the amount of data a function can access and modify
-- Defensive programming :: Validate data and check for unsatisfied conditions as
-  soon as possible before executing an action
-- Keep it simple
-  - Design modular and composable functions and contracts
-  - Prefer clarity over performance
-  - Only use the blockchain for critical data and operations
+- Least privilege :: Grant only the minimum necessary rights to a subject to
+  perform an action. Enforce subject authorization with Solidity access control
+  modifiers
+- Least information :: Minimize the amount of data a function can access and
+  modify
+- Defensive programming :: Perform input validate and check authN and authZ
+  conditions as soon as possible before executing an action
+- Economy of mechanism :: Keep it simple. Prefer clarity over performance. Only
+  use the blockchain for critical data and operations
+- Fail securely :: After a failure a contract must be in a secure state by
+  handling errors gracefully
 - Blockchain properties
-  - The *private data of a contract is publicly viewable* on a blockchain. To
-    preserve data privacy on a blockchain use a *commit-reveal scheme* where the
-    salted hash of a private data is stored on the blockchain, and later the
-    data and the salt matching the published hash are revealed
-  - The public interface of a contract can be called maliciously
-  - Calls to external contracts that may execute malicious code
-  - Timestamps are imprecise on a blockchain. If the contract logic maintains
-    integrity with the 15 seconds margin, that it is safe to use
-    =block.timestamp= which can be manipuated by a miner
+  - =block.timestamp= is imprecise on a blockchain
   - Randomness is non-trivial on a blockchain
-- Prepare for failure, graceful error handling
-  - Prepare a smart contract to gracefully handle bugs and vulnerabilities
-  - Circuit breaker :: Use a circuit breaker to stop programmatically or on
-    demand the failing contract when certain conditions are met
+
+** Security mechanisms
+
+- Circuit breaker :: Use a circuit breaker to stop automatically or on demand a
+  failing contract when certain conditions are met
     #+BEGIN_SRC solidity
 contract C {
   bool stopped;
@@ -664,10 +667,10 @@ contract C {
   function withdraw() only(owner) isStopped(true) { }
 }
     #+END_SRC
-  - Rate limiter :: Use a rate limiter and quotas to limit the frequency of
-    requests and the value at risk by introducing deliberate delays in contract
-    actions e.g. deferred withdrawals, deferred activation of configuration
-    changes
+- Rate limiter :: Use a rate limiter and quotas to limit the frequency of
+  requests and the value at risk by introducing deliberate delays in contract
+  actions e.g. deferred withdrawals, deferred activation of configuration
+  changes
     #+BEGIN_SRC solidity
 contract C {
   struct Withdrawal { uint value; uint timestamp; }
@@ -678,7 +681,7 @@ contract C {
     uint value = balances[withdrawer];
     require(value > 0, ErrNothingToWithdraw(withdrawer));
     balances[withdrawer] = 0;
-    withdrawals[withdrawer] = Withdrawal(value, block.timestamp + 7 days);
+    withdrawals[withdrawer] = Withdrawal(value, block.timestamp + 1 days);
   }
   function withdraw() public {
     address withdrawer = msg.sender;
@@ -692,91 +695,8 @@ contract C {
   }
 }
     #+END_SRC
-  - Contract upgrade :: Set up an effective upgrade path for fixes and
-    improvements. Code of deployed contracts is immutable. A contract upgrade
-    implies a single owner or a multisig authority with the power to trigger an
-    update (some centralization)
-    - Registry contract :: Use a registry contract that holds the address of the
-      latest version of the contract. Users must always lookup the latest
-      address
-      #+BEGIN_SRC solidity
-contract Registry {
-  address current;
-  function upgrade(address next) external only(owner) {
-    require(next != address(0) && next != current, ErrInvalidContract(next));
-    current = next;
-    emit EvUpgrade(next);
-  }
-}
-      #+END_SRC
-    - Relay contract, transparent proxy :: A relay contract stores all state
-      across multiple versions of delegated logic contracts. The relay contract
-      forwards calls via the =delegatecall= in the =fallback()= function to the
-      latest version of the logic contract. The called logic contract must have
-      the same storage layout as the calling relay contract. The relay contract
-      only forwards calls, but does not return values from the logic contract.
-      Admin calls are not forwarded to the logic contract, but executed directly
-      on the relay contract to update its configuration
-      #+BEGIN_SRC solidity
-contract Relay is Registry {
-  fallback() external payable {
-    (bool success, ) = current.delegatecall(msg.data);
-    require(success, ErrRelay(msg.data));
-  }
-}
-      #+END_SRC
-- Testing strategy :: Fixes bugs, introduces performance optimizations,
-  integrates quality-of-life features
-  - Isolated testing :: Local linting, unit, integration, and property-based
-    fuzzy testing with 100% coverage
-  - Local testnet :: Deploy to a local testnet forked from the mainnet for the
-    private on-chain testing in realistic conditions. Use Foundry cheatcodes to
-    simulate unexpected and failure conditions
-  - Public testnet :: Deploy to a public testnet for the volume testing in a
-    more unpredictable environment, bug bounties and external beta testers
-  - Mainnet in beta :: Deploy to the mainnet in beta with the limited value at
-    risk and extensive monitoring of the activity of a smart contract
-  - Mainnet release :: Mainnet release
-- Frontrunning :: Every pending transaction is visible in the mempool before
-  execution. The public knowledge of already submitted, but not yet executed
-  transactions allows to submit another transaction with higher fees targeting
-  the same assets, before the original transaction is included into a block
-  - Displacement :: The original transaction is processed on an already invalid
-    state after the malicious transaction with higher fees has been processed
-  - Insertion :: The original transaction is processed on a modified state after
-    the malicious transaction with higher fees has been processed
-  - Suppression, block stuffing :: The execution of ordinary transactions e.g.
-    oracle updates is significantly delayed by placing other transactions with
-    high fees
-  - Mitigation of frontrunning :: Reduce the benefits of frontrunning in the
-    contract by minimizing the importance of transaction ordering or transaction
-    timing e.g. a commit-reveal scheme
-- Reentrancy :: A called external function performs an unanticipated call into
-  the calling original function initiating multiple half-completed executions of
-  the original function leading to a cascade of state changes. Mitigation: use
-  the checks-effects-interactions design pattern. No state change must occur
-  after an external call. State changes after an external call enable the
-  vulnerability
-  #+BEGIN_SRC solidity
-contract Reentrancy {
-  mapping(address => unit) balances;
-  // An attacker repeatedly calls back the function until all funds of the
-  // contract are drained. The attacker must stop when the contact balnce or the
-  // gas left is zero, otherwise the whole operation will be reverted
-  function withdraw() external {
-    address withdrawer = msg.sender;
-    uint value = balances[withdrawer];
-    balances[withdrawer] = 0; // SAFE state change BEFORE the external call
-    (bool success, ) = withdrawer.call{value: value}("");
-    require(success, ErrWithdraw(withdrawer));
-    balances[withdrawer] = 0; // UNSAFE state change AFTER the external call
-  }
-}
-  #+END_SRC
 
-** Development recommendations
-
-*** External calls
+** Secure coding
 
 - External calls :: Treat external contract calls ~contract.function()~ and
   external raw calls ~address.function()~ calls as a potential security risk
@@ -821,3 +741,92 @@ modifier validRecipient(address to) {
   _;
 }
   #+END_SRC
+** Testing
+
+- Testing strategy :: Fix bugs, introduce performance optimizations, integrate
+  quality-of-life features
+  - Isolated testing :: Local linting. Unit and integration testing with
+    Foundry with 100% coverage. Property-based fuzzy testing with Echidna
+  - Local testnet :: Deploy to a local testnet forked from the mainnet for the
+    private on-chain testing in realistic conditions. Use Foundry cheatcodes to
+    simulate unexpected and failure conditions
+  - Public testnet :: Deploy to a public testnet for the volume testing in a
+    more unpredictable environment, bug bounties and external beta testers
+  - Mainnet in beta :: Deploy to the mainnet in beta with the limited value at
+    risk and extensive monitoring of the activity of a smart contract
+  - Mainnet release :: Mainnet release
+
+** Contract upgrade
+
+- Contract upgrade :: Set up an effective upgrade path for fixes and
+  improvements. Code of deployed contracts is immutable. A contract upgrade
+  implies a single owner or a multisig authority with the power to trigger an
+  update (some centralization)
+  - Registry contract :: Use a registry contract that holds the address of the
+    latest version of the contract. Users must always lookup the latest address
+    #+BEGIN_SRC solidity
+contract Registry {
+  address current;
+  function upgrade(address next) external only(owner) {
+    require(next != address(0) && next != current, ErrInvalidContract(next));
+    current = next;
+    emit EvUpgrade(next);
+  }
+}
+      #+END_SRC
+  - Relay contract, transparent proxy :: A relay contract stores all state
+    across multiple versions of delegated logic contracts. The relay contract
+    forwards calls via the =delegatecall= in the =fallback()= function to the
+    latest version of the logic contract. The called logic contract must have
+    the same storage layout as the calling relay contract. The relay contract
+    only forwards calls, but does not return values from the logic contract.
+    Admin calls are not forwarded to the logic contract, but executed directly
+    on the relay contract to update its configuration
+    #+BEGIN_SRC solidity
+contract Relay is Registry {
+  fallback() external payable {
+    (bool success, ) = current.delegatecall(msg.data);
+    require(success, ErrRelay(msg.data));
+  }
+}
+      #+END_SRC
+
+** Attacks
+
+- Frontrunning :: Every pending transaction is visible in the mempool before
+  execution. The public knowledge of already submitted, but not yet executed
+  transactions allows to submit another transaction with higher fees targeting
+  the same assets, before the original transaction is included into a block
+  - Displacement :: The original transaction is processed on an already invalid
+    state after the malicious transaction with higher fees has been processed
+  - Insertion :: The original transaction is processed on a modified state after
+    the malicious transaction with higher fees has been processed
+  - Suppression, block stuffing :: The execution of ordinary transactions e.g.
+    oracle updates is significantly delayed by placing other transactions with
+    high fees
+  - Mitigation of frontrunning :: Reduce the benefits of frontrunning in the
+    contract by minimizing the importance of transaction ordering or transaction
+    timing e.g. a commit-reveal scheme
+- Reentrancy :: A called external function performs an unanticipated call into
+  the calling original function initiating multiple half-completed executions of
+  the original function leading to a cascade of state changes. Mitigation: use
+  the checks-effects-interactions design pattern. No state change must occur
+  after an external call. State changes after an external call enable the
+  vulnerability
+  #+BEGIN_SRC solidity
+contract Reentrancy {
+  mapping(address => unit) balances;
+  // An attacker repeatedly calls back the function until all funds of the
+  // contract are drained. The attacker must stop when the contact balnce or the
+  // gas left is zero, otherwise the whole operation will be reverted
+  function withdraw() external {
+    address withdrawer = msg.sender;
+    uint value = balances[withdrawer];
+    balances[withdrawer] = 0; // SAFE state change BEFORE the external call
+    (bool success, ) = withdrawer.call{value: value}("");
+    require(success, ErrWithdraw(withdrawer));
+    balances[withdrawer] = 0; // UNSAFE state change AFTER the external call
+  }
+}
+  #+END_SRC
+
