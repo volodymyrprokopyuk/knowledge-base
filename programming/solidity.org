@@ -698,49 +698,53 @@ contract C {
 
 ** Secure coding
 
-- External calls :: Treat external contract calls ~contract.function()~ and
-  external raw calls ~address.function()~ calls as a potential security risk
-- Handle errors in low-level raw calls :: Explicitly handle the bool return
-  value of low-level raw calls operating on addresses e.g. ~address.call()`,
-  ~address.staticcall()~. Contract calls ~contract.function()~ automatically
-  revert
-- Checks-effects-interactions :: First perform all checks using the =require()=.
-  Then make state changes by modifying state variables. Only then call external
-  contracts. Avoid state changes after external calls
-- Prefer call over transfer and send :: Prefer the =call()= over the
-  =transfer()= and =send()=. The transfer and the send functions forward only
-  2300 gas, which may not be enough if the recipient is a contract or the cost
-  of EVM instructions changes. The call function forwards all available gas
-  #+BEGIN_SRC solidity
-// avoid
-msg.sender.transfer(value);
-// prefer
-(bool success, ) = msg.sender.call{value: value}("");
-require(success, ErrTransfer());
-  #+END_SRC
-- Prefer pull over push for external calls :: Minimize damage of a failure of an
-  external call by isolating the external call into its own transaction
-  initiated by the recipient. E.g. let users withdraw funds rather then pushing
-  funds to them automatically, avoid combining multiple transactions into a
-  single transaction, avoid looping over an arbitrary large array whose
-  processing may reach the block gas limit and revert the whole transaction.
-  Split a large array into multiple blocks processed in isolated transactions
-- Do not delegate call to untrusted code :: ~address.delegatecall()~ executes
-  functions from external contracts in the context of the calling contract. The
-  untrusted external contract may change the state of the calling contract.
+*** Contract structure
+
+- Checks-effects-interactions :: First perform all checks using the =require()=
+  function. Then, make state changes by modifying state variables, even if
+  recorded actions are not performed yet. Finally, perform local actions, call
+  external contracts. Avoid state changes after external calls
+- Isolate transactions :: Avoid combining multiple transactions into a single
+  transaction. Avoid looping over an arbitrary large array whose processing may
+  reach the gas limit of a block and revert the whole transaction. Split a large
+  array into multiple blocks processed in isolated transactions
+
+*** External calls
+
+- msg.sender vs tx.origin :: If a contact =A= calls a contract =B=, and a
+  contract =B= calls a contract =C=, then in the contract =C= =tx.origin= is
+  =A=, and =msg.sender= is =B=. Always use =msg.sender= for authorization. Never
+  use =tx.origin= for authorization
+- Check low-level raw calls :: Explicitly handle the success bool return value
+  of low-level raw calls operating on addresses e.g. ~addr.call()`,
+  ~addr.staticcall()~, ~addr.delegatecall()~. Calls on contract instances
+  ~ctr.function()~ revert automatically
+- External calls :: Treat external calls ~ctr.function()~ and external raw calls
+  ~addr.call()~ to other contracts as a potential security risk
+- Do not delegate call to untrusted code :: The ~addr.delegatecall()~ executes
+  functions from external libraries in the context of the calling contract.
   Delegate calls only to trusted contracts. Never delegate calls to a
   user-supplied address
-- msg.sender vs tx.origin :: If a contact =A= calls a contract =B= and a
-  contract =B= calls a contract =C=, then in the contract =C= =tx.origin= is =A=
-  and =msg.sender= is =B=. Always use =msg.sender= for authorization. Never use
-  =tx.origin= for authorization
-- Prevent transferring tokens to the contract's own address
+
+*** Payments
+
+- Prefer call over transfer and send :: Prefer the ~addr.call{vaule: 1, gas:
+  10}()~ over the =addr.transfer()= and =addr.send()=. The transfer and the send
+  functions forward only 2300 gas, which may not be enough if the recipient is a
+  contract or the cost of EVM instructions changes. The call function forwards
+  all available gas
   #+BEGIN_SRC solidity
-modifier validRecipient(address to) {
-  require(to != address && to != address(this), ErrInvalidRecipient(to));
-  _;
-}
+// Avoid
+msg.sender.transfer(value);
+// Prefer
+(bool succ, ) = msg.sender.call{value: value}("");
+require(succ, ErrTransfer());
   #+END_SRC
+- Prefer pull over push for external calls :: Minimize the damage of a failure
+  of an external call by isolating the external call into its own transaction
+  initiated by a recipient e.g. let users withdraw funds rather then pushing
+  funds to them automatically
+
 ** Testing
 
 - Testing strategy :: Fix bugs, introduce performance optimizations, integrate
@@ -751,7 +755,7 @@ modifier validRecipient(address to) {
     private on-chain testing in realistic conditions. Use Foundry cheatcodes to
     simulate unexpected and failure conditions
   - Public testnet :: Deploy to a public testnet for the volume testing in a
-    more unpredictable environment, bug bounties and external beta testers
+    more unpredictable environment, bug bounties, and external beta testers
   - Mainnet in beta :: Deploy to the mainnet in beta with the limited value at
     risk and extensive monitoring of the activity of a smart contract
   - Mainnet release :: Mainnet release
@@ -759,14 +763,15 @@ modifier validRecipient(address to) {
 ** Contract upgrade
 
 - Contract upgrade :: Set up an effective upgrade path for fixes and
-  improvements. Code of deployed contracts is immutable. A contract upgrade
+  improvements. Code of a deployed contract is immutable. A contract upgrade
   implies a single owner or a multisig authority with the power to trigger an
-  update (some centralization)
-  - Registry contract :: Use a registry contract that holds the address of the
-    latest version of the contract. Users must always lookup the latest address
-    #+BEGIN_SRC solidity
+  upgrade (some centralization)
+- Registry contract with redirection :: Use a registry contract that holds the
+  address of the latest version of the target contract. Users must always lookup
+  the latest address
+  #+BEGIN_SRC solidity
 contract Registry {
-  address current;
+  address public current;
   function upgrade(address next) external only(owner) {
     require(next != address(0) && next != current, ErrInvalidContract(next));
     current = next;
@@ -774,45 +779,51 @@ contract Registry {
   }
 }
       #+END_SRC
-  - Relay contract, transparent proxy :: A relay contract stores all state
-    across multiple versions of delegated logic contracts. The relay contract
-    forwards calls via the =delegatecall= in the =fallback()= function to the
-    latest version of the logic contract. The called logic contract must have
-    the same storage layout as the calling relay contract. The relay contract
-    only forwards calls, but does not return values from the logic contract.
-    Admin calls are not forwarded to the logic contract, but executed directly
-    on the relay contract to update its configuration
-    #+BEGIN_SRC solidity
+- Relay contract with transparent proxy :: A relay contract stores all state
+  across multiple versions of delegated logic contracts. The relay contract
+  forwards calls via the =delegatecall= in the =fallback()= function to the
+  latest version of the logic contract. The called logic contract must have the
+  same storage layout as the calling relay contract. The relay contract only
+  forwards calls, but does not return values from the logic contract. Admin
+  calls are not forwarded to the logic contract, but executed directly on the
+  relay contract to update its configuration
+  #+BEGIN_SRC solidity
 contract Relay is Registry {
   fallback() external payable {
-    (bool success, ) = current.delegatecall(msg.data);
-    require(success, ErrRelay(msg.data));
+    (bool succ, ) = current.delegatecall(msg.data);
+    require(succ, ErrRelay(msg.data));
   }
 }
       #+END_SRC
 
 ** Attacks
 
+*** Frontrunning
+
 - Frontrunning :: Every pending transaction is visible in the mempool before
   execution. The public knowledge of already submitted, but not yet executed
-  transactions allows to submit another transaction with higher fees targeting
-  the same assets, before the original transaction is included into a block
-  - Displacement :: The original transaction is processed on an already invalid
-    state after the malicious transaction with higher fees has been processed
-  - Insertion :: The original transaction is processed on a modified state after
-    the malicious transaction with higher fees has been processed
-  - Suppression, block stuffing :: The execution of ordinary transactions e.g.
-    oracle updates is significantly delayed by placing other transactions with
-    high fees
-  - Mitigation of frontrunning :: Reduce the benefits of frontrunning in the
-    contract by minimizing the importance of transaction ordering or transaction
-    timing e.g. a commit-reveal scheme
+  transactions allows to submit and process another transaction with
+  considerably higher fees targeting the same assets, before the original
+  transaction is included into a block
+- Insertion :: The original transaction is processed on a modified state after
+  the malicious transaction with higher fees has been processed
+- Displacement :: The original transaction is processed on an already invalid
+  state after the malicious transaction with higher fees has been processed
+- Mitigation of frontrunning :: Reduce the benefits of frontrunning in the
+  contract by minimizing the importance of transaction ordering or transaction
+  timing e.g. a commit-reveal scheme
+- Suppression, block stuffing :: The execution of ordinary transactions e.g.
+  oracle updates is significantly delayed by placing other transactions with
+  higher fees
+
+*** Reentrancy
+
 - Reentrancy :: A called external function performs an unanticipated call into
   the calling original function initiating multiple half-completed executions of
   the original function leading to a cascade of state changes. Mitigation: use
   the checks-effects-interactions design pattern. No state change must occur
   after an external call. State changes after an external call enable the
-  vulnerability
+  reentrancy vulnerability
   #+BEGIN_SRC solidity
 contract Reentrancy {
   mapping(address => unit) balances;
@@ -823,8 +834,8 @@ contract Reentrancy {
     address withdrawer = msg.sender;
     uint value = balances[withdrawer];
     balances[withdrawer] = 0; // SAFE state change BEFORE the external call
-    (bool success, ) = withdrawer.call{value: value}("");
-    require(success, ErrWithdraw(withdrawer));
+    (bool succ, ) = withdrawer.call{value: value}("");
+    require(succ, ErrWithdraw(withdrawer));
     balances[withdrawer] = 0; // UNSAFE state change AFTER the external call
   }
 }
