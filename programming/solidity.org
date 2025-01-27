@@ -455,12 +455,13 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
   implementing contracts. An interface can define =enum=, =struct=, =event=, and
   inherit from other interfaces.
 - Library :: A =library= is a set of internal and external functions deployed
-  once and reused in the context of calling contracts through the =delegatecall=
-  for the external functions and the efficient jumps inside EVM for the internal
-  functions. All internal library functions referenced by a calling contract are
-  included in the calling contract during the construction, so calls to internal
-  library functions are efficient jumps inside EVM. A library cannot define
-  state variables
+  once and reused in the context of calling contracts. A library cannot define
+  state variables. All library functions are stateless. External library
+  functions are called through the =addr.delegatecall=. Internal functions are
+  implemented as efficient jumps inside EVM. All internal library functions
+  referenced by a calling contract are included in the calling contract during
+  the construction, so calls to internal library functions are efficient jumps
+  inside EVM.
 - Using F for T :: The ~using f, g as +, Lib.e for typ;~ directive attaches free
   functions or library functions to the type within the scope of the contract or
   the scope of a source file. The ~using Lib for typ;~ directive attaches all
@@ -479,8 +480,9 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
   - Call :: The =call()= function switches the EVM state to the new called
     contract, so the context of the calling contract is inaccessible
   - Delegate call :: The =delegatecall()= function implements the =library=
-    feature, preserves the context of the current calling contract, and only
-    uses the code from the target address
+    feature, preserves the context of the current calling contract e.g.
+    =msg.sender=, =msg.value=, including the sequential slot structure of state
+    variables, and only uses the code from the target library address
   - Static call :: The =staticcall()= function reverts if the called function
     modifies the state of the current calling contract
     #+BEGIN_SRC solidity
@@ -530,30 +532,39 @@ contract Derived is Base1(1), Base2(2) { // Static args for base constructors
   function that is executed when no other contract function matches the call
   signature. The payable fallback function is executed when the =receive()=
   function is not defined or the =msg.data= is not empty
-- Exact contract balance is unreliable :: Reverting from the receive function
-  and the payable fallback function cannot prevent a contract from receiving
-  ether. The actual contract balance can be higher than the internally accounted
-  balance
-  #+BEGIN_SRC solidity
-contract Receive {
-  event EvReceive(address indexed from, uint value);
+- this.balance is unreliable :: The actual contract balance can be higher than
+  the balance internally tracked in a state variable. Reverting from the
+  =receive()= function and the payable =fallback()= function cannot prevent a
+  contract from receiving ether.
+  - Construct :: Ether can be sent to a pre-calculated address of a contract
+    before the creation of a contract
+  - Self destruct :: The ~selfdestruct(address)~ instruction unconditionally
+    sends ether of the contract being destroyed to the specified address without
+    invoking any payable function of the specified contract
+  - Mitigation: track the balance of a contract in a state variable updated by
+    payable functions. The state variable may have a lower balance than the
+    actual contract ~this.balance~, but the state variable is not influenced by
+    the ether forcibly sent to the contract, and won't lock funds forever
+    #+BEGIN_SRC solidity
+  contract Receive {
+    event EvReceive(address indexed from, uint value);
 
-  function deposit() external payable {
-    console.log("<== deposit %s", msg.value);
-    emit EvReceive(msg.sender, msg.value);
-  }
+    function deposit() external payable {
+      console.log("<== deposit %s", msg.value);
+      emit EvReceive(msg.sender, msg.value);
+    }
 
-  receive() external payable {
-    console.log("<== receive %s", msg.value);
-    emit EvReceive(msg.sender, msg.value);
-  }
+    receive() external payable {
+      console.log("<== receive %s", msg.value);
+      emit EvReceive(msg.sender, msg.value);
+    }
 
-  fallback() external payable {
-    console.log("<== fallback %s", msg.value);
-    emit EvReceive(msg.sender, msg.value);
+    fallback() external payable {
+      console.log("<== fallback %s", msg.value);
+      emit EvReceive(msg.sender, msg.value);
+    }
   }
-}
-  #+END_SRC
+    #+END_SRC
 
 *** Outbound payable
 
@@ -645,13 +656,18 @@ import * as alias from "path"; // Import all symbols under an alias
   modify
 - Defensive programming :: Perform input validate and check authN and authZ
   conditions as soon as possible before executing an action
-- Economy of mechanism :: Keep it simple. Prefer clarity over performance. Only
-  use the blockchain for critical data and operations
+- Economy of design :: Keep it simple. Simpler is more secure. Prefer clarity
+  over performance. Only use the blockchain for critical data and operations
+- Open design :: Reuse tried and tested standard solutions from well-tested
+  libraries, before rolling out a home-grown solution. A contract code is
+  public, open for reviews and exploitation of vulnerabilities by anyone
 - Fail securely :: After a failure a contract must be in a secure state by
   handling errors gracefully
-- Blockchain properties
+- Blockchain properties can be manipulated by miners e.g. =block.hash=,
+  =block.timestamp=
   - =block.timestamp= is imprecise on a blockchain
-  - Randomness is non-trivial on a blockchain
+  - Randomness is non-trivial on a blockchain. The source of entropy must be
+    external to the blockchain (a randomness oracle)
 
 ** Security mechanisms
 
@@ -729,10 +745,11 @@ contract C {
 *** Payments
 
 - Prefer call over transfer and send :: Prefer the ~addr.call{vaule: 1, gas:
-  10}()~ over the =addr.transfer()= and =addr.send()=. The transfer and the send
-  functions forward only 2300 gas, which may not be enough if the recipient is a
-  contract or the cost of EVM instructions changes. The call function forwards
-  all available gas
+  10}()~ (returns false on failure) over the =addr.transfer()= and
+  =addr.send()=. The transfer function (reverts on failure) and the send
+  functions (returns false on failure) forward only 2300 gas, which may not be
+  enough if the recipient is a contract or the cost of EVM instructions changes.
+  The call function forwards all available gas
   #+BEGIN_SRC solidity
 // Avoid
 msg.sender.transfer(value);
@@ -801,10 +818,13 @@ contract Relay is Registry {
 *** Frontrunning
 
 - Frontrunning :: Every pending transaction is visible in the mempool before
-  execution. The public knowledge of already submitted, but not yet executed
+  execution. The public knowledge of already submitted, but not yet processed
   transactions allows to submit and process another transaction with
   considerably higher fees targeting the same assets, before the original
   transaction is included into a block
+  - Mitigation: set an upper bound on the gas price
+  - Mitigation: use a commit-reveal scheme to hide transaction information in
+    the commit phase and reveal the information later in the reveal phase
 - Insertion :: The original transaction is processed on a modified state after
   the malicious transaction with higher fees has been processed
 - Displacement :: The original transaction is processed on an already invalid
@@ -818,26 +838,69 @@ contract Relay is Registry {
 
 *** Reentrancy
 
-- Reentrancy :: A called external function performs an unanticipated call into
-  the calling original function initiating multiple half-completed executions of
-  the original function leading to a cascade of state changes. Mitigation: use
-  the checks-effects-interactions design pattern. No state change must occur
-  after an external call. State changes after an external call enable the
-  reentrancy vulnerability
+- Reentrancy :: A called external function performs an unanticipated call back
+  into the original calling function initiating multiple half-completed
+  executions of the original function leading to a cascade of state changes.
+  When a contract sends ether to an unauthorized address a a malicious called
+  function calls back to the original contract and reenters the process of
+  sending ether until all ether is sent or the gas limit is reached.
+  - Mitigation: use the checks-effects-interactions design pattern. No state
+    change must occur after an external call. State changes after an external
+    call enable the reentrancy vulnerability
+  - Mitigation: use a reentrancy lock in the form of a mutex
   #+BEGIN_SRC solidity
-contract Reentrancy {
+contract Reentrant {
   mapping(address => unit) balances;
+  bool transient locked;
+
+  modifier lock() {
+    require(!locked, "reentrant call");
+    lock = true;
+    _;
+    lock = false;
+  }
+
+  function deposit() external payable {
+    blances[msg.sender] += msg.value;
+  }
+
   // An attacker repeatedly calls back the function until all funds of the
-  // contract are drained. The attacker must stop when the contact balnce or the
-  // gas left is zero, otherwise the whole operation will be reverted
-  function withdraw() external {
+  // contract are drained. The attacker must stop when the contact balance or
+  // the gas left is zero, otherwise the whole operation will be reverted
+  function withdraw() external lock {
     address withdrawer = msg.sender;
     uint value = balances[withdrawer];
-    balances[withdrawer] = 0; // SAFE state change BEFORE the external call
+    // 1. Checks: guards against reentrant calls
+    require(value > 0, ErrNothingToWithdraw(withdrawer));
+    // 2. Effects: record the result of a not yet executed action
+    // SAFE state change BEFORE an external call
+    balances[withdrawer] = 0;
+    // 3. Interactions: execute the action by performing an external call
+    // Will call the Attack.receive() payable function
     (bool succ, ) = withdrawer.call{value: value}("");
     require(succ, ErrWithdraw(withdrawer));
-    balances[withdrawer] = 0; // UNSAFE state change AFTER the external call
+    // UNSAFE state change AFTER the external call
+    // UNSAGE record the result of already executed action
+    balances[withdrawer] = 0;
+  }
+}
+
+contract Attack {
+  Reentrant reentrant;
+
+  function attack() { // Provide a lot of gas for subsequent withdrawals
+    // Deposit ether to have the right to withdraw
+    reentrant.deposit(1);
+    // Start withdrawal
+    reentrant.withdraw()
+  }
+
+  receive() payable {
+    // Continue withdrawal until all funds from the Reentrant contract are moved
+    // to the Attack contract
+    if (reentrant.balance > 0) {
+      reentrant.withdraw();
+    }
   }
 }
   #+END_SRC
-
