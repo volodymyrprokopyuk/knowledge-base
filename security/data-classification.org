@@ -1,0 +1,83 @@
+* Data classification
+
+- Public data :: Unauthorized disclosure of public data does not have a negative
+  impact on customers of a company
+  - Producers and consumers
+    - Producers: authenticated and authorized employees
+    - Consumers: leads, customers, employees
+  - Security risks
+    - Unauthorized modification (integrity)
+    - Unauthorized deletion (availability)
+    - Repudiation of actions (audit trail)
+  - Protection mechanisms
+    - Read: none
+    - Write: strong authentication, audit trail
+  - Examples: application usage instructions, customer support material, public
+    marketing material
+- Internal data :: Unauthorized disclosure of internal data may benefit
+  competitors
+  - Producers and consumers
+    - Producers: authenticated and authorized employees
+    - Consumers: authenticated customers, authenticated employees
+  - Security risks
+    - Unauthorized disclosure (confidentiality)
+    - Unauthorized modification (integrity)
+    - Unauthorized deletion (availability)
+    - Repudiation of actions (audit trail)
+  - Protection mechanisms
+    - Read: strong authentication
+    - Write: string authentication, audit trail
+  - Examples: internal policies, internal procedures, training material
+- Confidential data :: Unauthorized disclosure of confidential data leads to
+  decreased customer trust, financial loss, legal penalties, reputational damage
+  for a company
+  - Producers and consumers
+    - Producers: authenticated and authorized customers, authenticated and
+      authorized employees
+    - Consumers: authenticated and authorized customers, authenticated and
+      authorized employees
+  - Security risks
+    - Unauthorized disclosure (confidentiality)
+    - Unauthorized modification (integrity)
+    - Unauthorized deletion (availability)
+    - Repudiation of actions (audit trail)
+  - Protection mechanisms
+    - Read: data encryption, strong authentication, fine-grained authorization
+    - Write: data encryption, strong authentication, fine-grained authorization,
+      audit trail, security monitoring
+  - Examples: personal identifiable information PII, protected health
+    information PHI, legal documents, pricing information, financial
+    information, payment information
+- Restricted data :: Unauthorized disclosure of restricted data severely impacts
+  financial stability of a company and threatens legal existence of a company
+  - Producers and consumers
+    - Producers: authenticated and authorized employees
+    - Consumers: authenticated and authorized employees
+  - Security risks
+    - Unauthorized disclosure (confidentiality)
+    - Unauthorized modification (integrity)
+    - Unauthorized deletion (availability)
+    - Repudiation of actions (audit trail)
+  - Protection mechanisms
+    - Read: data encryption, strong authentication, fine-grained authorization
+      audit trail, security monitoring
+    - Write: data encryption, strong authentication, fine-grained authorization,
+      audit trail, security monitoring
+  - Examples: trade secrets, patents, strategic business plans, strategic
+    partnership agreements
+- Archived data :: Archived data is no longer actively used, but must be
+  securely stored for legal and regulatory reasons
+  - Producers and consumers
+    - Producers: system processes for automatic data archiving
+    - Consumers: authenticated and authorized employees
+  - Security risks
+    - Unauthorized disclosure (confidentiality)
+    - Unauthorized modification (integrity)
+    - Unauthorized deletion (availability)
+    - Repudiation of actions (audit trail)
+  - Protection mechanisms
+    - Read: data encryption, strong authentication, fine-grained authorization
+      audit trail, security monitoring
+    - Write: data encryption, strong authentication, fine-grained authorization,
+      audit trail, security monitoring
+  - Examples: deactivated customer accounts, old financial reports
