@@ -1,83 +1,98 @@
 * Data classification
+** Methodology
+
+- Data classification :: Data classification *categorizes* business information
+  based on the *value* of information and a *negative impact* of unauthorized
+  disclosure, modification, or deletion of business information
+- Data classification levels :: The data classification levels are used to
+  identify *security risks* threatening business information at each security
+  level, and designate appropriate *protection mechanisms* that effectively
+  mitigate identified security risks
+
+*** Security risks
+
+- Security risks ::
+  - dis :: Unauthorized disclosure (confidentiality)
+  - mod :: Unauthorized modification (integrity)
+  - del :: Unauthorized deletion (availability)
+  - rep :: Repudiation of actions (audit trail)
+
+*** Protection mechanisms
+
+- Protection mechanisms ::
+  - aun :: Strong authentication e.g. MFA
+  - auz :: Fine-grained authorization e.g. RBAC, ABAC, PBAC
+  - aud :: Audit trail
+  - mon :: Security monitoring
+  - enc :: Data encryption
+
+** Data classification levels
+*** Public data
 
 - Public data :: Unauthorized disclosure of public data does not have a negative
-  impact on customers of a company
+  impact on customers or a company
   - Producers and consumers
-    - Producers: authenticated and authorized employees
-    - Consumers: leads, customers, employees
-  - Security risks
-    - Unauthorized modification (integrity)
-    - Unauthorized deletion (availability)
-    - Repudiation of actions (audit trail)
+    - Producers: =aun= and =auz= employees
+    - Consumers: unauthenticated leads, customers, employees
+  - Security risks: =mod=, =del=, =rep=
   - Protection mechanisms
-    - Read: none
-    - Write: strong authentication, audit trail
-  - Examples: application usage instructions, customer support material, public
-    marketing material
+    - Read: none (public access)
+    - Write: =aun=, =auz=, =aud=
+  - Examples: public marketing material, application usage instructions,
+    customer support material
+
+*** Internal data
+
 - Internal data :: Unauthorized disclosure of internal data may benefit
   competitors
   - Producers and consumers
-    - Producers: authenticated and authorized employees
-    - Consumers: authenticated customers, authenticated employees
-  - Security risks
-    - Unauthorized disclosure (confidentiality)
-    - Unauthorized modification (integrity)
-    - Unauthorized deletion (availability)
-    - Repudiation of actions (audit trail)
+    - Producers: =aun= and =auz= employees
+    - Consumers: =aun= customers, =aun= employees
+  - Security risks: =dis=, =mod=, =del=, =rep=
   - Protection mechanisms
-    - Read: strong authentication
-    - Write: string authentication, audit trail
+    - Read: =aun=
+    - Write: =aun=, =auz=, =aud=
   - Examples: internal policies, internal procedures, training material
-- Confidential data :: Unauthorized disclosure of confidential data leads to
-  decreased customer trust, financial loss, legal penalties, reputational damage
-  for a company
+
+*** Confidential data
+
+- Confidential data :: Unauthorized disclosure of confidential data negatively
+  impacts customer trust and leads to financial loss, legal penalties,
+  reputational damage for a company
   - Producers and consumers
-    - Producers: authenticated and authorized customers, authenticated and
-      authorized employees
-    - Consumers: authenticated and authorized customers, authenticated and
-      authorized employees
-  - Security risks
-    - Unauthorized disclosure (confidentiality)
-    - Unauthorized modification (integrity)
-    - Unauthorized deletion (availability)
-    - Repudiation of actions (audit trail)
+    - Producers: =aun= and =auz= customers, =aun= and =auz= employees
+    - Consumers: =aun= and =auz= customers, =aun= and =auz= employees
+  - Security risks: =dis=, =mod=, =del=, =rep=
   - Protection mechanisms
-    - Read: data encryption, strong authentication, fine-grained authorization
-    - Write: data encryption, strong authentication, fine-grained authorization,
-      audit trail, security monitoring
+    - Read: =aun=, =auz=, =enc=
+    - Write: =aun=, =auz=, =aud=, =mon=, =enc=
   - Examples: personal identifiable information PII, protected health
     information PHI, legal documents, pricing information, financial
     information, payment information
+
+*** Restricted data
+
 - Restricted data :: Unauthorized disclosure of restricted data severely impacts
   financial stability of a company and threatens legal existence of a company
   - Producers and consumers
-    - Producers: authenticated and authorized employees
-    - Consumers: authenticated and authorized employees
-  - Security risks
-    - Unauthorized disclosure (confidentiality)
-    - Unauthorized modification (integrity)
-    - Unauthorized deletion (availability)
-    - Repudiation of actions (audit trail)
+    - Producers: =aun= and =auz= employees
+    - Consumers: =aun= and =auz= employees
+  - Security risks: =dis=, =mod=, =del=, =rep=
   - Protection mechanisms
-    - Read: data encryption, strong authentication, fine-grained authorization
-      audit trail, security monitoring
-    - Write: data encryption, strong authentication, fine-grained authorization,
-      audit trail, security monitoring
+    - Read: =aun=, =auz=, =aud=, =mon=, =enc=
+    - Write: =aun=, =auz=, =aud=, =mon=, =enc=
   - Examples: trade secrets, patents, strategic business plans, strategic
     partnership agreements
+
+*** Archived data
+
 - Archived data :: Archived data is no longer actively used, but must be
   securely stored for legal and regulatory reasons
   - Producers and consumers
     - Producers: system processes for automatic data archiving
-    - Consumers: authenticated and authorized employees
-  - Security risks
-    - Unauthorized disclosure (confidentiality)
-    - Unauthorized modification (integrity)
-    - Unauthorized deletion (availability)
-    - Repudiation of actions (audit trail)
+    - Consumers: =aun= and =auz= employees
+  - Security risks: =dis=, =mod=, =del=, =rep=
   - Protection mechanisms
-    - Read: data encryption, strong authentication, fine-grained authorization
-      audit trail, security monitoring
-    - Write: data encryption, strong authentication, fine-grained authorization,
-      audit trail, security monitoring
+    - Read: =aun=, =auz=, =aud=, =mon=, =enc=
+    - Write: =aun=, =auz=, =aud=, =mon=, =enc=
   - Examples: deactivated customer accounts, old financial reports
