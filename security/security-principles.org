@@ -1,0 +1,42 @@
+* Security principles
+
+- Data security at rest ::
+  - Confidentiality :: Only authorized users can read data
+  - Integrity :: Only authorized users can write data
+  - Availability :: Data is always available to authorized users
+- Data security in transit :: Alice sends a message to Bob
+  - Confidentiality :: Only Bob can read the message
+  - Integrity :: Eve cannot modify the message
+  - Authenticity :: Only Alice could have sent the message
+
+** Exposure minimization
+
+- Least information :: Collect, store, and process only the minimal necessary
+  information on the need-to-know basis in order to prevent information
+  disclosure. Use appropriate subsets of the same data in different contexts
+- Least privilege :: A principal is explicitly granted only the minimal
+  necessary privileges to execute a function on the need-to-know basis in order
+  to prevent damage to a system. The permission is granted immediately before
+  the execution of the function, and is revoked immediately after the execution
+  of the function
+- Secure by default :: System default functionality must be secure. System
+  default configuration must be secure
+- Allow list vs block list :: Anything is denied by default. Explicitly grant
+  permissions instead of revoking not allowed permissions. Any omission in an
+  infinite block list is a security flaw. Any omission in a finite allow list
+  can be fixed without compromising security
+- Fail securely :: After a failure a system must end up in a secure state.
+  Release resources, revoke permissions on a failure
+
+** Strong enforcement
+
+- Defense in depth :: Combination of multiple independent protection mechanisms
+  is far more secure than a single protection mechanism
+- Complete mediation :: The same access policy must be consistently enforced by
+  authentication and authorization on all access paths to a protected resource.
+  Provide a single access point to a protected resource with impenetrable walls
+  e.g. network boundary, process boundary, data hiding
+- Separation of duties ::
+- Separation of privilege ::
+- Least common mechanism :: Minimize sharing of protection mechanisms between
+  independent processes to limit unauthorized actions from a compromised system

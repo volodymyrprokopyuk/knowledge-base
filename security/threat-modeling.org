@@ -1,0 +1,19 @@
+* Threat modeling
+
+- Threat modeling :: Identifies and prioritizes security risks by enumerating
+  the most probable and the most impactful threats, vulnerabilities, and attack
+  vectors on the most valuable assets of a system. Threat modeling uses system
+  interaction diagrams, data flow diagramss, and trust boundary crossing points
+  to identify security risks. The threat model is used to elaborate a
+  prioritized list of protection mechanisms to mitigate the identified risks
+- STRIDE threat taxonomy :: STRIDE categorizes the most impactful types of
+  threats
+  - Identity spoofing :: Impersonation. Strong authentication
+  - Tampering with data :: Unauthorized modification. Data integrity, data
+    encryption
+  - Repudiation and deniability :: Deniability of actions. Audit trail
+  - Information disclosure :: Unauthorized disclosure. Data encryption,
+    fine-grained authorization
+  - Denial of service :: System unavailability. Rate limiting, input validation
+  - Privilege elevation :: Abuse of high privileges. Separation of duty,
+    separation of privilege
