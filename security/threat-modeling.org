@@ -4,14 +4,16 @@
   targeted by potential threats that pose security risks on the system. Security
   risks can be mitigated by placing protection mechanisms, can be transferred to
   third parties, or can be assumed as non critical
-- Threat modeling :: Identifies and prioritizes security risks by enumerating
-  the most probable and the most impactful threats, vulnerabilities, and attack
-  vectors on the most valuable assets of a system. Threats tend to cluster
-  around data assets to steal and trust boundaries to cross. Threat modeling
-  uses system interaction diagrams, data flow diagrams, and trust boundary
-  crossing points to identify security risks. The threat model is used to
-  elaborate a prioritized list of protection mechanisms to mitigate the
-  identified risks
+- Threat modeling :: Identifies, assess, and prioritizes security risks by
+  enumerating the most probable threats that will cause the biggest impact on a
+  system, vulnerabilities, and attack vectors on the most valuable assets of a
+  system. Threats tend to cluster around data assets to steal and trust
+  boundaries to cross. Threat modeling is applied continuously through the
+  software development lifecycle and at different levels of abstraction e.g. C4
+  diagrams. Threat modeling uses system interaction diagrams, data flow
+  diagrams, and trust boundary crossing points to identify security risks. The
+  threat model is used to elaborate a prioritized list of protection mechanisms
+  to mitigate the identified risks
 - STRIDE threat taxonomy :: STRIDE categorizes the most impactful types of
   threats
   - Identity spoofing :: Impersonation. Strong authentication
