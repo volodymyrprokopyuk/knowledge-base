@@ -1,19 +1,49 @@
 * Security principles
 
 - Data security at rest ::
-  - Confidentiality :: Only authorized users can read data
-  - Integrity :: Only authorized users can write data
-  - Availability :: Data is always available to authorized users
+  - Confidentiality :: Only authorized users can read data. Confidentiality
+    prevents unauthorized information disclosure
+  - Integrity :: Only authorized users can write data. Integrity prevents
+    unauthorized information modification
+  - Availability :: Data is always available to authorized users. Availability
+    prevents unauthorized system downtime
 - Data security in transit :: Alice sends a message to Bob
   - Confidentiality :: Only Bob can read the message
   - Integrity :: Eve cannot modify the message
   - Authenticity :: Only Alice could have sent the message
+- Security mechanisms ::
+  - Authentication :: AuthN verifies the identity of a principal by validating
+    principal credentials
+  - Authorization :: AuthZ grants an authenticated principal permissions to
+    perform actions on protected resources e.g. RBAC assigns fixed permissions,
+    ABAC considers context attributes, PBAC executes dynamic access policies
+  - Audit :: Auditing tracks authorized actions of an authenticated principal
+    creates by creating immutable audit trail records
+- Secure design :: Separate security from functionality. Place security on top
+  of functionality
+  - What are we doing? Data classification identifies key assets to steal and
+    trust boundaries to cross
+  - What can go wrong? Threat modeling priorities security risks on exposed
+    areas and attack vectors
+  - What are we going to do about it? Mitigate prioritized security risks by
+    placing effective security mechanisms
+- Authorization service ::
+  - Policy administration point PAP :: PAP defines access policies and assigns
+    access policies to principals, roles, and groups
+  - Policy enforcement point PEP :: PEP protects resources by intercepting all
+    requests and validating permissions at the PDP
+  - Policy decision point PDP :: PDP grants or denies permissions to a principal
+    accessing a resource by evaluating applicable access policies
+  - Policy information point PIP :: PIP provides up-to-date profile information
+    and principal attributes
 
 ** Exposure minimization
 
 - Least information :: Collect, store, and process only the minimal necessary
-  information on the need-to-know basis in order to prevent information
-  disclosure. Use appropriate subsets of the same data in different contexts
+  information on the need-to-know basis for specific purposes only in order to
+  prevent information disclosure. Retain sensitive information only as long as
+  necessary. Minimize sharing of sensitive information with third parties. Use
+  appropriate subsets of the same data in different contexts
 - Least privilege :: A principal is explicitly granted only the minimal
   necessary privileges to execute a function on the need-to-know basis in order
   to prevent damage to a system. The permission is granted immediately before
@@ -35,8 +65,23 @@
 - Complete mediation :: The same access policy must be consistently enforced by
   authentication and authorization on all access paths to a protected resource.
   Provide a single access point to a protected resource with impenetrable walls
-  e.g. network boundary, process boundary, data hiding
-- Separation of duties ::
-- Separation of privilege ::
+  e.g. network boundary, process boundary, in-process data hiding
+- Separation of duties :: Avoid power users in a system with wide range of
+  unrelated permissions. Two parties are far more secure that one party to
+  authorize the execution of a critical function
+- Separation of privilege :: Two or more conditions must be met to authorize the
+  execution of a critical function
+
+** Secure design
+
+- Economy of design :: The design of protection mechanisms should be as simple
+  as possible to avoid undetected security flaws. Compose a minimal set of
+  standard-compliant, self-contained, universally applicable security controls
+- Open design :: The open security design composes standard-compliant protection
+  mechanisms without any design secrecy or design obscurity. Only passwords,
+  access keys, private keys, and encryption keys must be kept in secret
+- Zero trust security :: Do not trust by default. Verify authenticated
+  principals and authorized permissions by using strong authentication,
+  fine-grained authorization, audit trail, and security monitoring
 - Least common mechanism :: Minimize sharing of protection mechanisms between
   independent processes to limit unauthorized actions from a compromised system
