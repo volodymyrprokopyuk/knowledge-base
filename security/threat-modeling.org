@@ -1,27 +1,51 @@
 * Threat modeling
 
-- Threats :: A system exposes an attack surface of vulnerabilities that are
-  targeted by potential threats that pose security risks on the system. Security
-  risks can be mitigated by placing protection mechanisms, can be transferred to
-  third parties, or can be assumed as non critical
-- Threat modeling :: Identifies, assess, and prioritizes security risks by
-  enumerating the most probable threats that will cause the biggest impact on a
-  system, vulnerabilities, and attack vectors on the most valuable assets of a
-  system. Threats tend to cluster around data assets to steal and trust
-  boundaries to cross. Threat modeling is applied continuously through the
-  software development lifecycle and at different levels of abstraction e.g. C4
-  diagrams. Threat modeling uses system interaction diagrams, data flow
-  diagrams, and trust boundary crossing points to identify security risks. The
-  threat model is used to elaborate a prioritized list of protection mechanisms
-  to mitigate the identified risks
-- STRIDE threat taxonomy :: STRIDE categorizes the most impactful types of
-  threats
-  - Identity spoofing :: Impersonation. Strong authentication
-  - Tampering with data :: Unauthorized modification. Data integrity, data
-    encryption
-  - Repudiation and deniability :: Deniability of actions. Audit trail
-  - Information disclosure :: Unauthorized disclosure. Data encryption,
-    fine-grained authorization
-  - Denial of service :: System unavailability. Rate limiting, input validation
-  - Privilege elevation :: Abuse of high privileges. Separation of duty,
-    separation of privilege
+- Threats :: A system exposes *vulnerabilities* that are targeted by potential
+  *threats* that, in turn, pose *security risks* on the system. Threats can be
+  intentional and *malicious* e.g. DoS or unintentional and *incidental* e.g.
+  unavailable DB
+- Security risk :: Security risks can be *eliminated* by changing the design of
+  a system, can be *mitigated* by placing protection mechanisms, can be
+  *transferred* to third parties, or can be *assumed* as non-critical
+- Threat modeling :: Thread modeling identifies, assesses, and *prioritizes
+  security risks* posed by system vulnerabilities and attack vectors on the most
+  valuable assets of a system and trust boundaries of a system. Threats tend to
+  cluster around *data assets* to steal and *trust boundaries* to cross. Threat
+  modeling is applied continuously and iteratively through the *software
+  development lifecycle* stages: design, implementation, testing, deployment,
+  and operation, and at *different levels of abstraction* e.g. C4 context,
+  component, container, and code. Threat modeling uses system interaction
+  diagrams, data flow diagrams, and system trust boundaries to identify security
+  risks. Threat modeling prioritizes the most probable threats that will cause
+  the biggest impact on the system. The threat model is used to elaborate a
+  prioritized list of protection mechanisms to mitigate the identified security
+  risks
+- Threat modeling process :: Separate security from functionality. Place
+  security on top of functionality
+  - What are we doing? Data classification identifies *data assets* to steal.
+    Coarse-grained (ab)use cases and fine-grained user stories identify *trust
+    boundaries* to cross and grant *trust levels* to escalate. External
+    dependency analysis identifies *external systems* that extend the attack
+    surface
+  - What can go wrong? Threat modeling *prioritizes security risks* on exposed
+    areas and attack vectors using the *STRIDE threat taxonomy*
+  - What are we going to do about it? Mitigate prioritized security risks by
+    placing effective protection mechanisms
+- STRIDE threat taxonomy :: STRIDE categorizes threats into an easy to remember
+  taxonomy
+  - Identity spoofing :: Impersonation violates authenticity. Impersonation is
+    mitigated with strong authentication
+  - Tampering with data :: Unauthorized modification violates integrity.
+    Unauthorized modification is mitigated with fine-grained authorization and
+    data encryption
+  - Repudiation and deniability :: Deniability of actions violates
+    non-repudiation. Deniability of actions is mitigated with audit trail
+  - Information disclosure :: Unauthorized disclosure violates confidentiality.
+    Unauthorized disclosure is mitigated with fine-grained authorization and
+    data encryption
+  - Denial of service :: System unavailability violates availability. System
+    unavailability is mitigated with redundancy, automatic recovery, rate
+    limiting, and input validation
+  - Privilege elevation :: Abuse of high privileges violates authorization.
+    Abuse of high privileges is mitigated with strong authentication and
+    fine-grained authorization, separation of duty, separation of privilege

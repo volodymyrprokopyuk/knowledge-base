@@ -19,14 +19,6 @@
     ABAC considers context attributes, PBAC executes dynamic access policies
   - Audit :: Auditing tracks authorized actions of an authenticated principal
     creates by creating immutable audit trail records
-- Secure design :: Separate security from functionality. Place security on top
-  of functionality
-  - What are we doing? Data classification identifies key assets to steal and
-    trust boundaries to cross
-  - What can go wrong? Threat modeling priorities security risks on exposed
-    areas and attack vectors
-  - What are we going to do about it? Mitigate prioritized security risks by
-    placing effective security mechanisms
 - Authorization service ::
   - Policy administration point PAP :: PAP defines access policies and assigns
     access policies to principals, roles, and groups
