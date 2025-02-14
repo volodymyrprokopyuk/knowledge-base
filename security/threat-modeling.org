@@ -24,7 +24,7 @@
   security on top of functionality
   - What are we doing? Data classification identifies *data assets* to steal.
     Coarse-grained (ab)use cases and fine-grained user stories identify *trust
-    boundaries* to cross and grant *trust levels* to escalate. External
+    boundaries* to cross and grant *trust levels* to elevate. External
     dependency analysis identifies *external systems* that extend the attack
     surface
   - What can go wrong? Threat modeling *prioritizes security risks* on exposed

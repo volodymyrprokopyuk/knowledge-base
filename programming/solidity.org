@@ -649,9 +649,9 @@ import * as alias from "path"; // Import all symbols under an alias
 
 ** Security principles
 
-- Least privilege :: Grant only the minimum necessary rights to a subject to
-  perform an action. Enforce subject authorization with Solidity access control
-  modifiers
+- Least privilege :: Grant only the minimum necessary permissions to a principal
+  to perform an action. Enforce principal authorization with Solidity access
+  control modifiers
 - Least information :: Minimize the amount of data a function can access and
   modify
 - Defensive programming :: Perform input validate and check authN and authZ
@@ -663,11 +663,14 @@ import * as alias from "path"; // Import all symbols under an alias
   public, open for reviews and exploitation of vulnerabilities by anyone
 - Fail securely :: After a failure a contract must be in a secure state by
   handling errors gracefully
-- Blockchain properties can be manipulated by miners e.g. =block.hash=,
-  =block.timestamp=
-  - =block.timestamp= is imprecise on a blockchain
+- Blockchain properties :: Blockchain properties can be manipulated by miners
+  e.g. =block.hash=, =block.timestamp=
+  - =block.timestamp= is imprecise and should not be used as an entropy source
+    for randomness on a blockchain
   - Randomness is non-trivial on a blockchain. The source of entropy must be
     external to the blockchain (a randomness oracle)
+  - =block.number= is better used for time sensitive operations e.g.
+    activation, expiration
 
 ** Security mechanisms
 
@@ -718,23 +721,24 @@ contract C {
 
 - Checks-effects-interactions :: First perform all checks using the =require()=
   function. Then, make state changes by modifying state variables, even if
-  recorded actions are not performed yet. Finally, perform local actions, call
+  recorded actions are not yet performed. Finally, perform local actions, call
   external contracts. Avoid state changes after external calls
 - Isolate transactions :: Avoid combining multiple transactions into a single
   transaction. Avoid looping over an arbitrary large array whose processing may
-  reach the gas limit of a block and revert the whole transaction. Split a large
-  array into multiple blocks processed in isolated transactions
+  reach the gas limit of a block and revert the whole transaction (DoS). Split a
+  large array into multiple blocks processed in isolated transactions
 
 *** External calls
 
 - msg.sender vs tx.origin :: If a contact =A= calls a contract =B=, and a
   contract =B= calls a contract =C=, then in the contract =C= =tx.origin= is
   =A=, and =msg.sender= is =B=. Always use =msg.sender= for authorization. Never
-  use =tx.origin= for authorization
+  use =tx.origin= for authorization. ~require(tx.origin == msg.sender)~ prevents
+  intermediate contracts being used to call the current contract
 - Check low-level raw calls :: Explicitly handle the success bool return value
   of low-level raw calls operating on addresses e.g. ~addr.call()`,
-  ~addr.staticcall()~, ~addr.delegatecall()~. Calls on contract instances
-  ~ctr.function()~ revert automatically
+  ~addr.staticcall()~, ~addr.delegatecall()~. Unsuccessful calls on contract
+  instances ~ctr.function()~ revert automatically
 - External calls :: Treat external calls ~ctr.function()~ and external raw calls
   ~addr.call()~ to other contracts as a potential security risk
 - Do not delegate call to untrusted code :: The ~addr.delegatecall()~ executes
@@ -811,7 +815,7 @@ contract Relay is Registry {
     require(succ, ErrRelay(msg.data));
   }
 }
-      #+END_SRC
+  #+END_SRC
 
 ** Attacks
 
@@ -838,12 +842,12 @@ contract Relay is Registry {
 
 *** Reentrancy
 
-- Reentrancy :: A called external function performs an unanticipated call back
-  into the original calling function initiating multiple half-completed
-  executions of the original function leading to a cascade of state changes.
-  When a contract sends ether to an unauthorized address a a malicious called
-  function calls back to the original contract and reenters the process of
-  sending ether until all ether is sent or the gas limit is reached.
+- Reentrancy :: A called external function performs an unanticipated external
+  call back into the original calling function initiating multiple
+  half-completed executions of the original function leading to a cascade of
+  state changes. When a contract sends ether to an unauthorized address a
+  malicious called function calls back to the original contract and reenters the
+  process of sending ether until all ether is sent or the gas limit is reached.
   - Mitigation: use the checks-effects-interactions design pattern. No state
     change must occur after an external call. State changes after an external
     call enable the reentrancy vulnerability
@@ -880,7 +884,7 @@ contract Reentrant {
     (bool succ, ) = withdrawer.call{value: value}("");
     require(succ, ErrWithdraw(withdrawer));
     // UNSAFE state change AFTER the external call
-    // UNSAGE record the result of already executed action
+    // UNSAFE record the result of already executed action
     balances[withdrawer] = 0;
   }
 }
