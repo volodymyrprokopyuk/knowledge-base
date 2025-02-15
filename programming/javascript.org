@@ -640,24 +640,26 @@ console.log(res); // 2
 
 ** Generators
 
-- *Generator* is a new type of function that *does not run to completion** as a
-  regular function does, but *creates an iterator that controls execution of the
-  generator**, *suspends maintaining the internal state* at every =yield= and
-  resumes on each iteration call to ~it.next()~. =yield= is the
-  right-associative like ~=~ and ~?:~
+- Generator :: A generator is a new type of function that *does not run to
+  completion* as a regular function does, but *creates an iterator that
+  controls execution of the generator*, *suspends maintaining the internal
+  state* at every =yield= and resumes on each iteration call to ~it.next()~.
+  =yield= is the right-associative like ~=~ and ~? :~
 - Generator use cases
-    - On demand production of series of values through the iteration maintaining
-      the internal state
-    - Async flow control through the two-way message passing
-- *Two-way message passing**
+    - On demand production of values through the iteration maintaining an
+      internal state
+    - Async flow control through returning promises and the two-way message
+      passing
+- Two-way message passing ::
     - *Generator* src_js{ const y = yield x } yields =x= to the caller before
       suspending and receives =y= from the caller after resuming
-    - *Caller* `src_js{ const { value: x } = it.next(y) } receives =x= from a
+    - *Caller* `src_js{ const { value: x } = it.next(y) } receives =x= from the
       suspended generator, resumes the generator and passes =y= into the
       generator
-- Generator implements the *cooperative multitasking* by yielding control, not
-  preemptive multitasking by external context switch. A generator suspends
-  itself via =yield=, the iterator call ~it.next()~ resumes the generator
+- Cooperative multitasking :: a generator implements the cooperative
+  multitasking by yielding control, not preemptive multitasking by external
+  context switch. A generator suspends itself via =yield=, the iterator call
+  ~it.next()~ resumes the generator
   #+BEGIN_SRC js
 function* g(x) {
   console.log(x++)
@@ -686,32 +688,37 @@ const { value: b } = it.next(1)
 it.next(2) // 1, 2 (finishes the generator)
 console.log(a, b) // a, b
   #+END_SRC
-- *Early termination* via =break=, =return=, =throw= from the =for/of= loop
+- Early termination :: =break=, =return=, =throw= from the =for/of= loop
   automatically terminates the generator's iterator, or manually via
   ~it.return()~ or ~it.throw()~
   #+BEGIN_SRC js
-function* g(n) {
+function* infinite() {
   let i = 0
-  while (i < n) { yield i++ }
+  try {
+    while (true) {
+      yield i++
+    }
+  } finally {
+    console.log("finally")
+  }
 }
-for (const el of g(3)) { console.log(el) } // 0, 1, 2
-
-const infinite = function*() {
-  let v = 0
-  try { while (true) { yield v++ } }
-  finally { console.log("finally") }
+for (const i of infinite()) {
+  if (i > 3) {
+    break
+  }
+  console.log(i) // 0, 1, 2, 3, finally
 }
 const inf = infinite()
 for (const i of inf) {
-  if (i > 1) {
-    const { value } = inf.return("return")
+  if (i > 3) {
+    const {value} = inf.return("return")
     console.log(value)
   }
-  console.log(i) // 0, 1, finally, return, 2
+  console.log(i) // 0, 1, 2, 3, finally, return, 4
 }
   #+END_SRC
-- Generator expresses the *async flow control* in the sequential, sync-like form
-  through the async iteration of a generator
+- Sequential async flow control :: Generator expresses the *async flow control*
+  in a sequential, sync-like form through the async iteration of a generator
   #+BEGIN_SRC js
 function f(v, done) {
   setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
@@ -727,7 +734,7 @@ function* g() {
 const gen = g()
 gen.next() // true, oh
   #+END_SRC
-- *Promise-yielding generator* is the basis for =async/await=
+- Promise-yielding generator :: The basis for =async/await=
   #+BEGIN_SRC js
 function f(v) {
   return new Promise((resolve, reject) =>
@@ -745,16 +752,16 @@ const gen = g()
 gen.next().value.then(x => gen.next(x).value.then(y => gen.next(y)))
   .catch(e => console.log(e.message)) // true, oh
   #+END_SRC
-- =yield*= delegates for the *composition of generators*. =yield*= requires an
-  iterable ~[Symbol.iterator]~, it then invokes that iterable's iterator
-  ~it.next()~ and delegates generator's control to that iterator until it is
-  exhausted
+- Composition of generators :: =yield*= delegates for the *composition of
+  generators*. =yield*= requires an iterable ~[Symbol.iterator]~, it then
+  invokes that iterable's iterator ~it.next()~ and delegates generator's control
+  to that iterator until it is exhausted
   #+BEGIN_SRC js
 function* inner() { yield 2; yield 3 }
 function* outer() { yield 1; yield* inner(); yield 4 }
 for (const el of outer()) { console.log(el) } // 1, 2, 3, 4
   #+END_SRC
-- *Error handling* =try/catch= inside and outside of generators
+- Error handling :: =try/catch= inside and outside of generators
   #+BEGIN_SRC js
 function* g() {
   try { yield 1 }
