@@ -475,7 +475,7 @@ console.log(trampoline(tmap(a.fill(0), e => e + 1))) // no RangeError
 
 ** Callback
 
-- *Single-threaded event loop* the sequential execution *run to completion** on
+- Single-threaded event loop :: Sequential execution *run to completion** on
   every tick
   #+BEGIN_SRC js
 const events = [] // queue (FIFO)
@@ -487,84 +487,92 @@ while(true) {
   }
 }
   #+END_SRC
-- *Concurrency* splits two or more compound tasks into atomic steps, schedules
-  steps from all tasks to the event loop (interleave steps from different
-  tasks), executes steps in the event loop in order to progress simultaneously
-  on all tasks
-- *Callback* provides the strict separation between now (the current code) and
-  later (callback, the control delegation). Non-linear definition of a
-  sequential control flow and error handling, *trust issues due to the control
-  delegation* and to the *inversion of control* (continuations). A thrown error
-  is *not automatically propagated* through the chain of callbacks. =throw= is
-  not usable with callbacks
+- Concurrency :: Concurrency splits two or more compound tasks into atomic
+  steps, schedules steps from all tasks to the same event loop, executes steps
+  in the event loop interleaving steps from different tasks in order to progress
+  simultaneously on all tasks
+- Callback :: A callback provides strict separation between now (the current
+  code) and later (callback, the control delegation). *Non-linear* definition of
+  a sequential control flow and error handling. *Trust issues* due to the
+  *control delegation* and to the *inversion of control* (continuations). A
+  thrown *error is not automatically propagated* through the chain of callbacks.
+  =throw= is not usable with callbacks
   #+BEGIN_SRC js
-function timeoutify(f, timeout) {
-  const id = setTimeout(() => {
-    id = null; f(new Error("timeout"))
-  }, timeout)
+function timeoutify(f, t) {
+  let id = setTimeout(() => {
+    id = null
+    f(new Error("timeout"))
+  }, t)
   return (...args) => {
-    if (id) { clearTimeout(id); f(null, ...args) }
+    if (id) {
+      clearTimeout(id)
+      f(null, ...args)
+    }
   }
 }
-function f(e, v) { e ? console.error(e) : console.log(v) }
-const tf = timeoutify(f, 200)
-setTimeout(() => tf(1), 100) // 1
-  #+END_SRC
-- Callback testing
-  #+BEGIN_SRC js
-export function f(v, done) {
-  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+function f(err, ...args) {
+  if (err) {
+    console.error(err)
+  } else {
+    console.log(...args)
+  }
 }
-f(true, console.log) // null, true, control delegation = trust issue
-f(false, console.error) // oh
-describe("f", () => {
-  test("success", () => new Promise(done =>
-    f(true, (e, v) => { expect(v).toBe(true); done() })
-  ))
-  test("failure", () => new Promise(done =>
-    f(false, (e, v) => { expect(e.message).toBe("oh"); done() })
-  ))
+const tf = timeoutify(f, 200)
+setTimeout(() => tf(1, 2), 100) // 1, 2
+setTimeout(() => tf(1, 2), 300) // timeout
+  #+END_SRC
+- Callback testing ::
+  #+BEGIN_SRC js
+describe("callback test", () => {
+  function cb(v, done) {
+    setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+  }
+  test("callback success", () => new Promise(resolve => cb(1, (err, v) => {
+    expect(v).toBe(1)
+    resolve()
+  })))
+  test("callback failure", () => new Promise(resolve => cb(0, (err, v) => {
+    expect(err.message).toBe("oh")
+    resolve()
+  })))
 })
   #+END_SRC
 
 ** Promise
 
-- *Promise* a placeholder/proxy for a *future eventual value** trustable,
-  composable, time consistent, that is *guaranteed to be always async**. The
-  =resolve= and =reject= callabcks are guaranteed to be invoked *async at most
-  once and exclusively* either one or the other, even if a Promise is resolved
-  sync with a value, even if ~then()~ is called on an already settled Promise
+- Promise :: A promise is a placeholder/proxy for a *future eventual value*
+  trustable, composable, time consistent, that is *guaranteed to be always
+  async*. The =resolve= and the =reject= callabcks are guaranteed to be invoked
+  *async at most once and exclusively* either one or the other, even if a
+  Promise is resolved sync with a value, even if ~then()~ is called on an
+  already settled Promise
   #+BEGIN_SRC js
 Promise.resolve(1).then(console.log) // next tick
 console.log(2) // 2, 1
   #+END_SRC
-- *Promise* provides the *async composable flow control**. Multiple consumers
-  subscribe to a completion event of a producer that separates consumers from a
-  producer
-- *Thrown error* in either =resolve= or =reject= callback is *automatically
-  propagated* through the chain of promises as a rejection. =throw= is usable
-  with Promises
+- Composable flow control :: A promise provides an *async composable flow
+  control**. Multiple consumers subscribe to a completion event of a producer
+  that separates consumers from a producer
+- Error handling :: A thrown error in either a =resolve= or a =reject= callback
+  is *automatically propagated* through the chain of promises as a rejection.
+  =throw= is usable with Promises
 - Once a pending promise is settled, a *resolved value* or a *rejected error*
-  becomes *immutable*. Repeated calls to ~resolve()~ and ~reject()~ are ignored.
-  A promise *must be returned* to form a valid promise chain
+  becomes *immutable*. Repeated calls to a ~resolve()~ or a ~reject()~ are
+  ignored. A promise *must be returned* to form a valid promise chain
   #+BEGIN_SRC js
-function timeout(timeout) {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject("timeout"), timeout)
+function task(v, t) {
+  return new Promise((resolve, reject) => setTimeout(() =>
+    v ? resolve(v) : reject(new Error("oh")), t)
   )
 }
-function f(x, timeout) {
-  return new Promise(resolve =>
-    setTimeout(() => resolve(x), timeout)
-  )
-}
-Promise.race([f(1, 400), timeout(500)])
-  .then(console.log).catch(console.error) // 1
+Promise.race([task(0, 101), task(2, 100)])
+  .then(console.log).catch(console.error) // 2
   #+END_SRC
-- *Promises solve the trust issues* of callbacks by *inverting the callback
-  control delegation*. Promises don't get rid of callbacks, but they *let the
-  caller to control callbacks locally* via the ~p.then(cb)~ instead of passing
-  callabcks to the third party code as in the case of callbacks only approach
+- Promises are trusted :: *Promises solve the trust issues* of callbacks by
+  *inverting the callback control delegation*. Promises do not get rid of
+  callbacks, but they *let the caller to control callbacks locally* via the
+  ~p.then(cb)~ instead of passing callabcks to the third party code as in the
+  case of the callbacks only approach
 - ~Promise.resolve(x)~ normilizes values and misbehaving thenables to trustable
   and compliant promises
 - ~p.then()~ automatically and synchronously *creates a new Promise in a
@@ -584,66 +592,50 @@ Promise.resolve(1)
   .catch(e => { console.error(e.message); return 2 }) // for outgoing errors
   .then(console.log) // oh, 2 (back to normal)
   #+END_SRC
-- Promise testing
-  #+BEGIN_SRC js
-export function f(v) {
-  return new Promise((resolve, reject) =>
-    setTimeout(() => v ? resolve(v) : reject(new Error("oh")), 200)
-  )
-}
-f(true).then(console.log) // true, caller controls, no trust issues
-f(false).catch(console.error) // oh
-describe("f", () => {
-  test("success", () =>
-    f(true).then(v => expect(v).toBe(true))
-  )
-  test("failure", () =>
-    f(false).catch(e => expect(e.message).toBe("oh"))
-  )
-})
-  #+END_SRC
 - ~Promise.all([Promise])~ a gate that resolves with an array of all
   concurrently resolved promises or rejects with the first rejected promise
 - ~Promise.race([Promise])~ a latch that either resolves or rejects with the
   first settled promise. The other Promises cannot be canceled due to
   immutability, hence are settled and just ignored
 - Promises API
-    - src_js{ new Promise((resolve, reject) => {...}) }
-    - src_js{ Promise.resolve(x) }, src_js{ Promise.reject(x) }
-    - src_js{ p.then(success, [failure]) }, src_js{ p.catch(failure) }, src_js{
-      p.finally(always) }
-    - src_js{ Promise.all([]) => [all success] | first failure }
-    - src_js{ Promise.allSettled([]) => [all success | failure] }
-    - src_js{ Promise.race([]) => first success | first failure }
-    - src_js{ Promise.any([]) => first success | all failures }
+  - src_js{ new Promise((resolve, reject) => {...}) }
+  - src_js{ Promise.resolve(x) }, src_js{ Promise.reject(x) }
+  - src_js{ p.then(success, [failure]) }, src_js{ p.catch(failure) }, src_js{
+    p.finally(always) }
+  - src_js{ Promise.all([]) => [all success] | first failure }
+  - src_js{ Promise.allSettled([]) => [all success | failure] }
+  - src_js{ Promise.race([]) => first success | first failure }
+  - src_js{ Promise.any([]) => first success | all failures }
 - Callback => Promise = converts a callback-based function into a
   promise-returning function
   #+BEGIN_SRC js
-function f(v, done) {
-  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 200)
+function task(v, done) {
+  setTimeout(() => v ? done(null, v) : done(new Error("oh")), 100)
 }
 function promisify(f) {
   return function(...args) {
     return new Promise((resolve, reject) => {
-      args = [...args, (e, v) => e ? reject(e) : resolve(v)]
-      f(...args)
+      f(...args, (err, ...args) =>
+        err ? reject(err) : resolve(...args)
+      )
     })
   }
 }
-const ff = promisify(f)
-ff(true).then(console.log) // true
-ff(false).catch(console.error) // oh
+const taskp = promisify(task)
+taskp(1).then(console.log) // 1
+taskp(0).catch(console.error) // oh
   #+END_SRC
-- Sequential composition of promises
+- Sequential composition of promises ::
   #+BEGIN_SRC js
-function f(v) { return new Promise(
-  resolve => setTimeout(() => resolve(v + 1), 100)
-)}
-const p = [f, f].reduce((p, f) => p.then(f), Promise.resolve(1))
-p.then(console.log) // 3
-let r = 1
-for (const ff of [f, f]) { r = await ff(r) }
-console.log(r) // 3
+function inc(v) {
+  return new Promise(resolve => setTimeout(() => resolve(v + 1), 100))
+}
+let res = 0
+for (const f of [inc, inc]) {
+  res = await f(res)
+}
+console.log(res); // 2
+[inc, inc].reduce((res, f) => res.then(f), Promise.resolve(0)).then(console.log) // 2
   #+END_SRC
 
 ** Generators
@@ -779,13 +771,13 @@ try {
 
 ** Testing (bun test)
 
-- *Run tests* in the =*.test.js= files
-  #+BEGIN_SRC fish
-bun test --coverage file.test.js -t reTest
+- Run tests :: Tests are in the ~*.test.js~ files
+  #+BEGIN_SRC nushell
+bun test --coverage *.test.js -t reTest
   #+END_SRC
-- Suites, tests, *life cycle hooks*, *assertions*
+- Suites, tests, life cycle hooks, assertions ::
   #+BEGIN_SRC js
-// The bun transpiler automatically injected the import
+// The bun transpiler automatically injectes the import
 // There is no need for the explicit import
 import { describe, test, expect } from "bun:test"
 import { beforeAll, beforeEach, afterAll, afterEach } from "bun:test"
@@ -799,29 +791,29 @@ describe("assertions suite", () => {
   beforeEach(() => console.log("before each"))
   afterEach(() => console.log("after each"))
   test("assertions test", () => { // nested local testing context
-    const o = { a: 1 }, o2 = o
+    const o = {a: 1}, o2 = o
     expect(1).toBe(1) // primitive values via Object.is()
     expect(o).toBe(o2) // same object reference via Object.is()
     expect(0.1 + 0.2).not.toBe(0.3) // rounding error
     expect(0.1 + 0.2).toBeCloseTo(0.3, 5) // float point assertion
     expect(typeof 1).toBe("number") // type assertion
     expect(new Number(1) instanceof Number).toBe(true) // instance assertion
-    expect(o).not.toBe({ a: 1 }) // not the same object reference
-    expect(o).toEqual({ a: 1 }) // recursive content for object/array
+    expect(o).not.toBe({a: 1}) // not the same object reference
+    expect(o).toEqual({a: 1}) // recursive content for object/array
     expect(() => { throw new Error("oh") }).toThrow(/oh/) // error function
   })
 })
   #+END_SRC
-- *Custom matchers*
+- Custom matchers ::
   #+BEGIN_SRC js
 // expect(v).toCustomMatcher(a, b) => toCustomMatcher(v, a, b)
 function toBeWithinRange(v, a, b) {
   const pass = v >= a && v <= b
   const message = () => // error message when the matcher does not pass
     `expected ${v}${pass ? " not " : " " }to be within range ${a}..${b}`
-  return { pass, message } // return an object or a Promise to an object
+  return {pass, message} // return an object or a Promise to an object
 }
-expect.extend({ toBeWithinRange })
+expect.extend({toBeWithinRange})
 describe("custom matcher", () => {
   test("range matcher", () => {
     expect(2).toBeWithinRange(1, 3)
@@ -829,7 +821,7 @@ describe("custom matcher", () => {
   })
 })
   #+END_SRC
-- *Promise testing*, *async testing*
+- Promise testing and async testing ::
   #+BEGIN_SRC js
 describe("promise", () => {
   function task(v) {
@@ -839,22 +831,27 @@ describe("promise", () => {
   }
   test("promise then/catch", () => {
     task(1).then(v => expect(v).toBe(1))
-    task(0).catch(e => expect(e.message).toBe("oh"))
+    task(0).catch(err => expect(err.message).toBe("oh"))
   })
   test("promise async/await", async () => {
-    const v = await task(1)
-    expect(v).toBe(1)
+    expect(await task(1)).toBe(1)
     expect(async () => await task(0)).toThrow(/oh/)
-    try { await task(0) }
-    catch(e) { expect(e.message).toBe("oh") }
+    await expect(task(1)).resolves.toBe(1)
+    await expect(task(0)).rejects.toThrow(/oh/)
+    await expect(() => task(0)).toThrow(/oh/)
+    try {
+      await task(0)
+    } catch (err) {
+      expect(err.message).toBe("oh")
+    }
   })
   // .resolves/.rejects unwraps a Promise value/error to apply sync assertions
   // However, all assertions now return a Promise, hence => await expect(...)
   test("resolves", async () => await expect(task(1)).resolves.toBe(1))
-  test("rejectrs", async () => await expect(task(0)).rejects.toThrow(/oh/))
+  test("rejects", async () => await expect(task(0)).rejects.toThrow(/oh/))
 })
   #+END_SRC
-- *Parameterized tests*
+- Parameterized tests ::
   #+BEGIN_SRC js
 describe("parameterized", () => {
   test.each([
@@ -863,23 +860,23 @@ describe("parameterized", () => {
     expect(a + b).toBe(exp)
   )
   test.each([
-    { a: 1, b: 2, exp: 3 }, { a: 4, b: 5, exp: 9 }
-  ])("object sum($a, $b) === $exp", ({ a, b, exp }) => // object destructuring
+    {a: 1, b: 2, exp: 3}, {a: 4, b: 5, exp: 9}
+  ])("object sum($a, $b) === $exp", ({a, b, exp}) => // object destructuring
     expect(a + b).toBe(exp)
   )
 })
   #+END_SRC
-- *Test context* through a shared variable
+- Shared test context :: A shared test context through a shared variable
   #+BEGIN_SRC js
 describe("test context", () => {
-  let ctx = { }
+  let ctx = {}
   beforeEach(() => ctx.n = 10) // set up a test local context
   afterEach(() => delete ctx.n) // tear down a test local context
   test("context setup", () => expect(ctx.n + 1).toBe(11))
   test("context reset", () => expect(ctx.n - 1).toBe(9))
 })
   #+END_SRC
-- *Spies* and *mocks*
+- Spies and mocks ::
   #+BEGIN_SRC js
 describe("spies and mocks", () => {
   afterAll(() => mock.restore()) // restore all mocked functions, not modules
