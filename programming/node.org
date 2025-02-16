@@ -123,7 +123,7 @@ console.log(await sumFirstNP(10, 2)) // 55
   ~process.on(unchaughtException)~ is emitted and the *process exits* with a
   non-zero exit code
 
-*** Even loop blocking
+*** Event loop blocking
 
 - Even loop blocking :: *Sync CPU-bound operations* in a callback *block the
   event loop* and put on hold all concurrent processing blocking the whole
@@ -244,162 +244,220 @@ parallel([task, task, error, task], console.log) // 1, 1, oh, 1
 parallel([], console.log) // null, 0
   #+END_SRC
 
-- *Limited parallel execution* (sync loop until a limit) = executes at most N
-  tasks in parallel until all complete or the first error
-    #+BEGIN_SRC js
-    function parallelLimit(tasks, { limit = 2 }, done) {
-      let completed = 0, running = 0, i = 0
-      function next(err) {
-        if (err) { return done(err) }
-        if (++completed === tasks.length) { return done(null) }
-        if (--running < limit) { parallel() }
+*** Limited parallel execution
+
+- Limited parallel execution :: A limited parallel execution executes at most N
+  async tasks in parallel (limited) until all tasks successfully complete or the
+  first error
+  #+BEGIN_SRC js
+function parallelLimit(tasks, limit, done) {
+  let i = 0, running = 0, completed = 0
+  function cb(err, v) {
+    if (err) {
+      done(err) // stop the parallel on the first error
+    } else {
+      running--
+      if (++completed === tasks.length) {
+        done(null, v) // complete the parallel with the last async result
+      } else {
+        runLimit(v) // start up to limit async tasks in parallel
       }
-      function parallel() {
-        while (i < tasks.length && running < limit) {
-          tasks[i++](next); ++running
-        }
-      }
-      if (tasks.length === 0) { queueMicrotask(() => done(null)) }
-      parallel()
     }
-    // 1, 2 | 3, 4 | 5, null
-    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
-    // 1, 2 | 3, oh | 4
-    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
-    parallelLimit(tasks, { limit: 2 }, console.log)
-    parallelLimit([], { }, console.log) // null
-    #+END_SRC
+  }
+  function runLimit(v) {
+    while (running < limit && i < tasks.length) {
+      running++
+      queueMicrotask(() => tasks[i++](v, cb))
+    }
+  }
+  if (tasks.length === 0) {
+    queueMicrotask(() => done(null, 0))
+  } else {
+    runLimit(1) // start up to limit async tasks in parallel
+  }
+}
+// 1, 1; 2, 2; 3, null, 4
+parallelLimit([task, task, task, task, task], 2, console.log)
+// 1, 1; 2, oh; 3
+parallelLimit([task, task, task, error, task], 2, console.log)
+parallelLimit([], 2, console.log) // null, 0
+  #+END_SRC
 
 ** Observer pattern
 
-- *Observer* = `EventEmitter` continuously notifies *multiple
-  observers/listeners* on its state changes through different types of
-  recurrent events. `EventEmitter` *does not have trust issues* = a callback
+*** Event emitter
+
+- Observer :: An =EventEmitter= continuously *notifies multiple observers*
+  subscribed with listeners on state changes through different types of
+  recurrent events. =EventEmitter= *does not have trust issues* as the callback
   is controlled by a caller
-- Events are *guaranteed to fire async* in the next cycle of the event loop.
-  However, `ee.emit()` is called sync for all registered listeners. Combining
-  `EventEmitter` with the callback interface is an elegant and flexible solution
-- `EventEmitter` = registers multiple `function listener(event, ...args)` for
-  specific event types `ee.on|once(event, listener)`. Synchronously
-  `ee.emit(event, ...args)` for all registered listeners.
-  `ee.removeListener(event, listener)` unsubscribes a listeners when it is no
-  longer needed to avoid memory leaks due to captured context in listener
-  closures. If `ee.on(error, ...args)` is not registered an `Error` is thrown.
-  Always register a listener for the `error` event
-- Async result/error is propagated through `emit` events. Never `return` a
-  result or `throw` an error from an `EventEmitter` (`return` and `throw` are
-  unusable with `EventEmitter`)
-    #+BEGIN_SRC js
-    import { EventEmitter } from "node:events"
-    class EE extends EventEmitter { }
-    const ee = new EE()
-    ee.on("error", err => console.error(err.message))
-    ee.on("start", console.log)
-    ee.on("start", function () { this.emit("error", new Error("oh")) })
-    setTimeout(() => ee.emit("start", 1), 500) // 1, oh
-    #+END_SRC
+- Async events :: Events are *guaranteed to fire async* in the next cycle of the
+  event loop. However, ~ee.emit()~ is called sync for all registered listeners
+- Event emitter :: =EventEmitter= registers multiple ~function listener(event,
+  ...args)~ for specific event types ~ee.on|once(event, listener)~.
+  Synchronously ~ee.emit(event, ...args)~ for all registered listeners.
+  ~ee.removeListener(event, listener)~ unsubscribes a listeners when it is no
+  longer needed to prevent memory leaks due to captured context in listener
+  closures
+
+*** Error handling
+
+- Result and error propagation :: Async result and error is propagated through
+  ~emit~ events. Never ~return~ a result or ~throw~ an error from an
+  ~EventEmitter~. ~return~ and ~throw~ are unusable with ~EventEmitter~
+- Error handling :: If ~ee.on(error, ...args)~ is not registered an ~Error~ is
+  thrown. Always register a listener for the ~error~ event
+  #+BEGIN_SRC js
+import { EventEmitter } from "node:events"
+class EE extends EventEmitter {}
+const ee = new EE()
+ee.on("error", console.error)
+ee.on("start", console.log)
+ee.on("start", () => ee.emit("error", new Error("oh")))
+setTimeout(() => ee.emit("start", 1), 100) // 1, oh
+  #+END_SRC
 
 ** Promise pattern
+*** Sequential execution
 
-- Sync code has an *ever-growing* list of `.on(uncaughtExeption)`. Promise
-  code has a *growing-and-shrinking* list of `.on(unhandledRegection)` as a
-  rejection can be handled later when a rejected promise gets a rejection
-  handler
-- *Sequential iteration* (dynamic promise chain in a sync loop)
-    #+BEGIN_SRC js
-    function task(v) {
-      return new Promise((resolve, reject) =>
-        setTimeout(
-          () => v ? (console.log(v), resolve()) : reject(new Error("oh")), 500
-        )
-      )
-    }
-    function sequence(tasks) {
-      let p = Promise.resolve()
-      for (const task of tasks) { p = p.then(task) }
-      return p
-    }
-    // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => () => task(el))
-    // 1, 2, oh
-    const tasks = [1, 2, 0, 3].map(el => () => task(el))
-    sequence(tasks).then(console.log, console.error)
-    sequence([]).then(console.log, console.error) // undefined
-    #+END_SRC
-- *Parallel execution* (sync loop for all tasks)
-    #+BEGIN_SRC js
-    function parallel(tasks) {
-      return new Promise ((resolve, reject) => {
-        let completed = 0
-        function next() {
-          if (++completed === tasks.length) { return resolve() }
+- Sequential execution ::
+  #+BEGIN_SRC js
+function task(v) {
+  return new Promise(resolve =>
+    setTimeout(() => {
+      console.log(v)
+      resolve(v + 1)
+    }, 500)
+  )
+}
+function error() {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("oh")), 500)
+  )
+}
+function sequence(tasks) {
+  if (tasks.length === 0) {
+    return Promise.resolve(0)
+  }
+  let res = Promise.resolve(1)
+  for (const task of tasks) {
+    res = res.then(task) // dynamically build a chain of promises
+  }
+  return res
+}
+sequence([task, task, task]).then(console.log) // 1, 2, 3, 4
+sequence([task, task, error, task]).then(console.log) // 1, 2, oh
+sequence([]).then(console.log) // 0
+  #+END_SRC
+
+*** Parallel execution
+
+- Parallel execution ::
+  #+BEGIN_SRC js
+function parallel(tasks) {
+  const res = Array(tasks.length)
+  if (tasks.length === 0) {
+    return Promise.resolve(res)
+  }
+  let completed = 0
+  return new Promise((resolve, reject) => {
+    function done(i) {
+      return function(v) {
+        res[i] = v // record a promise result
+        if (++completed == tasks.length) {
+          resolve(res) // complete the parallel with results of all promises
         }
-        if (tasks.length === 0) { return resolve() }
-        for (const task of tasks) { task().then(next, reject) }
-      })
+      }
     }
-    // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => () => task(el))
-    // 1, 2, oh, 3
-    const tasks = [1, 2, 0, 3].map(el => () => task(el))
-    parallel(tasks).then(console.log, console.error)
-    parallel([]).then(console.log, console.error) // undefined
-    #+END_SRC
-- *Limited parallel execution* (sync loop until a limit)
-    #+BEGIN_SRC js
-    function parallelLimit(tasks, limit = 2) {
-      return new Promise((resolve, reject) => {
-        let completed = 0, running = 0, i = 0
-        function next() {
-          if (++completed === tasks.length) { return resolve() }
-          if (--running < limit) { parallel() }
-        }
-        function parallel() {
-          while (i < tasks.length && running < limit) {
-            tasks[i++]().then(next, reject); ++running
-          }
-        }
-        if (tasks.length === 0) { return resolve() }
-        parallel()
-      })
+    for (let i = 0; i < tasks.length; i++) {
+      // start all promises at once
+      // stop the parallel on the first rejection
+      tasks[i](1).then(done(i), reject)
     }
-    // 1, 2 | 3, 4 | 5, undefined
-    const tasks = [1, 2, 3, 4, 5].map(el => () => task(el))
-    // 1, 2, | 3, oh | 4
-    const tasks = [1, 2, 3, 0, 4].map(el => () => task(el))
-    parallelLimit(tasks, 2).then(console.log, console.error)
-    parallelLimit([]).then(console.log, console.error) // undefined
-    #+END_SRC
+  })
+}
+parallel([task, task, task]).then(console.log) // 1, 1, 1, [2, 2, 2]
+parallel([task, task, error, task]).then(console.log) // 1, 1, 1, oh
+parallel([]).then(console.log) // []
+  #+END_SRC
+
+*** Limited parallel execution
+
+- Limited parallel execution ::
+  #+BEGIN_SRC js
+function parallelLimit(tasks, limit) {
+  const res = Array(tasks.length)
+  if (tasks.length === 0) {
+    return Promise.resolve(res)
+  }
+  let i = 0, running = 0, completed = 0
+  return new Promise((resolve, reject) => {
+    function done(i) {
+      return function(v) {
+        res[i] = v
+        running--
+        if (++completed === tasks.length) {
+          resolve(res)
+        } else {
+          runLimit(v)
+        }
+      }
+    }
+    function runLimit(v) {
+      while (running < limit && i < tasks.length) {
+        running++
+        tasks[i](v).then(done(i), reject)
+        i++
+      }
+    }
+    runLimit(1)
+  })
+}
+// 1, 1; 2, 2; 3, [2, 2, 3, 3, 4]
+parallelLimit([task, task, task, task, task], 2).then(console.log)
+// 1, 1; 2, oh
+parallelLimit([task, task, task, error, task], 2).then(console.log)
+parallelLimit([], 2).then(console.log) // []
+  #+END_SRC
 
 ** Async/await pattern
+*** Async function
 
-- `async` function *always returns a Promise* immediately and synchronously.
-  `try/catch/throw` inside an `async` function/generator work for both sync and
-  async code. Use `return await` or `yield await` to prevent errors on the
-  caller side and `catch` errors locally within an async function/generator
-    #+BEGIN_SRC js
-    async function localError() {
-      try { return task(false) } // Caller oh
-      try { return await task(false) } // Local oh
-      catch (err) { console.error("Local", err.message) }
-    }
-    localError().catch(err => console.error("Caller", err.message))
-    #+END_SRC
-- `async` function is a `Promise`-`yield`ing generator that on each `await`
-  expression `yield`s a Promise and suspends the generator, its internal state
-  is preserved and control is returned to the event loop. When the Promise that
-  has been `await`ed settles, control is given back to the `async` function and
-  the generator resumes
-- `Promise` *abstraction* and `async/await` *syntax* is used to manage async
-  operations in a *sync-like manner*. However, if async operations are
-  unrelated, `await` introduces unnecessary blocking. Do not use `await` inside
-  a loop, use `Promise.all()` instead
-    #+BEGIN_SRC js
-    console.log(await task(1), await task(2)) // sequence, slow
-    console.log(await Promise.all([task(1), task(2)])) // parallel, fast
-    #+END_SRC
-- *Sequential iteration* (sync loop with await)
-    #+BEGIN_SRC js
+- Async function :: An =async= function *always returns a Promise* immediately
+  and synchronously. Async function is a *promise-yielding generator* that *on
+  each await expression yields a promise* and suspends the generator. The
+  internal state of the generator is preserved and *control is returned to the
+  event loop*. When the promise that has been awaited settles, control is given
+  back to the async function and the generator resumes
+- async/await and Promise :: The =Promise= abstraction and the ~async/await~
+  syntax is used to manage *async operations in a sync-like syntax*.
+- await sequencing :: =await= sequencing introduces unnecessary blocking for
+  unrelated operations. Use =Promise.all()= instead
+  #+BEGIN_SRC js
+console.log(await task(1), await task(2)) // sequence, slow
+console.log(await Promise.all([task(1), task(2)])) // parallel, fast
+  #+END_SRC
+
+*** Error handling
+
+- return await, yield await :: ~try/catch/throw~ inside an async function or a
+  generator works for both sync and async code. Use =return await= or =yield
+  await= to *prevent errors on the caller side* and *catch errors locally*
+  within the async function or a generator
+  #+BEGIN_SRC js
+async function localError() {
+  try {
+    return Promise.reject(new Error("oh")) // Caller error oh
+    return await Promise.reject(new Error("oh")) // Local error oh
+  } catch (err) {
+    console.error("Local error", err)
+  }
+}
+localError().catch(err => console.error("Caller error", err))
+  #+END_SRC
+
+- *Sequential execution* (sync loop with await)
+  #+BEGIN_SRC js
     async function sequence(tasks) {
       for (const task of tasks) { await task() }
     }
@@ -410,9 +468,9 @@ parallel([], console.log) // null, 0
     try { console.log(await sequence(tasks)) }
     catch (err) { console.error(err.message) }
     console.log(await sequence([])) // undefined
-    #+END_SRC
+  #+END_SRC
 - *Parallel execution* (await loop)
-    #+BEGIN_SRC js
+  #+BEGIN_SRC js
     // Use the prallel() from the Promise pattern above
     // 1, 2, 3, undefined
     const tasks = [1, 2, 3].map(el => () => task(el))
@@ -421,9 +479,9 @@ parallel([], console.log) // null, 0
     try { console.log(await parallel(tasks)) }
     catch (err) { console.error(err.message) }
     console.log(await parallel([])) // undefined
-    #+END_SRC
+  #+END_SRC
 - *Limited parallel execution*
-    #+BEGIN_SRC js
+  #+BEGIN_SRC js
     // Use the parallelLimit() from the Promise pattern above
     // 1, 2 | 3, 4 | 5, undefined
     const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
@@ -432,7 +490,7 @@ parallel([], console.log) // null, 0
     try { console.log(await parallelLimit(tasks, 2)) }
     catch (err) { console.error(err.message) }
     console.log(await parallelLimit([], 2)) // undefined
-    #+END_SRC
+  #+END_SRC
 
 ** Stream pattern
 
