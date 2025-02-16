@@ -427,12 +427,12 @@ parallelLimit([], 2).then(console.log) // []
   and synchronously. Async function is a *promise-yielding generator* that *on
   each await expression yields a promise* and suspends the generator. The
   internal state of the generator is preserved and *control is returned to the
-  event loop*. When the promise that has been awaited settles, control is given
-  back to the async function and the generator resumes
+  event loop*. When the *promise settles*, control is returned back to the async
+  function and the generator resumes
 - async/await and Promise :: The =Promise= abstraction and the ~async/await~
   syntax is used to manage *async operations in a sync-like syntax*.
 - await sequencing :: =await= sequencing introduces unnecessary blocking for
-  unrelated operations. Use =Promise.all()= instead
+  unrelated operations. Use =Promise.all([Promise])= instead
   #+BEGIN_SRC js
 console.log(await task(1), await task(2)) // sequence, slow
 console.log(await Promise.all([task(1), task(2)])) // parallel, fast
@@ -440,7 +440,7 @@ console.log(await Promise.all([task(1), task(2)])) // parallel, fast
 
 *** Error handling
 
-- return await, yield await :: ~try/catch/throw~ inside an async function or a
+- return await, yield await :: ~try/catch/throw~ inside an =async= function or a
   generator works for both sync and async code. Use =return await= or =yield
   await= to *prevent errors on the caller side* and *catch errors locally*
   within the async function or a generator
@@ -456,40 +456,54 @@ async function localError() {
 localError().catch(err => console.error("Caller error", err))
   #+END_SRC
 
-- *Sequential execution* (sync loop with await)
+*** Sequential execution
+
+- Sequential execution ::
   #+BEGIN_SRC js
-    async function sequence(tasks) {
-      for (const task of tasks) { await task() }
-    }
-    // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => () => task(el))
-    // 1, 2, oh
-    const tasks = [1, 2, 0, 3].map(el => () => task(el))
-    try { console.log(await sequence(tasks)) }
-    catch (err) { console.error(err.message) }
-    console.log(await sequence([])) // undefined
+async function sequence(tasks) {
+  if (tasks.length === 0) {
+    return Promise.resolve(0)
+  }
+  let res = 1
+  for (const tsk of tasks) {
+    res = await tsk(res) // start the sequence of async tasks
+  }
+  return Promise.resolve(res)
+}
+console.log(await sequence([task, task, task])) // 1, 2, 3, 4
+try {
+  await sequence([task, task, error, task])
+} catch (err) { // catch async errors
+  console.error(err) // 1, 2, oh
+}
+console.log(await sequence([])) // 0
   #+END_SRC
-- *Parallel execution* (await loop)
+
+*** Parallel execution
+
+- Parallel execution ::
   #+BEGIN_SRC js
-    // Use the prallel() from the Promise pattern above
-    // 1, 2, 3, undefined
-    const tasks = [1, 2, 3].map(el => () => task(el))
-    // 1, 2, oh, 3
-    const tasks = [1, 2, 0, 3].map(el => () => task(el))
-    try { console.log(await parallel(tasks)) }
-    catch (err) { console.error(err.message) }
-    console.log(await parallel([])) // undefined
+console.log(await parallel([task, task, task])) // 1, 1, 1, [2, 2, 2]
+try {
+  await parallel([task, task, error, task])
+} catch (err) {
+  console.error(err) // 1, 1, oh
+}
+console.log(await parallel([])) // []
   #+END_SRC
-- *Limited parallel execution*
+
+*** Limited parallel execution
+
+- Limited parallel execution ::
   #+BEGIN_SRC js
-    // Use the parallelLimit() from the Promise pattern above
-    // 1, 2 | 3, 4 | 5, undefined
-    const tasks = [1, 2, 3, 4, 5].map(el => done => task(el, done))
-    // 1, 2, | 3, oh | 4
-    const tasks = [1, 2, 3, 0, 4].map(el => done => task(el, done))
-    try { console.log(await parallelLimit(tasks, 2)) }
-    catch (err) { console.error(err.message) }
-    console.log(await parallelLimit([], 2)) // undefined
+1, 1; 2, 2; 3, [2, 2, 3, 3, 4]
+console.log(await parallelLimit([task, task, task, task, task], 2))
+try {
+  await parallelLimit([task, task, task, error, task], 2)
+} catch (err) {
+  console.error(err) // 1, 1; 2, oh
+}
+console.log(await parallelLimit([], 2)) // []
   #+END_SRC
 
 ** Stream pattern
@@ -658,134 +672,142 @@ localError().catch(err => console.error("Caller error", err))
 
 ** Child process
 
-- `spawn(cmd, args, opts): ChildProcess` executes a *command from a PATH*.
-  Async foundation for all tools below. `ChildProcess` extends `EventEmitter`
-    #+BEGIN_SRC js
-    import { spawn } from "node:child_process"
-    const ls = spawn("ls", ["-lah", "/usr/lib"])
-    ls.on("error", console.error)
-    ls.on("close", exitCode => console.log(exitCode))
-    ls.stdout.setEncoding("utf8")
-    ls.stdout.on("data", console.log)
-    ls.stderr.setEncoding("utf8")
-    ls.stderr.on("data", console.error)
-    #+END_SRC
-- `exec(cmd, opts, done): ChildProcess` executes a *shell command*
-    #+BEGIN_SRC js
-    import { exec } from "node:child_process"
-    exec("for x in a b c; do echo $x; done", (err, stdout, stderr) => {
-      if (err) { return console.log(err) }
-      console.log(stdout) // a b c
-    })
-    #+END_SRC
-    #+BEGIN_SRC js
-    import { promisify } from "node:util"
-    import { exec } from "node:child_process"
-    const execp = promisify(exec)
-    try {
-      const { stdout, stderr } =
-            await execp("echo a b c | tr '[:lower:]' '[:upper:]'")
-      console.log(stdout) // A B C
-    } catch (err) { console.error(err) }
-    #+END_SRC
-- `execFile(file, args, opts, done): ChildProcess` executes a *command from a
-   file* without a shell
-    #+BEGIN_SRC js
-    import { execFile } from "node:child_process"
-    execFile("/usr/bin/bun", ["--version"], (err, stdout, stderr) => {
-      if (err) { return console.log(err) }
-      console.log(stdout) // 1.0.7
-    })
-    #+END_SRC
-- `fork(module, args, opts): ChildProcess` forks a *Node.js child process*
-  with a bidirectional IPC channel
-    #+BEGIN_SRC js
-    import { fork } from "node:child_process"
-    const [_, file, args] = process.argv
-    if (args === "child") { // child
-      // recieve a signal and close the IPC channel with a parent
-      process.on("SIGUSR2", process.disconnect)
-      process.on("message", msg => { // receive a message from a parent
-        console.log("chd", msg)
-        process.send({ res: "chd => par" }) // send a amessage to a parent
-      })
-    } else { // parent
-      const child = fork(file, ["child"]) // fork a Node.js child process
-      child.on("error", err => console.error("par", err))
-      child.on("close", exitCode => console.log("par", exitCode))
-      // send a message to a child once a child is spawned
-      child.on("spawn", () => child.send({ req: "par => chd" }))
-      child.on("message", msg => { // receive a message from a child
-        console.log("par", msg)
-        child.kill("SIGUSR2") // send a signar to a child
-      })
-    }
-    #+END_SRC
+- External command from the PATH :: ~spawn(cmd, args, opts): ChildProcess~
+  executes a command from the PATH. The =ChildProcess= extends the
+  =EventEmitter=
+  #+BEGIN_SRC js
+import {spawn} from "node:child_process"
+const ls = spawn("ls", ["-lah", "/usr/lib"])
+ls.on("error", console.error)
+ls.on("close", exitCode => console.log(exitCode))
+ls.stdout.setEncoding("utf8")
+ls.stdout.on("data", console.log)
+ls.stderr.setEncoding("utf8")
+ls.stderr.on("data", console.error)
+  #+END_SRC
+- Shell command :: ~exec(cmd, opts, done): ChildProcess~ executes a shell
+  command. The =ChildProcess= extends the =EventEmitter=
+  #+BEGIN_SRC js
+import {exec} from "node:child_process"
+exec("for x in a b c; do echo $x; done", (err, stdout, stderr) => {
+  if (err) {
+    return console.error(err)
+  }
+  console.log(stdout) // a b c
+})
+  #+END_SRC
+  #+BEGIN_SRC js
+import {promisify} from "node:util"
+import {exec} from "node:child_process"
+const execp = promisify(exec)
+try {
+  const {stdout, stderr} = await execp("echo a b c | tr '[:lower:]' '[:upper:]'")
+  console.log(stdout) // A B C
+} catch (err) {
+  console.error(err)
+}
+  #+END_SRC
+- Command from a file :: ~execFile(file, args, opts, done): ChildProcess~
+  executes a command from a file without a shell
+  #+BEGIN_SRC js
+import {execFile} from "node:child_process"
+execFile("/usr/bin/bun", ["--version"], (err, stdout, stderr) => {
+  if (err) {
+    return console.error(err)
+  }
+  console.log(stdout) // 1.0.7
+})
+  #+END_SRC
+- Fork Node.js child process :: ~fork(module, args, opts): ChildProcess~ forks a
+  Node.js child process with an *async bidirectional IPC channel* with its
+  parent
+  #+BEGIN_SRC js
+import {fork} from "node:child_process"
+const [_, file, args] = process.argv
+if (args === "child") { // child
+  // recieve a signal and close the IPC channel with a parent
+  process.on("SIGUSR2", process.disconnect)
+  process.on("message", msg => { // receive a message from a parent
+    console.log("chd", msg)
+    process.send({res: "chd => par"}) // send a amessage to a parent
+  })
+} else { // parent
+  const child = fork(file, ["child"]) // fork a Node.js child process
+  child.on("error", err => console.error("par", err))
+  child.on("close", exitCode => console.log("par", exitCode))
+  // send a message to a child once a child is spawned
+  child.on("spawn", () => child.send({req: "par => chd"}))
+  child.on("message", msg => { // receive a message from a child
+    console.log("par", msg)
+    child.kill("SIGUSR2") // send a signar to a child
+  })
+}
+  #+END_SRC
 
 ** Worker thread
 
-- `new Worker(module, opts)` creates an independent, dedicated *thread for
-  CPU-bound tasks* executed in parallel with the main thread event loop. A
-  Worker has an async *bidirectional communication channel* with its parent
-  `parentPort/worker.postMessage()/.on(message)`, per-thread *own event loop*,
-  and a separate V8 instance (small memory footprint, fast startup time, safe:
-  no synchronization, *no resource sharing*, no race conditions). All
-  communication over a channel between a parent and a Worker is serialized and
-  deserialized
-    #+BEGIN_SRC js
-    import {
-      Worker, isMainThread, parentPort, workerData,
-      setEnvironmentData, getEnvironmentData
-    } from "node:worker_threads"
-    const [_, file] = process.argv
-    if (isMainThread) { // main thread
-      // parameterize a worker before creation of a worker
-      setEnvironmentData("worker.inc", 3);
-      // provide a workload for a worker
-      const worker = new Worker(file, { workerData: [1, 2, 3] })
-      worker.on("error", error => console.error("main", error))
-      worker.on("exit", exitCode => console.log("main", exitCode))
-      // receive a message from a worker
-      worker.on("message", msg => console.log("main", msg))
-      // send a message to a worker
-      setTimeout(() => worker.postMessage({ req: "start" }), 100)
-    } else { // worker thread
-      const inc = getEnvironmentData("worker.inc") // get a clone of parameters
-      console.log("work", workerData, inc)
-      // receive a clone of a message from a parent
-      parentPort.on("message", msg => {
-        console.log("work", msg)
-        // process a clone of a workload and send a message to a parent
-        parentPort.postMessage(workerData.map(el => el + inc))
-        parentPort.close() // close an async bidirectional channel
-      })
-    }
-    #+END_SRC
-- A custom `MessageChannel` can be created on either thread for separation of
-  concerns and one of the `pors1/port2`s can be passed to the other thread over
-  the default channel
-    #+BEGIN_SRC js
-    import { Worker, isMainThread, parentPort, MessageChannel }
-    from "node:worker_threads"
-    const [node, file] = process.argv
-    if (isMainThread) {
-      const worker = new Worker(file)
-      worker.on("error", error => console.error("main", error))
-      worker.on("exit", exitCode => console.log("main", exitCode))
-      // create a new dedicate channel for separation of concerns
-      const newChannel = new MessageChannel()
-      // send a new channel to a worker
-      worker.postMessage({ port: newChannel.port1 }, [newChannel.port1])
-      // receive a message from a worker on a new channel
-      newChannel.port2.on("message", msg => console.log("main", msg))
-    } else {
-      let newPort
-      parentPort.once("message", msg => {
-        // receive a new channel from a parent
-        const { port: newPort } = msg
-        // send a message to a parent over a new channel
-        newPort.postMessage({ worker: "hi" })
-        newPort.close()
-      })
-    }
-    #+END_SRC
+- CPU-bound Worker thread :: A ~new Worker(module, opts)~ creates an
+  independent, *dedicated thread for CPU-bound tasks* executed in parallel with
+  the main thread of the event loop. A Worker has an async *bidirectional
+  communication channel* with its parent, a *per-thread own event loop*, and a
+  *separate V8 instance*. A Worker has a small memory footprint, fast startup
+  time, and is safe: *no synchronization*, *no resource sharing*, *no race
+  conditions*
+  #+BEGIN_SRC js
+import {
+  Worker, isMainThread, parentPort, workerData,
+  setEnvironmentData, getEnvironmentData
+} from "node:worker_threads"
+const [_, file] = process.argv
+if (isMainThread) { // main thread
+  // parameterize a worker before creation of a worker
+  setEnvironmentData("worker.inc", 3);
+  // provide a workload for a worker
+  const worker = new Worker(file, { workerData: [1, 2, 3] })
+  worker.on("error", error => console.error("main", error))
+  worker.on("exit", exitCode => console.log("main", exitCode))
+  // receive a message from a worker
+  worker.on("message", msg => console.log("main", msg))
+  // send a message to a worker
+  setTimeout(() => worker.postMessage({req: "start"}), 100)
+} else { // worker thread
+  const inc = getEnvironmentData("worker.inc") // get a clone of parameters
+  console.log("work", workerData, inc)
+  // receive a clone of a message from a parent
+  parentPort.on("message", msg => {
+    console.log("work", msg)
+    // process a clone of a workload and send a message to a parent
+    parentPort.postMessage(workerData.map(el => el + inc))
+    parentPort.close() // close an async bidirectional channel
+  })
+}
+  #+END_SRC
+- Custom message channel :: A custom =MessageChannel= can be created on either
+  thread for separation of concerns and one of the ~pors1/port2~ can be passed
+  to the other thread over the default channel
+  #+BEGIN_SRC js
+import {
+  Worker, isMainThread, parentPort, MessageChannel
+} from "node:worker_threads"
+const [node, file] = process.argv
+if (isMainThread) {
+  const worker = new Worker(file)
+  worker.on("error", error => console.error("main", error))
+  worker.on("exit", exitCode => console.log("main", exitCode))
+  // create a new dedicate channel for separation of concerns
+  const newChannel = new MessageChannel()
+  // send a new channel to a worker
+  worker.postMessage({port: newChannel.port1}, [newChannel.port1])
+  // receive a message from a worker on a new channel
+  newChannel.port2.on("message", msg => console.log("main", msg))
+} else {
+  let newPort
+  parentPort.once("message", msg => {
+    // receive a new channel from a parent
+    const {port: newPort} = msg
+    // send a message to a parent over a new channel
+    newPort.postMessage({ worker: "hi" })
+    newPort.close()
+  })
+}
+  #+END_SRC
