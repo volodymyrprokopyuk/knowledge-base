@@ -613,6 +613,23 @@ contract Send {
   topic. All not indexed event fields are stored in the data part of the
   transaction log
 
+*** Contract features
+
+- Owner control :: The owner control mechanisms allow to grant or revoke special
+  permissions e.g. minting and burning of tokens, suspension and resume of a
+  contract, whitelisting and blacklisting of addresses, recovery of funds to a
+  set of designated addresses (multisig)
+- Token minting and burning :: The minting mechanism creates and transfers
+  tokens to recipients designated by the owner. The burning mechanism removes
+  and destroys tokens from owners designated by the owner
+- Token caps :: The ability to set predefined limits on the total supply of
+  tokens
+- Funds recovery :: The funds recovery mechanisms are activated by a designated
+  set of address and allow to recover funds and reverse transfers
+- Address whitelisting and blacklisting :: The whitelisting mechanism allows to
+  restrict critical actions to a designated set of addresses. The blacklisting
+  mechanism blocks transfers to specific addresses
+
 ** Import
 
 - Import :: The =import= statement imports all or explicitly selected global
