@@ -886,24 +886,28 @@ func GreetHandler(w http.ResponseWriter, r *http.Request) {
 
 *** Generic functions
 
-- Generics :: compile-time automatic generation of type-safe types, structures,
-  functions, and methods
-- Generic function :: has type parameters for input arguments and return values.
-  A generic function is not a Go function, but a *template* used by the Go
-  compiler to instantiate Go functions on either concrete types or interfaces. A
-  generic function accepts input arguments and returns return values of
-  unspecified or constrained types, not known at the time of definition of a
-  generic algorithm
+- Generics :: Generics provide compile-time automatic generation of type-safe
+  types, structures, functions, and methods
+- Generic function :: A generic function has *type parameters* for input
+  parameters and return values. A generic function accepts input parameters and
+  returns return values of unspecified or constrained types, not known at the
+  time of definition of a generic function. A generic function is not a Go
+  function, but a *template* used by the Go compiler to instantiate Go functions
+  on either *concrete types* or *interfaces*.
 
 #+BEGIN_SRC go
-func Map[T any](fun func(val T) T, slc []T) []T {
-  res := make([]T, len(slc))
+// Map
+func Map[T, U any](f func(val T) U, slc []T) []U {
+  res := make([]U, len(slc))
   for i, val := range slc {
-    res[i] = fun(val)
+    res[i] = f(val)
   }
   return res
 }
-func Filter[T any](slc []T, prd func(val T) bool) []T {
+ // 1.1, 2.2, 3.3
+Map(func(val int) float64 { return float64(val) * 1.1 }, []int{1, 2, 3})
+// Filter
+func Filter[T any](prd func(val T) bool, slc []T) []T {
   res := make([]T, 0, len(slc))
   for _, val := range slc {
     if prd(val) {
@@ -912,36 +916,41 @@ func Filter[T any](slc []T, prd func(val T) bool) []T {
   }
   return res
 }
-func Reduce[T, U any](slc []T, fun func(val T, res U) U, init U) U {
+Filter(func(val int) bool { return val % 2 == 0 }, []int{1, 2, 3, 4}) // 2, 4
+// Reduce
+func Reduce[T, U any](f func(val T, res U) U, init U, slc []T) U {
+  res := init
   for _, val := range slc {
-    init = fun(val, init)
+    res = f(val, res)
   }
-  return init
+  return res
 }
-slc := []int{1, 2, 3, 4, 5}
-fmt.Println(Reduce(slc, func(val, res int) int { return val + res }, 0)) // 15
-func Compose[T, U, V any](f func(val T) U, g func(val U) V) func(val T) V {
+res := Reduce(
+  func(val int, res float64) float64 {
+    return float64(val) + res
+  }, 0.0, []int{1, 2, 3, 4},
+) // 10
+// Compose
+func Compose[T, U, V any](f func(val T) U, g func(val U) V) func (val T) V {
   return func(val T) V {
     return g(f(val))
   }
 }
-fun := Compose(
-  func(val int) float64 { return float64(val) * 2.0 },
-  func(val float64) string { return fmt.Sprintf("val: %v", val) },
-)
-fmt.Println(fun(1)) // val: 2
+flo := func(val int) float64 { return float64(val) }
+str := func(val float64) string { return fmt.Sprintf("%.2f", val) }
+res := Compose(flo, str)(1) // 1.00
 // comparable types support ==, !=, but not <, <=, >, >= operators
 // slice, map, func are not comparable
-func Contains[T comparable](slc []T, val T) bool {
-  for _, e := range slc {
-    if e == val {
+func Contains[T comparable](val T, slc []T) bool {
+  for _, v := range slc {
+    if v == val {
       return true
     }
   }
   return false
 }
-slc := []int{1, 2, 3}
-Contains(slc, 2); Contains(slc, 9) // true, false
+Contains(1, []int{1, 2, 3}) // true
+Contains(9, []int{1, 2, 3}) // false
 #+END_SRC
 
 *** Type elements
@@ -1155,37 +1164,47 @@ n.InOrder(func (val int) {
 
 *** Packages
 
-- Package :: a set of types, functions, and methods defined in multiple files
-  under a package directory. One-word all-lowercase package name should match a
-  package directory. Every source file in a package directory must have the same
-  package name src_go{ package pkgname }. Top-level Capitalized identifiers are
-  exported from a package. Merge packages or create a new common package to
-  resolve circular dependencies
-  - Import a package src_go{ import "scm/user/mod/pkgdir" }
-  - Import alias src_go{ import pkgname "scm/user/mod/pkgdir" }
-  - Access an identifier src_go{ pkgname.Identifier }
+- Package :: A package is a set of types, functions, and methods defined in
+  multiple files under a package directory. One-word, all-lowercase package name
+  must match the package directory. Every source file in the package directory
+  must have the same package name src_go{ package pkgname }. Top-level
+  Capitalized identifiers are *exported* from a package. Top-level lowercase
+  identifiers are *unexported* and private to a package. *Circular dependencies*
+  between packages *are not allowed*. Merge dependent packages into a single
+  package, or create a new shared package to resolve circular dependencies
+  - Import a package src_go{ import "scm/user/module/pkgname" }. All imports are
+    available under the =pkgname= identifier
+  - Import alias src_go{ import pkgalias "scm/user/module/pkgname" }. All
+    imports are available under the =pkgalias= identifier
+  - Access an exported identifier from a package src_go{ pkgname.Identifier }
 
 *** Modules
 
-- Module :: a unit of versioning identified by a repository path
-  ~scm/user/mod~. A module represents either
-  - *Library* of *importable packages* src_fish{ go get ... } or
-  - *Application* of *executable commands* src_fish{ go install ... }
-    src_go{ package main; func main { ... } }
-  - src_fish{ go mod init scm/user/mod } initializes a module in the current
-    directory. The ~go.mod~ file defines the current module name, a supported Go
-    version, and module dependencies
-  - src_fish{ go get -u ./...; go mod tidy } upgrades patch and minor versions
-    module dependencies and synchnonizes ~go.mod~ with imported packages from
-    the source code. A different module path ~scm/user/mod/v2~ is used to
+- Module :: A module is a unit of versioning identified by a repository path
+  ~scm/user/module~. A module represents either
+  - Library :: A library contains *importable packages* src_nushell{ go get ...
+    }
+  - Application :: An application contains *executable commands* src_nushell{ go
+    install ... }
+    #+BEGIN_SRC go
+package main
+func main() { ... }
+    #+END_SRC
+  - src_nushell{ go mod init scm/user/module } initializes a module in the
+    current directory. The ~go.mod~ file defines the current module name, a
+    supported Go version, and module dependencies
+  - src_nushell{ go get -u './...' } upgrades patch and minor versions of module
+    dependencies
+  - src_nushell{ go mod tidy } synchronizes ~go.mod~ with imported packages from
+    the source code. A different module path ~scm/user/module/v2~ is used to
     upgrade a module major version without changing the module name
-  - src_fish{ go run ... } builds and runs a module during development
-  - src_fish{ go build } builds a module into a self contained executable
+  - src_nushell{ go run ... } builds and runs a module during development
+  - src_nushell{ go build } builds a module into a self-contained executable
 
 *** Static code analysis
 
-- src_fish{ yay -S golangci-lint }
-  src_fish{ golangci-lint run ./... }
+- src_nushell{ yay -S golangci-lint }
+  src_nushell{ golangci-lint run './...' }
 
 ** Concurrency
 
