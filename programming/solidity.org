@@ -931,7 +931,7 @@ contract Attack {
 ** Cheatcodes
 *** Deal balance
 
-- Deal balance :: The =vm.deal= function
+- Deal balance :: The =vm.deal= function sets the balance of an address
   #+BEGIN_SRC solidity
 function deal(address addr, uint256 balance) external;
 address own = makeAddr("owner");
@@ -957,8 +957,8 @@ vm.stopPrank();
 *** Assert calls
 
 - Assert call :: The =vm.expectCall= function asserts whether a call to an
-  address with the exact or the prefix match data has been made, or not made at
-  all (~count = 0~)
+  address with the exact match or the prefix match data has been made, or not
+  made at all (~count = 0~)
   #+BEGIN_SRC solidity
 function expectCall(
   address addr, [uint256 value], bytes calldata data, [uint64 count]
@@ -976,8 +976,8 @@ token.transfer(rcp, 1)
 - Emit event :: The =vm.expectEmit= function asserts that a sequence of events
   is emitted by an optional emitter possibly skipping some events during the
   next call, by optionally matching the events attributes against the topic 0
-  (is always matched), topics 1-3, and the data. Multiple =vm.expectEmit= +
-  =emit Ev...= can be specified before the call
+  (is always matched), the topics 1-3, and the data. Multiple =vm.expectEmit= +
+  =emit Ev...= patterns can be specified before the call
   #+BEGIN_SRC solidity
 function expectEmit([address emitter]); // Checks all the topics and the data
 function expectEmit(
@@ -997,7 +997,8 @@ token.transfer(rcp, 1);
   After calling the =vm.expectRevert= calls to other cheatcoes before the
   reverting call are ignored
   #+BEGIN_SRC solidity
-function expectRevert() external; // Asserts a revert with any calldata
+// Asserts a revert with any calldata
+function expectRevert() external;
 function expectRevert(address reverter) external;
 // Exact match on a selector
 function expectRevert(bytes4 message, [address reverter]) external;
