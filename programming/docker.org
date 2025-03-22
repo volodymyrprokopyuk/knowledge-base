@@ -1,72 +1,76 @@
 * Docker
+** Docker
 
-- Docker :: a platform for software distribution: multi-stage image build,
-  share images through an image registry, run a container from an image. Image
-  layers reduce build time, storage space, and network bandwidth
+- Software distribution platform :: Docker is a unified platform for software
+  distribution. Docker provides multi-stage image builds, sharing images through
+  an image registry, runing a container from an image. Image layers reduce the
+  build time, the storage space, and the network bandwidth
 - Reproducible builds :: Docker allows to build and test applications without
   having to locally install compilers, runtimes, testing frameworks, and
-  packages. All build and test instructions are captured in a multi-stage
-  Dockerfile. All deployment instructions are captured in a compose.yaml
-- Container orchestrator :: provides an API to manage a cluster of nodes as a
-  single unit, runs multi-container applications on a cluster. Network
+  packages. All *build and test instructions* are captured in a multi-stage
+  =Dockerfile=. All *deployment instructions* are captured in a =compose.yaml=
+- Container orchestrator :: Docker provides an API to manage a cluster of nodes
+  as a single unit and run multi-container applications on a cluster. Network
   management, container scheduling, data management, configuration management,
   application resilience
 
 ** Images
 
-- Image reference :: a unique identifier of a specific image in a registry
-  ~registryDomain/userAccount/imageRepository:versionTag~
-- Image :: (the initial file system for a container from a Dockerfile) a
-  portable packaging format to build a layered file system of a container. An
-  image is a read-only template for creating containers. Immutable image layers
-  are shared between different images to save storage space, reduce network
-  traffic and build time. Every instruction in a Dockerfile creates an immutable
-  image layer that is reused from a cache to reduce a build time of subsequent
-  builds if the instruction and the previous image layers have not been altered
-- Image hierarchy :: base image e.g. golang, golden image e.g. golang + tools,
-  application image e.g. golden image + application artifacts
-- Image optimizations :: once a layer changes all downstream layers has to be
-  recreated
+- Image reference :: An image reference is a *unique identifier* of a specific
+  image in a registry ~registryDomain/userAccount/imageRepository:versionTag~
+- Image :: An image is a *portable packaging format* to build a layered file
+  system of a container. An image provides an initial file system for a
+  container defined in a Dockerfile. An image is a read-only template for
+  creating containers. *Immutable image layers* are shared between different
+  images to save the storage space, reduce the network traffic, and the build
+  time. Every instruction in a Dockerfile creates an immutable image layer that
+  is reused from a cache to reduce the build time of subsequent builds if the
+  instruction and the previous image layers have not been altered
+- Image hierarchy :: An image hierarchy contains
+  - Base image :: e.g. golang
+  - Golden image :: e.g. golang + tools
+  - Application image :: e.g. golden image + application artifacts
+- Image optimizations :: Once a base layer changes all downstream layers has to
+  be recreated
   - Minimize the number of RUN commands by chaining commands using shell
-    mechanisms
+    mechanisms e.g. ~cmd1 && cmd2~
   - Place instructions that are more likely to change towards the end of a
     Dockerfile to minimize the number of layers that have to be rebuilt after a
     change
   - Removing files after a COPY in a Dockerfiles does not frees space in image
-    layers. COPY only the necessary files, do not ~rm -rf ...~ in a separate RUN
-    command
+    layers. COPY only the necessary files and do not ~rm -rf ...~ in a separate
+    RUN command
   - Prefer temporal mounts for a single RUN command that do not persist in the
     image src_fish{ RUN --mount=type=bind,from=stage,source=src,target=dst }
     over COPY that is persisted in the image
   - To build images on a remote Docker engine, Docker compresses a build context
-    (directory) and send it to a remote Docker engine. Use ~.dockerignore~ to
-    exclude from compression unnecessary files and folders.
-  - Use a multi-stage build with the absolutely necessary runtime in production
-    images
+    (a directory) and sends it to a remote Docker engine. Use the
+    =.dockerignore= to exclude from compression unnecessary files and folders
+  - Use a multi-stage build with only the absolutely necessary runtime in
+    production images
 
 ** Dockerfile
 
-- Dockerfile :: (run an image with a runtime) specifies a packaging procedure to
-  build an image of a single application
-- Shell form src_fish{ RUN cmd a1 a2 \ a3 } uses a shell
-- Exec form src_fish{ ENTTRYPOINT/CMD ["cmd", "a1", "a2"] } does not use a shell
-  - ~ENTTRYPOINT~ sets the default command for a container. The exec form is
-    preferred as it allows to override CMD arguments with command line arguments
-    and starts the main process as PID 1. The shell form starts a process as a
-    subcommand of src_fish{ /bin/sh -c ... } with a PID distinct from 1, as
-    well as does not allow to override CMD arguments from the command line.
-    src_fish{ docker container stop } will send the SIGTERM and after a timeout
-    with force a container to exit with SIGKILL
-  - ~CMD~ sets the default arguments with or without a command itself
-  - ~RUN~ creates a new image layer
-- Change a default shell src_fish{ SHELL ["/usr/bin/fish", "-c"] }
-- ~ENV~ persists variables into the image. Exports variables into a container
+- Dockerfile :: A Dockerfile specifies a *packaging procedure* to build an image
+  of a single application
+- Shell form :: src_fish{ RUN cmd a1 a2 \ a3 } uses a shell. The shell form
+  starts a process as a subcommand of src_fish{ /bin/sh -c ... } with a PID
+  distinct from 1, as well as does not allow to override CMD arguments from the
+  command line
+- Exec form :: src_fish{ ENTRYPOINT/CMD ["cmd", "a1", "a2"] } does not use a
+  shell. The exec form is preferred as it allows to override CMD arguments with
+  command line arguments and starts the main process as PID 1
+  - ~ENTTRYPOINT~ sets the *default command* for a container
+  - ~CMD~ sets the *default arguments* with or without a command itself
+  - ~RUN~ creates a *new image layer*
+- ~ENV~ persists variables into the image and exports variables into a container
 - ~ARG~ non-persisted build-time variables with either a default value or a
   value from a command line ~--build-arg VAR=val~
-- Multi-stage Dockerfile :: (build an image with a toolchain) separate
-  build-time dependencies from runtime dependencies. Builds a final image using
+- Change a default shell src_fish{ SHELL ["/usr/bin/fish", "-c"] }
+- Multi-stage Dockerfile :: A multi-stage Dockerfile separates build-time
+  dependencies from runtime dependencies. Builds a final image using
   independent, isolated, and reproducible stages each starting from a
-  potentially different image with a different toolchain for building and
+  potentially different image with a different tool chain for building and
   testing an application. Each stage is started with src_fish{ FROM image AS
   stage }. Files from previous stages are selectively copied into the next
   stages using src_fish{ COPY --from=stage|image src dst }. The final image is
@@ -74,71 +78,229 @@
 
 ** Containers
 
-- Container :: (OS-level virtualization) a portable image format for packaging
-  and an isolated environment for efficient execution of applications that share
-  a host kernel. A container is a runnable instance of an image. A container is
-  a normal OS process, but is isolated and has its own file system and
-  networking
-  - Isolation :: each container has its own hostname, IP, and a file system
-  - Density :: all containers efficiently share a host kernel, CPU, and memory
-  - Network :: containers communicate through a virtual network. A Docker
-    internal DNS provides service discovery by a container name
-- Container resilience :: when a container ~HEALTHCHEC~ fails, Docker notifies a
+- Container :: A container is a portable packaging format and an isolated
+  environment for efficient execution of applications that share the host kernel
+  using the OS-level virtualization. A container is a runnable instance of an
+  image. A container is an isolated OS process that has its own file system and
+  network interfaces
+  - Isolation :: Each container runs in isolation and has its own hostname, an
+    IP, and a file system
+  - Density :: All containers efficiently share the host kernel, CPU, and memory
+  - Network :: Containers communicate through a Docker virtual network. A Docker
+    internal DNS provides service discovery by container names
+- Container resilience :: When a container ~HEALTHCHEC~ fails, Docker notifies a
   container orchestrator to take an action on the unhealthy container. A
   container should fail fast if its dependencies are not satisfied
   src_fish{ CMD curl --fail $host && ./app }. Docker compose ensures correct
-  order of starting containers through a ~depends_on~ directive
-- Union file system :: a container has a single, independent, layered, virtual,
+  order of starting containers through the ~depends_on~ directive
+- Union file system :: A container has a single, independent, layered, virtual,
   union file system that integrates data from image layers, volume mounts, and
-  bind mounts.
-- Writable layer :: (ephemeral container-local storage) a container has a
-  writable layer on top of immutable image layers that are driven by
-  instructions from a Dockerfile and provide an initial file system for a
-  container. A writable layer is created when a container is started and is
-  deleted when a container is removed. A writable layer contains new files and
-  uses copy-on-write for modifications of existing files from image layers. A
-  file system of a stopped container is accessible through src_fish{ docker
+  bind mounts
+- Writable layer :: A writable layer is an ephemeral container-local storage.
+  Each container has a writable layer on top of immutable image layers that are
+  driven by instructions from a Dockerfile and provide an initial file system
+  for a container. A writable layer is created when a container is started and
+  is deleted when a container is removed. A writable layer contains new files
+  and uses copy-on-write for modifications of existing files from image layers.
+  A file system of a stopped container is accessible through src_fish{ docker
   container cp src dst } until a container is removed
 
 ** Mounts
 
-- Volume mount :: (~--volume~ persistent Docker-managed storage) provides a
-  persistent, decoupled from a container storage for production. A volume is
-  allocated on a host and managed by Docker. A volume is accessible only from a
-  container (not from a host). A volume mount survives container restarts or a
-  removal
-- Bind mount :: (~--mount~ bidirectional shared local or distributed storage)
-  makes a directory or a file on a host available on a container. A bind mount
-  is bidirectional and is accessible from both a container and a host mostly for
-  development. Changes to a host directory are immediately available to the
-  container. A directory mount over an already existing target directory
-  completely replaces a target directory. A file mount over an already existing
-  target directory merges a new file with already existing files from image
-  layers. A bind mount survives container restarts or a removal
+- Volume mount :: A volume mount ~--volume~ is a persistent Docker-managed
+  storage. A volume mount provides a persistent, decoupled from a container
+  storage for production. A volume is allocated on a host and is managed by
+  Docker. A volume is accessible only from a container, not from a host. A
+  volume mount survives container restarts or a container removal
+- Bind mount :: A bind mound ~--mount~ is bidirectional shared local or
+  distributed storage. A bind mount makes a directory or a file on a host
+  available to a container. A bind mount is bidirectional and is accessible from
+  both a container and a host mostly for development. Changes to a host
+  directory are immediately available to a container. A directory mount over an
+  already existing target directory completely replaces the target directory. A
+  file mount over an already existing target directory merges a new file with
+  the already existing files from image layers. A bind mount survives container
+  restarts or a removal
+
+** Docker commands
+
+Install and configure Docker
+
+#+BEGIN_SRC fish
+yay -S docker docker-compose docker-buildx
+sudo groupadd docker
+sudo usermod -G docker -a $USER
+newgrp docker
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+#+END_SRC
+
+Network management
+
+#+BEGIN_SRC fish
+docker network create $net
+docker network ls
+docker network rm --force $net
+docker container run --network $net --network-alias $cnt $img
+#+END_SRC
+
+Image management
+
+#+BEGIN_SRC fish
+docker buildx build --tag user/image:tag --target stage .
+docker image ls --all [image[:tag]]
+docker image rm --force $img
+# Space for images, build cache, local volumes and container writable layers
+docker system df
+# Remove all stopped containers, unused networks, dangling images, unused cache
+docker system prune
+#+END_SRC
+
+Container management
+
+#+BEGIN_SRC fish
+docker container run --name $cnt --hostname $cnt --rm $img \
+  [cmd args...] [bash -c 'cmd ...']
+docker container run --interactive --tty $img
+docker container run --env VAR=val $img
+docker container run --detach --publish $hostport:$cntport $img
+docker container ls --all
+docker container stop $cnt
+docker container rm --force $cnt # Stop then remove
+#+END_SRC
+
+Execute a command inside a container
+
+#+BEGIN_SRC fish
+docker container top/stats/logs --follow $cnt
+docker container cp hostfile $cnt:/path # Even from stopped
+docker container exec $cnt ls/cat/rm /path # Only on running
+docker container exec -it $cnt bash # Interactive
+#+END_SRC
+
+Volume and mount management
+
+#+BEGIN_SRC fish
+docker volume create $vol
+docker volume ls
+docker volume rm --force $vol
+docker container run --volume $vol:/cntpath $img
+docker container run --name $cnt --rm \
+  --mount type=volume,source=$vol,target=/cntpath,readonly $img
+docker container run --name $cnt --rm \
+  --mount type=bind,source=(pwd)/hostpath,target=/cntpath,readonly $img
+#+END_SRC
 
 ** Docker compose
 
-- Docker compose file :: specifies a deployment procedure for local development
-  of an application consisting of multiple containers deployed to a single host.
-  A compose file declares a desired state of containers and networks that Docker
-  compose tries to satisfy. Once deployed, docker compose neither monitors nor
-  restarts containers until the next explicit src_fish{ docker-compose up }.
-- Compose override files :: override files with environment-specific
-  configuration differences can be applied to a single core compose file with
-  common definitions to simultaneously deploy the same application on the same
-  host on different isolated networks under different project/directory names
-- Compose extension fields :: avoid file-level duplication of configuration by
-  using the YAML merge syntax with element anchors and element references
-
+- Compose file :: A compose file =compose.yaml= specifies an *automated
+  deployment procedure* with dependencies for a *local development and testing*
+  of an application consisting of *multiple containers* deployed to a *single
+  development host* or a CI server. A compose file declares the desired state of
+  containers, volumes and networks that Docker compose tries once to satisfy.
+  Once deployed, Docker compose neither monitors nor restarts containers until
+  the next explicit src_fish{ docker-compose up }.
 #+BEGIN_SRC yaml
-# definition of an extension field
-x-networks: &networks # element anchor
-  networks:
-    -vladnet
+# Project name. The default name is the project directory
+name: project1
 services:
-  caddy:
-    # mering of an extension field (in multiple services)
-    <<: *networks # element reference
-networks:
-  vladnet: { }
+  # Service name. A service can run multiple replicas of a container
+  service1:
+    # ** Service identification and dependencies
+    # Build specification
+    build:
+      context:
+      dockerfile:
+      args:
+    # Image identifier
+    image:
+    # Controls order of service startup and shutdown
+    depends_on:
+      - service2 # Equivalent to service_started
+      service2:
+        condition: service_started | service_healthy | service_completed_successfully
+
+    # ** User, command and arguments
+    # Overrides the USER from the Dockerfile
+    user:
+    # Overrides the WORKDIR from the Dockerfile
+    working_dir:
+    # Overrides the ENTRYPOINT from the Dockerfile
+    entrypoint: ["ls", "-l"] # exec form
+    entrypoint: bash -c 'ls -l' # shell form
+    # Overrides the CMD from the Dockerfile
+    command: ["ls", "-l"] # exec form
+    command: bash -c 'ls -l' # shell form
+
+    # ** Exposed ports
+    # Ports internally exposed to the container network, not to the host
+    expose:
+      - "containerPort"
+    # Ports externally accessible from the host
+    ports:
+      - "hostPort:containerPort"
+
+    # ** Environment, configuration, and secrets
+    # Environment variables inside a container
+    environment:
+      - VAR=val
+      VAR: val
+    # Configs are mounted as files inside a container /config_name
+    # Access to specific configs is granted on a per-service basis
+    configs:
+      config1:
+        file: ./host/path
+        environment: HOST_VAR
+        content: inline content
+    # Secrets are mounted as files inside a container /run/secrets/secret_name
+    # Access to specific secrets is granted on a per-service basis
+    secrets:
+      secret1:
+        file: ./host/path
+        environment: HOST_VAR
+
+    # ** Persisted volumes
+    # Persisted mounted or bound external directories
+    volumes:
+      - ./host/path:/container/path:ro
+      - type: volume | bind
+        source: ./host/path
+        target: /container/path
+        read_only: true
+
+    # ** Network segregation
+    # The default network name is the project name
+    # Any service can reach any other service by the service name
+    # Defines networks that service containers can be attached
+    # Allows for network segregation
+    networks:
+
+    # ** Deployment, lifecycle hooks, and healthcheck
+    # Resource limits, replication factors, placement constraints,
+    # restart policies for service containers
+    deploy:
+    # Selectively deploys supportive services based on activated profiles
+    # Core services, usually without profiles, are always deployed
+    profiles:
+    # Post-start lifecycle hook
+    post_start:
+    # Pre-stop lifecycle hook (executed only after > docker compose down)
+    pre_stop:
+    # Overrides the HEALTHCHEC from the Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080"]
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080"]
+#+END_SRC
+
+*** Docker compose commands
+
+#+BEGIN_SRC fish
+docker compose config # Validate merged YAML config with interpolated variables
+docker compose --file compose.yaml up [--detach]
+docker compose up --build --scale $srv=N # Creates new containers
+docker compose ps
+docker compose run $srv $cmd
+docker compose logs --follow [$srv]
+docker compose start/stop # Existing containers
+docker compose down [$srv] # Removes containers
 #+END_SRC
