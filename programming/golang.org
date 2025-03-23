@@ -254,7 +254,6 @@ fmt.Println(p.Model, p.Price, p.Bayan.Year) // Nextra, 16e3, 2020
 #+END_SRC
 
 ** Operators
-
 *** Bitwise operators
 
 - Bitwise and :: The ~a & b~ operator is 1, when both =a= and =b= are 1,
@@ -263,31 +262,36 @@ fmt.Println(p.Model, p.Price, p.Bayan.Year) // Nextra, 16e3, 2020
   otherwise is 0
 - Bitwise xor :: The ~a ^ b~ operator is 1, when =a= and =b= are different,
   otherwise is 0
-- Bitwise not :: The ~^a~ operator is equivalent to ~1 ^ a~ and flips all bits
-  in =a=
+- Bitwise not :: The ~^a~ operator is equivalent to ~0xff ^ a~ and flips all
+  bits in =a=
 - Bitwise and-not :: The ~a &^ b~ operator is equivalent to ~a & (^b)~
 - Shift left :: The ~a << n~ operator multiplies =a= by 2^n
 - Shift right :: The ~a >> n~ operators divides =a= by 2^n
   #+BEGIN_SRC go
-print := func(a uint8) {
+bin := func(a uint8) {
   fmt.Printf("%08b\n", a)
 }
 var a uint8 = 0xf3
-print(a) // 11110011
-// definitions
-print(a & 0xf0) // 11110000
-print(a | 0x07) // 11110111
-print(^a) // 00001100
-print(a &^ 0xf0) // 00000011
-print(a << 2) // 11001100
-print(a >> 2) // 00111100
-// applications
-print(a & 0xfc) // and clears 0s 11110000
-print(a & 0x81) // and tests 1s 10000001
-print(a | 0x04) // or sets 1s 11110111
-print(a ^ 0x0f) // xor flips 1s 11111100
-print(a ^ a) // xor itself clears all 00000000
-print(^a) // not flips all 00001100
+bin(a) // 11110011
+// Definitions
+bin(a & 0xf0) // 11110000
+bin(a | 0x07) // 11110111
+bin(^a) // 00001100
+bin(0xff ^ a) // 00001100
+bin(a &^ 0xf0) // 00000011
+bin(a << 2) // 11001100
+bin(a >> 2) // 00111100
+// Applications
+bin(a & 0xfc) // and clears 0s 11110000
+bin(a & 0x81) // and tests 1s 10000001
+bin(a | 0x04) // or sets 1s 11110111
+bin(a ^ 0x0f) // xor flips 1s 11111100
+bin(a ^ a) // xor itself clears all 00000000
+bin(^a) // not flips all 00001100
+var b uint8 = 0x08
+bin(b) // 00001000
+// 00001000 & 00000111 = 00000000 == 0
+bin(b & (b - 1)) // checks if only 1 bit is set, must be 0
   #+END_SRC
 
 *** Built-in functions

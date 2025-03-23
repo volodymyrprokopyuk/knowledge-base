@@ -60,7 +60,7 @@
 - Exec form :: src_fish{ ENTRYPOINT/CMD ["cmd", "a1", "a2"] } does not use a
   shell. The exec form is preferred as it allows to override CMD arguments with
   command line arguments and starts the main process as PID 1
-  - ~ENTTRYPOINT~ sets the *default command* for a container
+  - ~ENTRYPOINT~ sets the *default command* for a container
   - ~CMD~ sets the *default arguments* with or without a command itself
   - ~RUN~ creates a *new image layer*
 - ~ENV~ persists variables into the image and exports variables into a container
@@ -75,6 +75,53 @@
   stage }. Files from previous stages are selectively copied into the next
   stages using src_fish{ COPY --from=stage|image src dst }. The final image is
   clean and minimal, and contains only tested artifacts for production
+
+*** Dockerfile
+
+#+BEGIN_SRC dockerfile
+# Build-time arguments only for FROM
+ARG TAG=latest
+# Sets the base image and the default stage
+FROM image:$TAG
+# Sets the base image and a new stage
+FROM image AS stage
+# Build-time arguments for any instruction in the current stage
+# Built-time arguments are not persisted in the final image
+ARG TAG=latest
+
+# Creates a bind mount to the host file system or to other stage
+RUN --mount=type=bind,source=./host/path,target=/container/path,from=stage
+# Executes a command and creates a new layer on top of the current image
+RUN ["ls", "-l"] # Exec form
+RUN ls -l # Shell form
+RUN ls \ # Shell form multi-line
+  -l
+RUN <<EOF # Shell form here-docs
+ls -l
+EOF
+
+# Sets persisted environment variables inside the container
+# Environment variables can be overriden by > docker run --env VAR=val
+ENV VAR=val
+USER user
+WORKDIR /workdir
+# Copies sources from the build context to a desitination
+COPY src1 src2 dst/
+# Copies sources from, a state or an image to a desitination
+COPY [--from=stage] src1 src2 dst/
+
+ENTRYPOINT
+# Default arguments for the ENTRYPOINT command
+# Default CMD arguments can be overriden by > docker run --arg arg=val
+CMD ["arg1", "arg2"] # Exec form for arguments only
+# Default command with arguments
+CMD ["cmd", "arg1", "arg2"] # Exec form for a command and arguments
+CMD cmd arg1 arg2 # Shell form for a command and arguments
+
+# Declares a port exposed from a container
+# Exposed ports can be published externally by > docker run --port host:cnt
+EXPOSE port
+#+END_SRC
 
 ** Containers
 
@@ -133,6 +180,7 @@ sudo usermod -G docker -a $USER
 newgrp docker
 sudo systemctl enable docker.service
 sudo systemctl start docker.service
+# Reboot
 #+END_SRC
 
 Network management
@@ -193,6 +241,8 @@ docker container run --name $cnt --rm \
 
 ** Docker compose
 
+*** compose.yaml
+
 - Compose file :: A compose file =compose.yaml= specifies an *automated
   deployment procedure* with dependencies for a *local development and testing*
   of an application consisting of *multiple containers* deployed to a *single
@@ -200,6 +250,7 @@ docker container run --name $cnt --rm \
   containers, volumes and networks that Docker compose tries once to satisfy.
   Once deployed, Docker compose neither monitors nor restarts containers until
   the next explicit src_fish{ docker-compose up }.
+
 #+BEGIN_SRC yaml
 # Project name. The default name is the project directory
 name: project1
@@ -226,11 +277,11 @@ services:
     # Overrides the WORKDIR from the Dockerfile
     working_dir:
     # Overrides the ENTRYPOINT from the Dockerfile
-    entrypoint: ["ls", "-l"] # exec form
-    entrypoint: bash -c 'ls -l' # shell form
+    entrypoint: ["ls", "-l"] # Exec form
+    entrypoint: bash -c 'ls -l' # Shell form
     # Overrides the CMD from the Dockerfile
-    command: ["ls", "-l"] # exec form
-    command: bash -c 'ls -l' # shell form
+    command: ["ls", "-l"] # Exec form
+    command: bash -c 'ls -l' # Shell form
 
     # ** Exposed ports
     # Ports internally exposed to the container network, not to the host
