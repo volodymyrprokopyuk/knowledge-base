@@ -79,17 +79,43 @@
 *** Dockerfile
 
 #+BEGIN_SRC dockerfile
+# ** Image and stage identification
 # Build-time arguments only for FROM
-ARG TAG=latest
+ARG TAG=default
 # Sets the base image and the default stage
 FROM image:$TAG
 # Sets the base image and a new stage
 FROM image AS stage
 # Build-time arguments for any instruction in the current stage
-# Built-time arguments are not persisted in the final image
-ARG TAG=latest
+# Build-time arguments are not persisted in the final image
+# Build-time arguments can be passed by > docker build --build-arg arg=val
 
-# Creates a bind mount to the host file system or to other stage
+# ** Built-time arguments and environment variables
+# An EVN variable with the same name always overrides an ARG variable
+ARG TAG=default
+# Sets persisted environment variables inside the container
+# Environment variables can be overriden by > docker run --env VAR=val
+ENV VAR=val
+
+# ** User, working directory, and shell
+# The user for ENTRYPOINT, CMD, and RUN
+USER user
+# The working directory for ENTRYPOINT, CMD, RUN, and COPY
+# The workdin directory will be created if it does not exist
+# The default working directory is /
+WORKDIR /workdir
+# Overrides the default shell for subsequent commands
+SHELL ["fish", "-c"]
+
+# ** Copy files
+# Copies sources from the build context to a destination
+COPY src1 src2 dst/
+# Copies sources from a stage or an image to a destination
+COPY --from=stage|image src1 src2 dst/
+
+# Run commands
+# A temporary bind mount to the host or a stage for this RUN command
+# The bind mount is not persisted to the image
 RUN --mount=type=bind,source=./host/path,target=/container/path,from=stage
 # Executes a command and creates a new layer on top of the current image
 RUN ["ls", "-l"] # Exec form
@@ -99,25 +125,37 @@ RUN ls \ # Shell form multi-line
 RUN <<EOF # Shell form here-docs
 ls -l
 EOF
+RUN <<EOF # Alternative interpreter
+#!/usr/bin/env fish
+ls -l
+EOF
+# Fail on the first failing command in a pipeline
+RUN set -o pipefail && curl $url | wc -l > /number.txt
 
-# Sets persisted environment variables inside the container
-# Environment variables can be overriden by > docker run --env VAR=val
-ENV VAR=val
-USER user
-WORKDIR /workdir
-# Copies sources from the build context to a desitination
-COPY src1 src2 dst/
-# Copies sources from, a state or an image to a desitination
-COPY [--from=stage] src1 src2 dst/
-
-ENTRYPOINT
+# ** Entry point with arguments
+# Default command with arguments
+# Extra arguments to > docker run image ... will be appended to ENTRYPOINT
+# The exec form uses CMD arguments and receives signals from > docker stop ...
+ENTRYPOINT ["ls", "-l"]
+# The shell form does not use CMD arguments, creats a shell as PID 1,
+# and does not receive signals from > docker stop ...
+ENTRYPOINT ls -l
+# Receives signals from > docker stop ... because the shell is substituted
+ENTRYPOINT exec ls -l
 # Default arguments for the ENTRYPOINT command
-# Default CMD arguments can be overriden by > docker run --arg arg=val
+# Extra arguments to > docker run image ... will override CMD arguemtns
 CMD ["arg1", "arg2"] # Exec form for arguments only
 # Default command with arguments
 CMD ["cmd", "arg1", "arg2"] # Exec form for a command and arguments
 CMD cmd arg1 arg2 # Shell form for a command and arguments
 
+# ** Container healthchecks
+# Checks container health by running a command inside a container
+HEALTHCHECK --interval=30s --timeout=30s --retries=3 \
+  CMD curl --fail http://localhost:8080 # Shell form
+HEALTHCHECK ["curl" "--fail" "http://localhost:8080"] # Exec form
+
+# ** Declare exposed ports
 # Declares a port exposed from a container
 # Exposed ports can be published externally by > docker run --port host:cnt
 EXPOSE port
@@ -169,6 +207,25 @@ EXPOSE port
   the already existing files from image layers. A bind mount survives container
   restarts or a removal
 
+** Docker best practices
+
+- Multi-stage builds :: Multi-stage build allows to split the build process e.g.
+  build, test, production image in order to ensure that the production image is
+  minimal and contains only the absolutely necessary final afrifacts without
+  supportive tools and libraries. Create reusable stages with common tools and
+  libraries e.g. a golden Go image is reused by the testing and production
+  stages.
+- Minimal images :: Define and build images with minimal necessary tools and
+  libraries to reduce the attack surface. Each image should serve only a single
+  purpose e.g. use separate images for a web applicaiton and a supportive DB for
+  fine-greained horizontal scaling and access control
+- Image build :: Use the =.dockerignore= to exclude files from a Docker build
+  Rebuild images frequently src_fish{ docker build --no-cache ... } to get the
+  lates bug fixes and security patches. Image tags are mutable for transparent
+  bug fixes and security patches. Pin the image version to specific diges e.g.
+  ~image:1.2@sha256:1a2b...~ to
+  ensure reproducible builds
+
 ** Docker commands
 
 Install and configure Docker
@@ -180,6 +237,7 @@ sudo usermod -G docker -a $USER
 newgrp docker
 sudo systemctl enable docker.service
 sudo systemctl start docker.service
+docker buildx install
 # Reboot
 #+END_SRC
 
@@ -346,12 +404,34 @@ services:
 *** Docker compose commands
 
 #+BEGIN_SRC fish
-docker compose config # Validate merged YAML config with interpolated variables
-docker compose --file compose.yaml up [--detach]
-docker compose up --build --scale $srv=N # Creates new containers
-docker compose ps
-docker compose run $srv $cmd
-docker compose logs --follow [$srv]
-docker compose start/stop # Existing containers
-docker compose down [$srv] # Removes containers
+# Builds images
+docker compose build --no-cache --build-arg ARG=val
+# Creates and starts containers
+docker compose --file compose.yaml up --build --remove-orphans --detach
+# Stops started constraints
+docker compose stop
+# Starts stopped existing constraint
+docker compose start
+# Lists running compose projects
+docker compose ls --all --filter name=blockchain
+# Lists running containers in a project
+docker compose ps --all --filter status=running
+# Lists running processes in project containers
+docker compose top
+# Shows container logs
+docker compose logs --follow
+# Executes a one-off command in a running container
+docker compose exec --env VAR=$val --privileged \
+  --user $user --workdir $dir \
+  $svc $cmd $arg...
+# Runs a one-off command in a separate container on a service
+docker compose run --rm \
+  --entrypoint $entry --env VAR=$val --volume $bindmount \
+  --user $user --workdir $dir \
+  $svc $cmd $arg...
+# Copies files between a container and the local file system
+docker compose cp $svc:$src $dst
+docker compose cp $src $svc:$dst
+# Stops and removes containers and networks (volumes)
+docker compose down [--volumes]
 #+END_SRC
