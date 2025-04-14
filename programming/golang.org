@@ -574,7 +574,7 @@ if errors.As(err, &oh) { // Cast the err into the OhError type
     check) and the ~errors.As()~ (error type reflection) functions inspect an
     error tree by unwrapping each error in the depth-first traversal
     - Prefer ~errors.Is(err, ErrOh)~ over ~err == ErrOh~, as the former
-      correctly handles a wrapped =ErrOh= value
+      correctly handles a wrapped ~ErrOh~ value
     - Prefer ~var oh OhError; errors.As(err, &oh)~ over ~oh, assert :=
       err.(*OhError); assert~, as the former correctly handles a wrapped
       =OhError= type

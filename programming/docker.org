@@ -105,7 +105,7 @@ USER user
 # The default working directory is /
 WORKDIR /workdir
 # Overrides the default shell for subsequent commands
-SHELL ["fish", "-c"]
+SHELL ["/bin/bash", "-c"]
 
 # ** Copy files
 # Copies sources from the build context to a destination
@@ -256,6 +256,7 @@ Image management
 docker buildx build --tag user/image:tag --target stage .
 docker image ls --all [image[:tag]]
 docker image rm --force $img
+docker image rm (docker image ls --quiet --all)
 # Space for images, build cache, local volumes and container writable layers
 docker system df
 # Remove all stopped containers, unused networks, dangling images, unused cache
@@ -290,6 +291,7 @@ Volume and mount management
 docker volume create $vol
 docker volume ls
 docker volume rm --force $vol
+docker volume prune
 docker container run --volume $vol:/cntpath $img
 docker container run --name $cnt --rm \
   --mount type=volume,source=$vol,target=/cntpath,readonly $img
@@ -316,13 +318,17 @@ services:
   # Service name. A service can run multiple replicas of a container
   service1:
     # ** Service identification and dependencies
-    # Build specification
-    build:
-      context:
-      dockerfile:
-      args:
-    # Image identifier
+    # Image identifier to pull from a registry or to use with a build
     image:
+    # Build specification for > docker compose build
+    build:
+      context: ./build/path
+      dockerfile: Dockerfile
+      dockerfile_inline: |
+        FROM scratch
+      args:
+        ARG: val # if empty, then --build-arg ARV=val is used
+      target: prod # A stage name from a multi-stage Dockerfile
     # Controls order of service startup and shutdown
     depends_on:
       - service2 # Equivalent to service_started
@@ -350,7 +356,9 @@ services:
       - "hostPort:containerPort"
 
     # ** Environment, configuration, and secrets
-    # Environment variables inside a container
+    # Environment variables from a file
+    env_file: .env # VAR=val
+    # Environment variables inside a container (override env_file)
     environment:
       - VAR=val
       VAR: val
@@ -371,7 +379,7 @@ services:
     # ** Persisted volumes
     # Persisted mounted or bound external directories
     volumes:
-      - ./host/path:/container/path:ro
+      - ./host/path:/container/path:ro # bind volume
       - type: volume | bind
         source: ./host/path
         target: /container/path
@@ -406,6 +414,7 @@ services:
 #+BEGIN_SRC fish
 # Builds images
 docker compose build --no-cache --build-arg ARG=val
+docker buildx bake
 # Creates and starts containers
 docker compose --file compose.yaml up --build --remove-orphans --detach
 # Stops started constraints
