@@ -1683,3 +1683,91 @@ func BenchmarkReduce(b *testing.B) {
 - src_go{ type any interface{} } says nothing (about applicable operations to a
   type)
 - Do not panic (explicitly return and check errors)
+
+
+* Libraries
+
+** HTTP
+
+*** HTTP client
+
+#+BEGIN_SRC go
+func clientRequest() error {
+  // A Transport contains cached keep-alive TCP connections
+  trn := &http.Transport{
+    DisableKeepAlives: true,
+  }
+  // * Client: Transport, CheckRedirect, Jar, Timeout
+  // A Client is concurrency safe and should be created once and reused
+  cln := &http.Client{Transport: trn} // Create a client
+  ctx := context.Background()
+  url := "https://github.com/volodymyrprokopyuk/go-blockchain"
+  // * Request: Method, URL, Header, Body
+  // Create a request
+  req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+  if err != nil {
+    return err
+  }
+  req.Header.Add("Accept", "text/html") // Add an HTTP header
+  // * Response: StatusCode, Header, Body
+  res, err := cln.Do(req) // Perform the request
+  if err != nil {
+    return err
+  }
+  defer res.Body.Close()
+  body, err := io.ReadAll(res.Body) // Read the body
+  fmt.Println(string(body))
+  return nil
+}
+#+END_SRC
+
+*** HTTP server
+
+#+BEGIN_SRC go
+func echoServer() error {
+  hello := func(res http.ResponseWriter, req *http.Request) {
+    res.Write([]byte("hello"))
+  }
+  echo := func(res http.ResponseWriter, req *http.Request) {
+    // Read a request before writing a response
+    body, err := io.ReadAll(req.Body)
+    if err != nil {
+      // Write the headers before writing the response
+      res.Header().Set("Content-Type", "text/html")
+      res.WriteHeader(http.StatusInternalServerError)
+      // Write the response after the headers
+      fmt.Fprintf(res, "%s", err)
+      return
+    }
+    fmt.Println(string(body))
+    io.Copy(res, bytes.NewReader(body))
+  }
+  mux := http.NewServeMux() // A request router
+  mux.HandleFunc("GET /", hello) // Register a request handlers
+  mux.HandleFunc("POST /", echo)
+  port := ":8080"
+  srv := &http.Server{ // Configure a server with the request router
+    Addr: port,
+    Handler: mux,
+  }
+  srv.SetKeepAlivesEnabled(false)
+  return srv.ListenAndServe()
+  // * Graceful shutdown
+  chShutdown := make(chan struct{})
+  go func() {
+    chSignal := make(chan os.Signal, 1)
+    signal.Notify(chSignal, os.Interrupt)
+    <- chSignal
+    err := srv.Shutdown(context.Background()) // Graceful shutdown
+    if err != nil {
+      fmt.Println(err)
+    }
+    close(chShutdown)
+  }()
+  fmt.Printf("listening on %s\n", port)
+  err := srv.ListenAndServe()
+  <- chShutdown // Wait for the graceful shutdown
+  fmt.Println("graceful shutdown")
+  return err
+}
+#+END_SRC
