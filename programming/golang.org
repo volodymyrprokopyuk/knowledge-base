@@ -1164,6 +1164,81 @@ n.InOrder(func (val int) {
 })
 #+END_SRC
 
+** Reflection
+
+- Reflection :: Teflection allows to inspect, create, and modify types,
+  variables, and function at runtime. Reflection in Go is used by =fmt=,
+  =encoding/json=, =database/sql=, =test=
+- Interface :: An interface variable holds a pair of a value and its concrete
+  type ~(reflect.Value, reflect.Type)~. An interface restricts methods
+  applicable to the value, even if the concrete type of the value implements
+  more methods
+- From an interface value to a reflection object :: Given an interface variable,
+  reflection allows to extract a value and a concrete type stored inside the
+  interface variable
+  #+BEGIN_SRC go
+func reflect.ValueOf(ifc any) reflect.Value
+func reflect.TypeOf(ifc any) reflect.Type
+  #+END_SRC
+- From a reflection object to an interface value :: Given a value and its
+  concrete type reflection allows to packe them back into an interface
+  #+BEGIN_SRC go
+func (v Value) reflect.Interface() any
+  #+END_SRC
+- Only settable values can be modified :: A reflection object of a settable
+  value must hold the address of the reflected value
+  #+BEGIN_SRC go
+j := 1
+reflect.ValueOf(&j).Elem().SetInt(2) // Dereference and set a value
+  #+END_SRC
+  #+BEGIN_SRC go
+type Float float64
+// Extract a value, a concrete type, and a value kind from an interface
+f := Float(1.2)
+fv := reflect.ValueOf(f)
+ft := reflect.TypeOf(f) // The concrete type
+fk := fv.Kind() // The underlying type
+fmt.Println(fv, ft, fv.Type() == ft, fk) // 1.2, Float, true, float64
+// Construct a typed value from a value and a concrete type
+f2, assert := fv.Interface().(Float)
+if assert {
+  fmt.Println(f2) // 1.2
+}
+// Read a value
+i := 1
+i2 := reflect.ValueOf(i).Int() + 1
+fmt.Println(i2) // 2
+// Write a value
+j := 1
+reflect.ValueOf(&j).Elem().SetInt(2) // Dereference and set a value
+fmt.Println(j) // 2
+// Make a new value
+it := reflect.TypeOf((*int)(nil)).Elem() // Must start from a value
+iv := reflect.New(it).Elem()
+iv.SetInt(1)
+fmt.Println(iv.Int()) // 1
+// Make a new slice
+slt := reflect.TypeOf([]int(nil)) // Must start from a value
+slv := reflect.MakeSlice(slt, 0, 2)
+slv = reflect.Append(slv, iv, reflect.ValueOf(j))
+fmt.Println(slv.Interface().([]int)) // 1, 2
+// Update struct
+type T struct {
+  Num int
+  Str string
+}
+t := T{Num: 1, Str: "a"}
+tv := reflect.ValueOf(&t).Elem()
+tt := tv.Type()
+for i := range tv.NumField() {
+  fv, ft := tv.Field(i), tt.Field(i)
+  fmt.Println(ft.Name, fv.Type(), fv.Interface()) // Num int 1, Str string a
+}
+tv.Field(0).SetInt(2)
+tv.Field(1).SetString("b")
+fmt.Println(t) // {Num: 2, Str: "b"}
+  #+END_SRC
+
 ** Packages and modules
 
 *** Packages
