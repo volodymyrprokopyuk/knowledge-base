@@ -1,0 +1,332 @@
+* PostgreSQL SQL
+
+** Data types
+
+| Data type        | Size     | Description                              |
+|------------------+----------+------------------------------------------|
+| =boolean=        |          | Boolean value                            |
+| =int=            | 4 bytes  | Standard integers                        |
+| =bigint=         | 8 bytes  | Large integers                           |
+| =numeric(p,s)=   | variable | Precise decimals without rounding errors |
+|------------------+----------+------------------------------------------|
+| =text=           | variable | Unlimited-length string                  |
+| =varchar(n)=     | variable | Limited-length string                    |
+|------------------+----------+------------------------------------------|
+| =date=           |          | Date without time                        |
+| =timestamptz=    |          | Date and time with a time zone           |
+| =interval=       |          | Time duration                            |
+|------------------+----------+------------------------------------------|
+| =type[]=         | variable | Array of =type= elements                 |
+| =bytea=          | variable | Byte array of binary data                |
+|------------------+----------+------------------------------------------|
+| =enum=           |          | Fixed list of type-safe text values      |
+| =jsonb=          |          | Indexable structured JSON data           |
+| =record=         |          | Dynamic, anonymous, generic ROW data     |
+|------------------+----------+------------------------------------------|
+| =variable%type=  |          | Type of a variable                       |
+| =table.col%type= |          | Type of a table column                   |
+| =table%rowtype=  |          | Type of a table row                      |
+
+* PostgreSQL PL/pgSQL
+
+** Statements
+
+- DO block :: Anonymous code bloc
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int := 1;
+begin
+  raise notice '%', i;
+end;
+$$;
+  #+END_SRC
+- Assignment ::
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int;
+  s text;
+  r record; -- Anonymous, generic record
+begin
+  -- Assign the first row to scalars
+  select v.num, v.str into i, s from (values(1, 'a')) v(num, str);
+  raise notice '% %', i, s; -- 1, a
+  -- Assign the first row to a RECORD variable
+  select v.num, v.str into r from (values(2, 'b')) v(num, str);
+  raise notice '% %', r.num, r.str; -- 2, b
+end;
+$$;
+  #+END_SRC
+- if/elsif/then ::
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int := 1;
+begin
+  -- if arbitrary condition
+  if i > 0 and i < 5 then
+    raise notice 'small: %', i;
+  elsif i >= 5 then
+    raise notice 'big: %', i;
+  else
+    raise notice 'unknown: %', i;
+  end if;
+  #+END_SRC
+- case/when/then ::
+  #+BEGIN_SRC sql
+  -- case arbitrary condition
+  case
+  when i > 0 and i < 5 then
+    raise notice 'small: %', i;
+  when i >= 5 then
+    raise notice 'big: %', i;
+  else
+    raise notice 'unknown: %', i;
+  end case;
+  -- case equality
+  case i
+  when 0, 1, 2, 3, 4 then
+    raise notice 'small: %', i;
+  when 5 then
+    raise notice 'big: %', i;
+  else
+    raise notice 'unknown: %', i;
+  end case;
+end;
+$$;
+  #+END_SRC
+- while/loop ::
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int := 0;
+begin
+  loop
+    i := i + 1;
+    exit when i > 3;
+    continue when i = 2;
+    raise notice '%', i; -- 1, 3
+  end loop;
+  i := 0;
+  while i < 3 loop
+    i := i + 1;
+    raise notice '%', i; -- 1, 2, 3
+  end loop;
+end;
+$$;
+  #+END_SRC
+- for/in/loop ::
+  #+BEGIN_SRC sql
+DO $$
+declare
+  r record;
+  num int;
+  str text;
+  arr int[] := array[1, 2, 3];
+begin
+  -- Loop over a range
+  for i in reverse 6..1 by 2 loop
+    raise notice '%', i; -- 6, 4, 2
+  end loop;
+  -- Loop over a query using a RECORD
+  for r in select * from (values (1, 'a'), (2, 'b')) v(num, str) loop
+    raise notice '% %', r.num, r.str; -- 1, a; 2, b
+  end loop;
+  -- Loop over a query using scalars
+  for num, str in select * from (values (1, 'a'), (2, 'b')) v(num, str) loop
+    raise notice '% %', num, str; -- 1, a; 2, b
+  end loop;
+  -- Loop over an array
+  foreach num in array arr loop
+    raise notice '%', num; -- 1, 2, 3
+  end loop;
+END;
+$$;
+  #+END_SRC
+- return next ::
+  #+BEGIN_SRC sql
+create or replace function util.return_iter() returns setof record
+language plpgsql as $$
+declare
+  r record;
+begin
+  return next (1::int, 'a'::text);
+  return next (2::int, 'b'::text);
+end;
+$$;
+select s.num, s.str from util.return_iter() s(num int, str text);
+  #+END_SRC
+- return query ::
+  #+BEGIN_SRC sql
+create or replace function util.return_iter_table()
+returns table (num int, str text)
+language plpgsql as $$
+begin
+  return query
+    select v.num, v.str from (values (1, 'a'), (2, 'b')) v(num, str);
+end;
+$$;
+select s.num, s.str from util.return_iter_table() s(num, str);
+  #+END_SRC
+- begin/exception/when/then ::
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int := 1;
+begin -- Only txs within the block are rolled back on an exception
+  i := i / 0;
+  raise warning 'warn'; -- Print a warning
+  raise exception 'oh'; -- Raise an exception, aborts the transaction
+exception
+  when division_by_zero then
+    raise notice 'division by zero'; -- Log a message
+  when others then
+    raise notice 'other error';
+end;
+$$;
+  #+END_SRC
+
+** Cursors
+
+- Cursor :: A cursor wraps a query and allows to efficiently read a few rows at
+  a time in order to avoid high memory usage on large data sets. =for= loops
+  automatically use cursors internally to avoid high memory usage. A =scroll=
+  cursor supports backward fetches. When a cursor is opened a stateful,
+  server-side portal data structure is created to hold the execution state of a
+  cursor. A cursor within a transaction can be returned to a client and let the
+  client to operate the cursor. The =fetch= operation can retrieve =next/prior=,
+  =firtst/last=, =forward/backward=, =absolute/relative n=
+  #+BEGIN_SRC sql
+do $$
+declare
+  i int;
+  s text;
+  q text;
+  unb refcursor;
+  cur2 scroll cursor for
+    select v.* from (values (1, 'a'), (2, 'b')) v(num, str);
+  cur3 scroll cursor (q text) for
+    select v.* from (values (1, 'a'), (2, 'b')) v(num, str) where v.str = q;
+begin
+  -- unbound cursor, manual fetch and move
+  open unb for select * from (values (1, 'a'), (2, 'b')) v(num, str);
+  fetch next from unb into i, s;
+  raise notice '% %', i, s; -- 1, a
+  move prior from unb;
+  fetch next from unb into i, s;
+  raise notice '% %', i, s; -- 1, a
+  close unb; -- release resources before the end of a transaction
+  -- bound cursor, automatic open and fetch in a loop
+  for r in cur2 loop -- the for automatically opens the cursor
+    raise notice '%', r; -- (1, a), (2, b)
+  end loop;
+  -- parameterized cursor
+  open cur3(q := 'b');
+  fetch next from cur3 into i, s;
+  raise notice '% %', i, s; -- 2, b
+end;
+$$;
+  #+END_SRC
+
+** Transactions
+
+- Transaction :: A new transaction is automatically started in a =procedure= or
+  =do= block when the current transaction is ended with a =commit/rollback=
+  (default transaction configuration) or =commit/rollback and chain= (previous
+  transaction configuraiton)
+
+** Functions
+
+- Block structure :: The block structure defines nested blocks that contain
+  optional variable declarations and block statements. Variable declarations
+  have the block scope and shadow outer variables with the same name. There is
+  an implicit outer block labeled with the function name that contains
+  declarations of function parameters and special variables
+  #+BEGIN_SRC sql
+create or replace function util.block_structure() returns int
+language plpgsql as $$
+<<top>>
+declare -- Top outer block
+  i int := 1;
+begin -- Only groups statements. Does not start a transaction
+  raise notice '%', i; -- 1
+  i := 2;
+  declare -- Nested inner block
+    i int := 3; -- Block scope, variable shadowing
+  begin
+    raise notice '%', i; -- 3
+    raise notice '%', top.i; -- 2
+  end;
+  raise notice '%', i; -- 2
+  return i;
+end;
+$$;
+  #+END_SRC
+- Variable declaration :: All variables used in a block must be declared. Only
+  the variable in a for loop and a cursor loop are automatically declared.
+  Unassigned variables are automatically initialized with the SQL =NULL= value
+  #+BEGIN_SRC sql
+a int; -- NULL initialization
+b int := 1; -- Explicit initialization
+c int default 0; -- Default initialization
+d constant int := 2; -- Constant initialization
+  #+END_SRC
+- Output parameters :: The output parameters allow to return multiple values from
+  a function
+  #+BEGIN_SRC sql
+create or replace function util.quot_rem(
+  a int, b int, out quot int, out rem int -- Implicit anonymous record
+) language plpgsql as $$ -- Implicit returns record
+begin
+  quot := a / b;
+  rem := a % b;
+end;
+$$;
+select * from util.quot_rem(5, 2); -- 2, 1
+
+create or replace function util.quot_rem_table(a int, b int)
+returns table (quot int, rem int) language plpgsql as $$
+begin
+  return query select a / b, a % b;
+end;
+$$;
+select * from util.quot_rem_table(5, 2); -- 2, 1
+  #+END_SRC
+
+** Triggers
+
+- Trigger :: A trigger executes a function of data changes or database events. A
+  chain of triggers may be attached to a table. A trigger function must return
+  either
+  - =null= meaning that subsequent triggers are not fired and DML operations do
+    not occur for this row
+  - =record/row= value for the table meaning that subsequent triggers and DML
+    operations will use the new value
+  #+BEGIN_SRC sql
+drop schema if exists util cascade;
+create schema util;
+create table util.person (
+  name text,
+  updated timestamptz,
+  subject text
+);
+
+create or replace function util.trg_person_log() returns trigger
+language plpgsql as $$
+begin
+  if new.name is null then -- Validate changes
+    raise exception 'name is null';
+  end if;
+  new.updated := current_timestamp; -- Track changes
+  new.subject := current_user;
+  return new;
+end;
+$$;
+
+create trigger trg_person_log before insert or update on util.person
+  for each row execute function util.trg_person_log();
+
+insert into util.person values ('a');
+select * from util.person;
+  #+END_SRC
