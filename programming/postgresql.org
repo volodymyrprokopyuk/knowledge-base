@@ -144,6 +144,38 @@ begin
 END;
 $$;
   #+END_SRC
+- perform vs select vs execute ::
+  #+BEGIN_SRC sql
+drop table if exists util.person;
+create table util.person (
+  name text
+);
+insert into util.person(name) values ('a'), ('b');
+do $$
+declare
+  person_name text;
+begin
+  -- Perform discards results and sets the found variable
+  perform 1 from util.person per where per.name = 'a';
+  if found then
+    raise notice 'at least one row';
+  end if;
+  -- Select assigns the first row into the variables and sets the found variable
+  select per.name into strict person_name
+  from util.person per where per.name = 'a';
+  if found then
+    raise notice 'select into %', person_name;
+  end if;
+  -- Execute dynamic SQL with format %I identifiers and using $1 data values
+  execute format(
+    'select per.name from %I.%I per where per.name = $1', 'util', 'person'
+  ) into strict person_name using 'b';
+  if found then
+    raise notice 'execute into %', person_name;
+  end if;
+end;
+$$;
+  #+END_SRC
 - return next ::
   #+BEGIN_SRC sql
 create or replace function util.return_iter() returns setof record
