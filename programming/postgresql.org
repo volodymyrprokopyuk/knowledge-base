@@ -27,6 +27,26 @@
 | =table.col%type= |          | Type of a table column                   |
 | =table%rowtype=  |          | Type of a table row                      |
 
+** Arrays
+
+- Array :: An array is a 1-based dynamic sequence of elements of the same type
+  #+BEGIN_SRC sql
+do $$
+declare
+  arr int[] := array[1, 2, 3];
+begin
+  raise notice '%', arr; -- {1, 2, 3}
+  raise notice '%', arr[1]; -- 1
+  raise notice '%', arr[2:3]; -- {2, 3}
+  raise notice '%', arr[9]; -- null
+  raise notice '%', 0 || arr; -- {0, 1, 2, 3}
+  raise notice '%', arr || array[4, 5]; -- {1, 2, 3, 4, 5}
+  raise notice '%', 2 = any (arr); -- true
+  raise notice '%', 0 < all (arr); -- true
+end;
+$$;
+  #+END_SRC
+
 * PostgreSQL PL/pgSQL
 
 ** Statements
@@ -178,7 +198,8 @@ $$;
   #+END_SRC
 - return next ::
   #+BEGIN_SRC sql
-create or replace function util.return_iter() returns setof record
+create or replace function util.return_iter()
+returns setof record
 language plpgsql as $$
 declare
   r record;
@@ -304,26 +325,130 @@ b int := 1; -- Explicit initialization
 c int default 0; -- Default initialization
 d constant int := 2; -- Constant initialization
   #+END_SRC
-- Output parameters :: The output parameters allow to return multiple values from
-  a function
+- Positional vs named parameters ::
   #+BEGIN_SRC sql
-create or replace function util.quot_rem(
-  a int, b int, out quot int, out rem int -- Implicit anonymous record
-) language plpgsql as $$ -- Implicit returns record
+create or replace function util.greet(greet text, name text)
+returns text immutable
+language plpgsql as $$
 begin
-  quot := a / b;
-  rem := a % b;
+  return format('%s %s', greet, name);
 end;
 $$;
-select * from util.quot_rem(5, 2); -- 2, 1
+select util.greet('Hello', 'Postgres'); -- Hello Postgres
+select util.greet(name := 'Postgres', greet := 'Hello'); -- Hello Postgres
+  #+END_SRC
+- Default parameters ::
+  #+BEGIN_SRC sql
+create or replace function util.greet(name text, greet text default 'Hi')
+returns text immutable
+language plpgsql as $$
+begin
+  return format('%s %s', greet, name);
+end;
+$$;
+select util.greet(name := 'Postgres', greet := 'Hello'); -- Hello Postgres
+select util.greet(name := 'Postgres'); -- Hi Postgres
+  #+END_SRC
+- Variadic parameters :: Only one variadic parameter must be the last in the
+  parameter list and is treated as an array of a given type
+  #+BEGIN_SRC sql
+create or replace function util.greet(greet text, variadic names text[])
+returns text immutable
+language plpgsql as $$
+begin
+  return format('%s %s', greet, array_to_string(names, ', '));
+end;
+$$;
+select util.greet('Hello', 'a', 'b'); -- Hello a, b
+select util.greet('Hello', variadic array['a', 'b']); -- Hello a, b
+  #+END_SRC
+- Out parameters :: The output parameters allow to return multiple values from a
+  function or a procedure
+  #+BEGIN_SRC sql
+create or replace function util.greet(
+  greet text, name text, out greeting text
+) language plpgsql as $$
+begin
+  greeting := format('%s %s', greet, name);
+end;
+$$;
+select util.greet('Hello', 'Postgres'); -- Hello Postgres
 
-create or replace function util.quot_rem_table(a int, b int)
-returns table (quot int, rem int) language plpgsql as $$
+create or replace procedure util.greet2(
+  greet text, name text, out greeting text
+)
+language plpgsql as $$
 begin
-  return query select a / b, a % b;
+  greeting := format('%s %s', greet, name);
 end;
 $$;
-select * from util.quot_rem_table(5, 2); -- 2, 1
+do $$
+declare
+  greeting text;
+begin
+  call util.greet2('Hello', 'Postgres', greeting);
+  raise notice '%', greeting; -- Hello Postgres
+end;
+$$;
+  #+END_SRC
+- returns setof table type ::
+  #+BEGIN_SRC sql
+create table util.person (
+  id int primary key generated always as identity,
+  first_name text,
+  last_name text,
+  email text
+);
+insert into util.person(first_name, last_name, email)
+values ('First', 'Last', 'email'), ('First 2', 'Last 2', 'email2');
+
+-- A set of util.person table type
+create or replace function util.person_view()
+returns setof util.person stable
+language plpgsql as $$
+begin
+  return query select per.* from util.person per;
+end;
+$$;
+select * from util.person_view(); -- Rows 1, 2
+
+-- A single util.person table type
+create or replace function util.person_view(a_person_id int)
+returns util.person stable
+language plpgsql as $$
+declare
+  person util.person;
+begin
+  select per.* into person from util.person per
+  where per.id = a_person_id;
+  if not found then
+    raise exception 'person ID % not found', a_person_id;
+  end if;
+  return person;
+end;
+$$;
+select * from util.person_view(2); -- Row 2. Exception when not found
+  #+END_SRC
+- returns custom table type ::
+  #+BEGIN_SRC sql
+-- One or more custom table rows
+create or replace function util.person_custom_view(a_person_id int)
+returns table (first_name text, email text) stable
+language plpgsql as $$
+begin
+  if a_person_id != 0 then
+    perform 1 from util.person per where per.id = a_person_id;
+    if not found then
+      raise exception 'person ID % not found', a_person_id;
+    end if;
+  end if;
+  return query
+    select per.first_name, per.email from util.person per
+    where a_person_id = 0 or per.id = a_person_id;
+end;
+$$;
+select * from util.person_custom_view(0); -- Rows 1, 2
+select * from util.person_custom_view(2); -- Row 2. Empty set when not found
   #+END_SRC
 
 ** Triggers
