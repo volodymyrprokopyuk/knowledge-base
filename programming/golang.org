@@ -1762,6 +1762,80 @@ func BenchmarkReduce(b *testing.B) {
 
 * Libraries
 
+** PGX
+
+#+BEGIN_SRC go
+func postgres() error {
+  // The PGX pool is concurrency safe
+  dbp, err := pgxpool.New(ctx, os.Getenv("TRAINER_DB_URL"))
+  if err != nil {
+    return err
+  }
+  defer dbp.Close()
+  // Exec does not return rows
+  tx := `
+begin;
+drop schema if exists util cascade;
+create schema util;
+create table util.person (
+  id int primary key generated always as identity,
+  name text
+);
+insert into util.person(name) values ('a'), ('b');
+commit;`
+  _, err = dbp.Exec(ctx, tx)
+  if err != nil {
+    return err
+  }
+  // CollectRows into a struct using reflection
+  // Query error is safe to skip, as it is deferred to the first row scan
+  rows, _ := dbp.Query(
+    ctx, "select per.id, per.name from util.person per where per.id = $1;", 1,
+  )
+  type person struct {
+    ID int `db:"id"`
+    Name string `db:"name"`
+  }
+  persons, err := pgx.CollectRows(rows, pgx.RowToStructByName[person])
+  if err != nil {
+    return err
+  }
+  fmt.Printf("%+v\n", persons) // [{ID:1 Name:a}]
+  // CollectRows into a struct manually
+  rows, _ = dbp.Query(
+    ctx, "select per.id, per.name from util.person per where per.id = $1", 1,
+  )
+  persons, err = pgx.CollectRows(
+    rows, func(row pgx.CollectableRow) (person, error) {
+      var per person
+      err := row.Scan(&per.ID, &per.Name)
+      if err != nil {
+        return person{}, err
+      }
+      return per, nil
+    },
+  )
+  if err != nil {
+    return err
+  }
+  fmt.Printf("%+v\n", persons) // [{ID:1 Name:a}]
+  // ForEachRow for row-by-row processing
+  rows, _ = dbp.Query(
+    ctx, "select per.id, per.name from util.person per where per.id = $1;", 2,
+  )
+  var id int
+  var name string
+  _, err = pgx.ForEachRow(rows, []any{&id, &name}, func() error {
+    fmt.Printf("%d %s\n", id, name) // 2 b
+    return nil
+  })
+  if err != nil {
+    return err
+  }
+  return nil
+}
+#+END_SRC
+
 ** HTTP
 
 *** HTTP client
