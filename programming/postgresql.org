@@ -291,6 +291,13 @@ $$;
 
 ** Functions
 
+- Function mutability :: Function mutability declares function behavior with
+  respect to data changes
+  - Immutable :: A pure function that does not access tables
+  - Stable :: Returns the same result within a single query. Read-only access to
+    tables
+  - Volatile :: (default) May return different results within a single query.
+    Write access to tables
 - Block structure :: The block structure defines nested blocks that contain
   optional variable declarations and block statements. Variable declarations
   have the block scope and shadow outer variables with the same name. There is
