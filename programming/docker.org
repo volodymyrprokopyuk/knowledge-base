@@ -260,7 +260,7 @@ docker image rm (docker image ls --quiet --all)
 # Space for images, build cache, local volumes and container writable layers
 docker system df
 # Remove all stopped containers, unused networks, dangling images, unused cache
-docker system prune
+docker system prune --force
 #+END_SRC
 
 Container management
@@ -291,7 +291,7 @@ Volume and mount management
 docker volume create $vol
 docker volume ls
 docker volume rm --force $vol
-docker volume prune
+docker volume prune --force
 docker container run --volume $vol:/cntpath $img
 docker container run --name $cnt --rm \
   --mount type=volume,source=$vol,target=/cntpath,readonly $img

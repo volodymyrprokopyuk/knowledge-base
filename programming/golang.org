@@ -623,7 +623,9 @@ if err != nil {
 
 *** panic/recover
 
-- Panic :: The =panic()= built-in function signals the termination of a program
+- defer :: The =defer= function is automatically executed on =return= or
+  =panic()=
+- panic :: The =panic()= built-in function signals the termination of a program
   due to an unrecoverable situation. On panic the execution of functions in the
   call stack stops, *all defer functions are executed* up until the top of the
   current goroutine, and then the program terminates with a non-zero exit code.
@@ -646,6 +648,9 @@ func panicRecover() {
 panicRecover()
 fmt.Println("continue") // panic: oh, continue
   #+END_SRC
+- os.Exit(1) :: ~os.Exit(1)~ immediately terminates the process without running
+  =defer= functions and =recover= handlers. Perform manual cleanup before
+  calling ~os.Exit(1)~
 
 ** Functions and methods
 
@@ -1244,13 +1249,16 @@ fmt.Println(t) // {Num: 2, Str: "b"}
 *** Packages
 
 - Package :: A package is a set of types, functions, and methods defined in
-  multiple files under a package directory. One-word, all-lowercase package name
-  must match the package directory. Every source file in the package directory
-  must have the same package name src_go{ package pkgname }. Top-level
-  Capitalized identifiers are *exported* from a package. Top-level lowercase
-  identifiers are *unexported* and private to a package. *Circular dependencies*
-  between packages *are not allowed*. Merge dependent packages into a single
-  package, or create a new shared package to resolve circular dependencies
+  multiple files under a package directory. A package is the smallest unit of
+  code organization and code compilation. A package provides clear API
+  boundaries by encapsulating private and exporting public identifiers.
+  One-word, all-lowercase package name must match the package directory. Every
+  source file in the package directory must have the same package name src_go{
+  package pkgname }. Top-level Capitalized identifiers are *exported* from a
+  package. Top-level lowercase identifiers are *unexported* and private to a
+  package. *Circular dependencies* between packages *are not allowed*. Merge
+  dependent packages into a single package, or create a new shared package to
+  resolve circular dependencies
   - Import a package src_go{ import "scm/user/module/pkgname" }. All imports are
     available under the =pkgname= identifier
   - Import alias src_go{ import pkgalias "scm/user/module/pkgname" }. All
@@ -1259,8 +1267,9 @@ fmt.Println(t) // {Num: 2, Str: "b"}
 
 *** Modules
 
-- Module :: A module is a unit of versioning identified by a repository path
-  ~scm/user/module~. A module represents either
+- Module :: A module is a collection of packages. A module is a unit of
+  versioning identified by a repository path ~scm/user/module~. A module with
+  its dependencies is defined in =go.mod=. A module represents either
   - Library :: A library contains *importable packages* src_nushell{ go get ...
     }
   - Application :: An application contains *executable commands* src_nushell{ go
