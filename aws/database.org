@@ -1,0 +1,18 @@
+* AWS database
+
+** Amazon Aurora
+
+- Amazon Aurora :: Aurora is a fully managed PostgreSQL service in a single
+  region
+  - Storage :: Aurora provides up to 128 TB distributed, fault-tolerant,
+    auto-scaled in 10 GB increments storage cluster with zero data loss
+    replication. Multi-region data replication can be enabled. Aurora provides
+    continuous backup and point-in-time recovery
+  - Availability :: Aurora provides multi AZ availability with 10-30 sec
+    automatic failover to a standby replica in a single region
+  - Scalability :: Aurora provides up to 15 low-latency parallel read replicas.
+    Aurora decouples database compute and storage layers, so each layer can be
+    scaled independently. Separate read and write API operations for better
+    scalability
+  - Security :: Aurora provides VPC isolation, IAM authentication, data
+    encryption at rest and in transit

@@ -1,0 +1,8 @@
+* AWS monitoring
+
+** Amazon CloudWatch
+
+- Amazon CloudWatch Logs ::
+  - Log group :: A service level
+  - Log stream :: A component or task level
+  - Log event :: A timestamped message

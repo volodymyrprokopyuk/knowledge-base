@@ -1,0 +1,15 @@
+* AWS storage
+
+** Amazon S3
+
+- Amazon S3 :: A Simple Storage Service is a scalable, durable, and secure
+  object store
+  - Security :: S3 uses IAM policies for granting access to S3 buckets. S3
+    provides pre-signed URLs for temporary access for clients to upload or
+    download documents without the need of AWS credentials. S3 provides server
+    side encryption with either S3-managed or KMS-managed encryption keys
+  - Storage :: S3 uses a global namespace, so bucket names must be unique with
+    optional / separators. Object keys are structured with optional /
+    separators. S3 supports versioning, delete protection, and expiration of
+    objects in a bucket. S3 automatically scales by object key, not by bucket
+    name

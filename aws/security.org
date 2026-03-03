@@ -1,0 +1,30 @@
+* AWS security
+
+** AWS IAM
+
+- AWS IAM :: Identity and Access Management
+  - Authentication :: IAM provides strong authentication and identity management
+    for subjects
+    - Identity types ::
+      - IAM users :: An IAM user is a person with long-term credentials
+      - IAM roles :: An IAM role is a temporary identity that can be assumed by
+        a service or a user
+      - Federated identities :: External users authenticated via OIDC, SAML
+  - Authorization :: IAM enforces fine-grained, policy-based, least privilege
+    authorization and access control of subjects performing actions on AWS
+    resources
+    - IAM roles :: IAM roles minimize the use of credentials and secrets by
+      providing temporary, scoped, role-based access to AWS resources through
+      role assumption and STS tokens
+    - Policy types ::
+      - Inline policy :: An inline policy is a unique policy directly attached
+        to a user or a role
+      - Managed policy :: A managed policy is a reusable policy attached to a
+        user or a role
+    - Policy language ::
+      - Effect: allow | deny
+      - Principal: service
+      - Action: service:operation
+      - Resource: arn:aws:service:resource
+      - Condition: optional contextual constraint
+    - Role assumption :: IAM roles are temporary assumed using STS tokens

@@ -1,0 +1,27 @@
+* AWS queue
+
+** Amazon SQS
+
+- Amazon SQS :: The Simple Queue Service is a fully managed, automatically
+  scalable, pull-based, durable, one-to-one, bulkhead FIFO queue that requires
+  acknowledgment of each processed message. The standard SQS provides the
+  at-least-once delivery (requires idempotent consumers) without the ordering
+  guarantee. The FIFO SQS ensures the exactly once delivery with the ordering
+  guarantee. If a message is not acknowledged before the visibility timeout
+  (should be lightly longer that the maximum processing time) expires, the
+  message is returned back to the queue. SQS provides an optional DLQ for
+  handling repeatedly failed messages. Each message can be up to 256 KB. Up to
+  10 messages can be batched in a single pull. Message retention is up to 14
+  days. Multiple consumers can read from a single SQS queue. Messages between
+  consumers are distributed at random
+
+** Amazon SNS
+
+- Amazon SNS :: The Simple Notification Service is a fully managed,
+  automatically scalable, push-based, ephemeral, one-to-many, message
+  distribution fan-out pub/sub. Messages are published to a topic. Multiple
+  subscribes e.g. SQS, Lambda, email, SMS receive a copy of each published
+  message. SNS provides at-least-once delivery (requires idempotent consumers)
+  without the ordering guarantee. SNS supports message filtering for
+  fine-grained content-based message routing. SNS tries to deliver a messages
+  with an exponential backoff for up to 23 days

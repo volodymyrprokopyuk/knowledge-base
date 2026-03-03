@@ -1,0 +1,74 @@
+* AWS network
+
+** VPC
+
+- VPC :: A Virtual Private Cloud is a logically isolated virtual network
+  offering complete control over IP addressing, network segmentation, private,
+  public, and isolated subnets, subnet availability, routing, security, and
+  Internet access. An AWS account has a default VPC in each region. A VPC spans
+  all AZs in a region
+  | VPC netmask | Number of IPs |
+  |-------------+---------------|
+  | 10.0.0.0/16 |         65536 |
+  | 10.0.0.0/20 |          4096 |
+  | 10.0.0.0/24 |           256 |
+  | 10.0.0.0/28 |            16 |
+- VPC network segmentation ::
+  - VPC 10.0.0.0/16
+    - Public subnet 10.0.0.0/24 - Internet gateway inbound/outbound Internet
+      - API gateway, ALB, NAT gateway
+    - Private subnet 10.0.1.0/24 - NAT gateway outbound-only Internet
+      - API containers, ECS tasks (services, jobs), SQS consumers
+    - Isolated subnet 10.0.1.0/24 - No Internet access
+      - RDS database service, Aurora database cluster
+- CIDR addressing :: Classless Inter-Domain Routing ~network IP/network mask~
+  allows for flexible division of IP ranges between subnets e.g. 10.0.0.0/16.
+  Break the main VPC CIDR/16 into smaller non-overlapping CIDR/20 blocks per
+  environment and further into CIDR/24 blocks for public and private subnets
+- Separate VPC per environment :: Separate VPC per environment provides far
+  stronger isolation, security, and independent operation
+  | Env   | VPC          | Pub subnet ALB | Prv subnet ECS | Iso subnet RDS |
+  |-------+--------------+----------------+----------------+----------------+
+  | dev   | 10.10.0.0/20 | 10.10.0.0/24   | 10.10.16.0/24  | 10.10.32.0/24  |
+  | stage | 10.20.0.0/20 | 10.20.0.0/24   | 10.20.16.0/24  | 10.20.32.0/24  |
+  | prod  | 10.30.0.0/16 | 10.30.0.0/20   | 10.30.48.0/20  | 10.30.96.0/20  |
+- Environments and subnets :: The main VPC 10.0.0.0/16 has up to 16 /20 CIDR
+  blocks for different environments. Each /20 CIDR block has up to 16 /24
+  public, private and isolated subnets. Each subnet has up to 256 - 5 reserved =
+  251 IP addresses for servers
+  | Env   | VPC CIDR     | Public subnet | Private subnet | Isolated subnet |
+  |-------+--------------+---------------+----------------+-----------------|
+  | dev   | 10.0.0.0/20  | 10.0.0.0/24   | 10.0.1.0/24    | 10.0.2.0/24     |
+  | stage | 10.0.16.0/20 | 10.0.16.0/24  | 10.0.17.0/24   | 10.0.18.0/24    |
+  | prod  | 10.0.32.0/20 | 10.0.32.0/24  | 10.0.33.0/24   | 10.0.34.0/24    |
+- Subnet :: A subnet is a logical subdivision of VPC IP range within a single AZ
+  between public, private, and isolated subnets. VPC reserves 5 IP addresses per
+  subnet for internal use. Separate RDS databases with no Internet access
+  (isolated subnet), from ECS tasks (services, jobs) and SQS consumers with
+  outbound-only Internet access (private subnet) to define the network
+  segmentation, enforce the least privilege, and the defense in depth principles
+  using fine grained routing table rules, stricter security groups, and network
+  ACL. Deploy components to multiple (at least 2) AZ for high availability e.g.
+  API containers, SQS consumers. Tag all subnets with =environment.AZ.component=
+- Route table :: A route table directs traffic to an Internet gateway, a NAT
+  gateway, or to other subnets. Keep inter-service communication within VPC, not
+  over Internet
+- Internet gateway :: An Internet gateway enables bidirectional access to
+  Internet for public subnets
+- NAT gateway :: A NAT gateway enables instances in a private subnet to access
+  Internet without being exposed to inbound traffic. AWS automatically load
+  balances traffic between NAT gateways in different subnets/AZs
+- Network ACL :: A network ACL is a stateless, subnet-level firewall at the
+  subnet level for coarse-grained network security. Network ACL have both allow
+  and deny rules. Rules evaluation order matters
+
+** AWS security groups
+
+- Security group :: A SG is a fine-grained, stateful, virtual firewall that
+  controls inbound and outbound traffic at the instance level and a port or the
+  ENI level. SGs are stateful, so if inbound traffic on a port is allowed, than
+  the outbound traffic is automatically allowed, and vice versa. SGs have only
+  allow rules, not deny rules. Use SG referencing to allow access from one SG to
+  another, instead of IPs or networks e.g. 0.0.0.0/0. SGs scale automatically
+  with EC2 instances or ECS services they protect. By default all egress
+  0.0.0.0/0 is allowed unless overridden

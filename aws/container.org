@@ -1,0 +1,23 @@
+* AWS container
+
+** AWS Fargate
+
+- AWS Fargate :: Fargate is a serverless compute engine for running containers
+  without managing servers. Fargate works with Amazon Container/Kubernetes
+  Services ECS/EKS
+  - Networking :: Fargate supports only =awsvpc= where each task gets its own
+    ENI attached directly to a VPC subnet
+  - Scalability :: Fargate automatically manages provisioning and scaling of
+    infrastructure. Only the vCPU and memory have to be specified at the task
+    level and the count of tasks has to be specified at the service level.
+    Fargate tasks must be stateless for horizontal scaling. Fargate
+    automatically distributes traffic between subnets in different AZs if the
+    desired count of service instances is greater than 1. Fargate automatically
+    replaces crashed service instances to meet the desired count of service
+    instances
+  - Task types ::
+    - ecs.Service :: A continuous server (request, response) behind ALB or a
+      continuous worker (poll, process, acknowledge) behind SQS automatically
+      restarted on crash
+    - ecs.Task :: A one-time job run to completion or a recurrent job
+      scheduled periodically
