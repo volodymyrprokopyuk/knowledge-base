@@ -62,7 +62,60 @@
   subnet level for coarse-grained network security. Network ACL have both allow
   and deny rules. Rules evaluation order matters
 
-** AWS security groups
+** Route table
+
+- Route table :: A route table decides the next network hop by specifying a
+  destination network prefix and a routing target e.g. Internet gateway, NAT
+  gateway, Transit gateway, VPC peering. VPC owns all route tables including the
+  default main route table. Each subnet is associated with exactly one route
+  table either explicitly or implicitly with the main route table. Multiple
+  subnets can share the same route table. Route table rules
+  #+begin_src yaml
+  # Local VPC (always present)
+  Destination: 10.0.0.0/16 # VPC CIDR
+  Target: local
+  # Bidirectional Internet (public subnet)
+  Destination: 0.0.0.0/0
+  Target: Internet gateway ID
+  # Outbound Internet (private subnet)
+  Destination: 0.0.0.0/0
+  Target: NAT gateway ID
+  # Other VPCs
+  Destination: 10.1.0.0/16 # Other VPC CIDR
+  Target: VPC peering, Transit gateway ID
+  # On premise network
+  Destination: Network IP
+  Target: Direct connect, VPN
+  #+end_src
+
+** Internet gateway
+
+- Internet gateway :: The Internet gateway is a fully managed, highly available,
+  horizontally scalable VPC component that enables the inbound and outbound
+  Internet access for public subnets. The Internet gateway supports both IPv4
+  and IPv6. Multiple public subnets can be attached to a single Internet
+  gateway.
+
+** NAT gateway
+
+- NAT gateway :: The NAT gateway is a fully managed, highly available,
+  horizontally scalable VPC component that enables only the outbound Internet
+  access for private subnets. The NAT gateway enables AWS resources in private
+  subnets access the Internet without being exposed to the Internet. The NAT
+  gateway support only IPv4 (use the Egress-only Internet gateway for IPv6). A
+  NAT gateway must be placed in a public subnet. An Elastic IP must be attached
+  to a NAT gateway. A private subnet must have a route targeting a NAT gateway.
+  The flow is: EC2 => route table => NAT gateway => Internet gateway => Internet
+
+** Transit gateway
+
+** VPC peering
+
+** Direct connect
+
+** Private link
+
+** Security groups
 
 - Security group :: A SG is a fine-grained, stateful, virtual firewall that
   controls inbound and outbound traffic at the instance level and a port or the
