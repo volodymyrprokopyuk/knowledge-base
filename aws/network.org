@@ -92,28 +92,70 @@
 
 - Internet gateway :: The Internet gateway is a fully managed, highly available,
   horizontally scalable VPC component that enables the inbound and outbound
-  Internet access for public subnets. The Internet gateway supports both IPv4
-  and IPv6. Multiple public subnets can be attached to a single Internet
-  gateway.
+  Internet access for instances with public IPs or Elastic IPs in public
+  subnets. The Internet gateway is attached to a VPC, not public subnets. Only
+  one Internet gateway can be attached to a VPC. Multiple public subnets can be
+  attached to a single Internet gateway. A public subnet must have a route
+  targeting an Internet gateway. The Internet gateway supports both IPv4 and
+  IPv6.
 
 ** NAT gateway
 
 - NAT gateway :: The NAT gateway is a fully managed, highly available,
   horizontally scalable VPC component that enables only the outbound Internet
-  access for private subnets. The NAT gateway enables AWS resources in private
-  subnets access the Internet without being exposed to the Internet. The NAT
-  gateway support only IPv4 (use the Egress-only Internet gateway for IPv6). A
-  NAT gateway must be placed in a public subnet. An Elastic IP must be attached
-  to a NAT gateway. A private subnet must have a route targeting a NAT gateway.
-  The flow is: EC2 => route table => NAT gateway => Internet gateway => Internet
+  access for instances with private IPs in private subnets. The NAT gateway
+  enables AWS resources in private subnets access the Internet without being
+  exposed to the Internet. A NAT gateway must be placed in a public subnet. An
+  Elastic IP must be attached to a NAT gateway. Use one NAT gateway per
+  availability zone. A private subnet must have a route targeting a NAT gateway.
+  The flow is: ~private EC2 => NAT gateway => Internet gateway => Internet~. The
+  NAT gateway support only IPv4 (use the Egress-only Internet gateway for IPv6).
 
 ** Transit gateway
 
+- Transit gateway :: The Transit gateway is a fully manage, highly available,
+  horizontally scalable AWS networking service that acts as a central hub for
+  connecting multiple networks e.g. VPCs via VPC attachments, other AWS regions
+  via Transit gateway peering, on-premises networks via VPN connections, private
+  data centers via Direct connect. The Transit gateway provides centralized
+  routing between multiple networks, route segmentation through multiple route
+  tables, and traffic control through routing policies. The Transit gateway
+  supports transitive routing ~A => B => C~
+- The Transit gateway use cases
+  - Large multi-VPC network architectures
+  - Large multi-region network architectures
+  - Large hybrid cloud network architectures
+
 ** VPC peering
+
+- VPC peering :: The VPC peering provides a direct point-to-point private,
+  potentially cross-account and cross-region connection between two VPCs. The
+  VPC peering allows two VPCs with non-overlapping CIDR blocks to communicate
+  directly using private IPs as if they were part of the same network. VPC
+  peering does not support transitive connectivity, ~A => B~ only. Route tables
+  of each VPC must be updated to enable VPC peering
+  #+begin_src yaml
+  # VPC-A 10.0.0.0/16
+  Destination: 10.1.0.0/16 # VPC-B
+  Target: VPC peering ID
+  # VPC-B 10.1.0.0/16
+  Destination: 10.0.0.0/16 # VPC-A
+  Target: VPC peering ID
+  #+end_src
 
 ** Direct connect
 
-** Private link
+- Direct connect :: The Direct connect is a service that provides dedicated,
+  private (not over the Internet), high-latency, low-bandwidth network
+  connections between an on-premises data center and VPCs and AWS resources. The
+  Direct connect can use a VPN connection over Internet as a failover
+
+** PrivateLink
+
+- PrivateLink :: The PrivateLink is a network service that enables private
+  connections inside the AWS network to AWS resources, private services in
+  another VPC without exposing traffic to the Internet (without the Internet
+  gateway, the NAT gateway, the Transit gateway, the VPC peering)
 
 ** Security groups
 
