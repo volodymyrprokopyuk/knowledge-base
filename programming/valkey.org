@@ -1,0 +1,119 @@
+* Valkey
+
+- Valkey :: Valkey is a distributed (async replication), in-memory, flat TTL
+  keyspace of prefixed keys mapped to typed values. Valkey is a remote data
+  structure server that provides atomic operations on String, Hash, List, Set,
+  SortedSet in-memory data structures. Valkey acts as a fast, ephemeral
+  operational store e.g. cache, session store, event store, rate limiting,
+  message blocker, streaming engine
+#+begin_src fish
+docker run --interactive --tty --network sem_default \
+  --rm valkey/valkey-bundle:9-trixie valkey-cli -h valkey
+#+end_src
+
+** Data types
+
+- String :: A String is a sequence of bytes that can store any type of data e.g.
+  text, numeric, bitmap, binary. A String is implemented using a Simple Dynamic
+  String SDS with a constant time length lookup, binary safety, and
+  type-dependent dynamic encoding e.g integer, header-embedded small strings,
+  header-separated large strings
+  - String operations ::
+    - =set, get= O(1)
+    - =mset, mget= O(1) multiple keys
+    - =setrange, getrange= O(n)
+    - =incr, decr= O(1) integer value
+    - =incrby, decrby= O(1)
+    - =append= O(1)
+    - =strlen= O(1)
+    - =getdel, getset= O(1)
+    - =delifeq= O(1)
+    - =setbit, getbit= O(1) memory-efficient array of bits
+    - =bitop= O(n) and, or, xor, not
+    - =bitcount= O(n) 0/1 total count
+    - =bitpos= O(n) first 0/1 position
+    - =bitfield= O(1) packed counters of arbitrary size signed/unsigned integers
+  - String use cases ::
+    - Cache text or binary data
+    - Store blobs and serialized objects
+    - Track real-time counters and metrics
+    - Store session tokens and user information
+    - Track bitmaps of user presence, preferences, or feature flags
+    - Atomic acquire/release locks
+- List :: A List is a linked list of String values e.g. stack, queue. A List
+  supports blocking commands to implement a queue with producers and consumers.
+  A String is consumed by exactly one consumer. After consumption a String is
+  removed from the List. An empty List is automatically created on the first
+  push. A List key is automatically deleted when the List becomes empty
+- Set :: A Set is an unordered collection of unique Strings with efficient
+  membership testing and efficient union, intersection, and difference
+- SortedSet :: A SortedSet is an ordered by a double precision score collection
+  of unique Strings. Different Strings with the same score are ordered
+  lexicographically.
+- Hash :: A Hash is a structure with field-value pairs.
+- Stream :: A Stream is an append-only log of Hashes under monotonically
+  increasing server-generated IDs =millisTime-sequenceNumber= with efficient
+  random access, efficient range queries by ID, and fan out consumption via
+  consumer groups. Clients in a consumer group must acknowledge processing of
+  each delivered Hash. Multiple consumer groups can read a Stream. A Stream
+  supports blocking commands to implement a stream with publishers and
+  subscribers. Each Hash will be delivered to all subscribers by default. After
+  delivery a Hash remains indefinitely in the Stream, unless explicitly removed
+- Pub/Sub :: A Pub/Sub provides the at-most-once delivery of published messages
+  to subscribes. A Pub/Sub is totally independent from the keyspace. A published
+  message is delivered to all subscribers. A published message is lost if there
+  are no subscribers
+- Transactions =multi ... exec/discard= :: Transactions provide atomic execution
+  of a group of queued commands without a rollback on failure. Command queuing
+  errors discard the transaction. After queuing all commands are executed even
+  if some commands fail
+- Optimistic locking =watch .. exec ... exec/discard= :: Optimistic locking
+  provides the check-and-set monitoring of keys before =exec=. If at least one
+  key is modified the transaction is aborted
+- Secondary indices ::
+  - Numeric field range query index :: Use a SortedSet =zadd/zrange= to build
+    and range query an index on a numeric field mapping to a Hash ID
+  - Lexicographical index :: Use a SortedSet =zadd/zrange= with the same 0 score
+    for all elements. Every element can have appended extra fields (possibly
+    padded) separated by =:= e.g. a frequency suffix that influences the rank of
+    the element (composite index). The elements are sorted by their byte
+    representation
+- Distributed lock ::
+  - Acquire a lock =set lock:resource lock_id nx ex 30=
+  - Release a lock =delifeq lock:resource lock_id=
+  - Otherwise a lock will be expired
+
+** TODO
+
+*** Development
+
+- Key by entry vs Hash under a single key
+- Bit fields
+- Bit maps
+- Bloom filters probabilistic
+- HyperLogLog probabilistic
+- DONE. Data types
+- DONE. Distributed locks
+- DONE. Hashes
+- DONE. Key eviction
+- DONE. Keyspace
+- DONE. Lists
+- DONE. Patterns example
+- DONE. Pipelining
+- DONE. Pub/Sub
+- DONE. Sets
+- DONE. Sorted sets
+- DONE. Secondary indices
+- DONE. Streams
+- DONE. Strings
+- DONE. Transactions
+- Valkey JSON module
+- Valkey search module
+
+*** Deployment
+
+- Configuration
+- Persistence
+- Replication
+- Security
+- ACL
