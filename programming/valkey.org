@@ -40,11 +40,29 @@ docker run --interactive --tty --network sem_default \
     - Store session tokens and user information
     - Track bitmaps of user presence, preferences, or feature flags
     - Atomic acquire/release locks
-- List :: A List is a linked list of String values e.g. stack, queue. A List
+- List :: A List is a doubly linked list (quicklist) of small arrays (listpacks)
+  of ordered String values with constant time operations on the edges. A List
   supports blocking commands to implement a queue with producers and consumers.
   A String is consumed by exactly one consumer. After consumption a String is
-  removed from the List. An empty List is automatically created on the first
-  push. A List key is automatically deleted when the List becomes empty
+  removed from the List
+  - List operations ::
+    - =lpush, rpush= O(1)
+    - =lpop, rpop= O(1)
+    - =blpop, brpop= O(1) blocking pop
+    - =lmove, blmove= O(1) between two lists
+    - =llen= O(1)
+    - =lrange= O(n)
+    - =lset= O(n) set by index
+    - =lindex= O(n) get by index
+    - =lpos= O(n) index of the first value
+    - =linsert= O(n) before or after the first value
+    - =lrem= O(n) remove by value
+    - =ltrim= O(n)
+  - List use cases ::
+    - Schedule jobs for in-order processing
+    - Store the last N items (via =ltrim=)
+    - Implement a blocking queue
+    - Implement a blocking stack
 - Set :: A Set is an unordered collection of unique Strings with efficient
   membership testing and efficient union, intersection, and difference
 - SortedSet :: A SortedSet is an ordered by a double precision score collection
