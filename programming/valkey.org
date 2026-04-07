@@ -64,10 +64,63 @@ docker run --interactive --tty --network sem_default \
     - Implement a blocking queue
     - Implement a blocking stack
 - Set :: A Set is an unordered collection of unique Strings with efficient
-  membership testing and efficient union, intersection, and difference
+  membership check and efficient union, intersection, and difference operations.
+  A Set is a hash table
+  - Set operations ::
+    - =sadd= O(1)
+    - =sismember= O(1)
+    - =srem= O(1)
+    - =smove= O(1)
+    - =scard= O(1)
+    - =srandmember, spop= O(1) get, remove random element
+    - =smembers= O(n) blocking, return all members at onece
+    - =sscan= O(n) non-blocking, cursor-based, incremental iteration
+    - =sunion, sunionstore= O(n)
+    - =sinter, sinterstore= O(n)
+    - =sdiff, sdiffstore= O(n)
+  - Set use cases ::
+    - Store unique values without duplicates e.g. tags, categories, permissions
+    - Check membership and find out mutual friends
+    - Perform set operations e.g. union, intersection, difference
 - SortedSet :: A SortedSet is an ordered by a double precision score collection
-  of unique Strings. Different Strings with the same score are ordered
-  lexicographically.
+  of unique Strings with efficient rank and range operations. Different Strings
+  with the same score are ordered lexicographically by their representation
+  bytes. A SortedSet consists of a hash table mapping a value to a score, and a
+  skip list for efficient insertion, deletion, range, and rank operations
+  ordered by score (similar to a balanced tree)
+  - Skip list :: A skip list is a probabilistic ordered data structure that
+    consists of multiple layered linked lists with logarithmic insert, delete,
+    and search operations. A skip list provides an efficient range traversal
+    with good CPU cache locality. A skip list requires minimal contained locks
+    for concurrent access. The skip list delete operation has always predictable
+    time without rebalancing rotations. A skip list is probabilistic, while
+    balanced trees are deterministic. A skip list has a simpler implementation
+    compared to balanced trees. A skip list consumes more memory than balanced
+    trees
+  - SortedSet operations ::
+    - =zadd= O(log(n)) add member or update score of member
+    - =zrem= O(log(n))
+    - =zremrangebyscore, zremrangebyrank= O(log(n))
+    - =zscore= O(1) return score of member
+    - =zrandmember= O(1)
+    - =zcard= O(1)
+    - =zcount= O(log(n)) count members within range by score
+    - =zrank, zrevrank= O(log(n)) return in-order position or index
+    - =zrange, zrevrange= O(log(n)) range by rank, by score, by lex
+    - =zpopmin, zpopmax= O(log(n))
+    - =bzpopmin, bzpopmax= O(log(n)) blocking
+    - =zincrby= O(log(n)) increment score of member
+    - =zscan= O(n) non-blocking, cursor-based, incremental iteration
+    - =zunion, zunionstore= O(n)
+    - =zinter, zinterstore= O(n)
+    - =zdiff, zdiffstore= O(n)
+  - SortedSet use cases ::
+    - Store leaderboards and rankings
+    - Query top N elements
+    - Schedule jobs priority-based processing
+    - Implement sliding window rate limiter
+    - Order time series by a timestamp score
+    - Implement a priority queue
 - Hash :: A Hash is a structure with field-value pairs.
 - Stream :: A Stream is an append-only log of Hashes under monotonically
   increasing server-generated IDs =millisTime-sequenceNumber= with efficient
@@ -85,7 +138,7 @@ docker run --interactive --tty --network sem_default \
   of a group of queued commands without a rollback on failure. Command queuing
   errors discard the transaction. After queuing all commands are executed even
   if some commands fail
-- Optimistic locking =watch .. exec ... exec/discard= :: Optimistic locking
+- Optimistic locking =watch/unwatch ... exec/discard= :: Optimistic locking
   provides the check-and-set monitoring of keys before =exec=. If at least one
   key is modified the transaction is aborted
 - Secondary indices ::
@@ -100,6 +153,20 @@ docker run --interactive --tty --network sem_default \
   - Acquire a lock =set lock:resource lock_id nx ex 30=
   - Release a lock =delifeq lock:resource lock_id=
   - Otherwise a lock will be expired
+- Valkey design patterns
+  - Prefer efficient single key design to minimize the number of keys involved
+    in a request
+  - Design for expiration and explicit deletion of every key. Use TTL
+    aggressively for ephemeral state to automatically remove expired data
+  - Choose the data type by access pattern, not by data shape. Strings for
+    values and counters. Hashes for structures of related data. Lists for
+    efficient edge push and pop. Sets for efficient membership check of unique
+    values. SortedSets for efficient ranking and range queries
+  - Prefer non-blocking incremental scans over blocking full dumps of large
+    collections
+  - Use server-side Lua scripts for multi-step atomic logic e.g. check-then-act,
+    read-modify-write, instead of =watch ... exec= optimistic locking with
+    client-side checks and retries
 
 ** TODO
 
