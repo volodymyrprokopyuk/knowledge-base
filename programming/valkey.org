@@ -11,7 +11,7 @@ docker run --interactive --tty --network sem_default \
   --rm valkey/valkey-bundle:9-trixie valkey-cli -h valkey
 #+end_src
 
-** Data types
+** Data structures
 
 - String :: A String is a sequence of bytes that can store any type of data e.g.
   text, numeric, bitmap, binary. A String is implemented using a Simple Dynamic
@@ -40,6 +40,20 @@ docker run --interactive --tty --network sem_default \
     - Store session tokens and user information
     - Track bitmaps of user presence, preferences, or feature flags
     - Atomic acquire/release locks
+- Hash :: A Hash is a structure of String field-value pairs with efficient field
+  level query and update under a single key. A Hash is a hash table
+  - Hash operations ::
+    - =hset, hget= O(1)
+    - =hmset, hmget= O(1) set, get multiple fields
+    - =hincrby= O(1)
+    - =hexists= O(1)
+    - =hdel= O(1)
+    - =hlen= O(1)
+    - =hkeys, hvals, hgetall= O(n)
+    - =hscan= O(n)
+  - Hash use cases ::
+    - Store structures and objects e.g. user profile, user session
+    - Cache structures and objects
 - List :: A List is a doubly linked list (quicklist) of small arrays (listpacks)
   of ordered String values with constant time operations on the edges. A List
   supports blocking commands to implement a queue with producers and consumers.
@@ -121,26 +135,6 @@ docker run --interactive --tty --network sem_default \
     - Implement sliding window rate limiter
     - Order time series by a timestamp score
     - Implement a priority queue
-- Hash :: A Hash is a structure with field-value pairs.
-- Stream :: A Stream is an append-only log of Hashes under monotonically
-  increasing server-generated IDs =millisTime-sequenceNumber= with efficient
-  random access, efficient range queries by ID, and fan out consumption via
-  consumer groups. Clients in a consumer group must acknowledge processing of
-  each delivered Hash. Multiple consumer groups can read a Stream. A Stream
-  supports blocking commands to implement a stream with publishers and
-  subscribers. Each Hash will be delivered to all subscribers by default. After
-  delivery a Hash remains indefinitely in the Stream, unless explicitly removed
-- Pub/Sub :: A Pub/Sub provides the at-most-once delivery of published messages
-  to subscribes. A Pub/Sub is totally independent from the keyspace. A published
-  message is delivered to all subscribers. A published message is lost if there
-  are no subscribers
-- Transactions =multi ... exec/discard= :: Transactions provide atomic execution
-  of a group of queued commands without a rollback on failure. Command queuing
-  errors discard the transaction. After queuing all commands are executed even
-  if some commands fail
-- Optimistic locking =watch/unwatch ... exec/discard= :: Optimistic locking
-  provides the check-and-set monitoring of keys before =exec=. If at least one
-  key is modified the transaction is aborted
 - Secondary indices ::
   - Numeric field range query index :: Use a SortedSet =zadd/zrange= to build
     and range query an index on a numeric field mapping to a Hash ID
@@ -149,24 +143,51 @@ docker run --interactive --tty --network sem_default \
     padded) separated by =:= e.g. a frequency suffix that influences the rank of
     the element (composite index). The elements are sorted by their byte
     representation
+
+** Streaming
+
+- Pub/Sub :: A Pub/Sub provides the at-most-once delivery of published messages
+  to subscribes. A Pub/Sub is totally independent from the keyspace. A published
+  message is delivered to all subscribers. A published message is lost if there
+  are no subscribers
+- Stream :: A Stream is an append-only log of Hashes under monotonically
+  increasing server-generated IDs =millisTime-sequenceNumber= with efficient
+  random access, efficient range queries by ID, and fan out consumption via
+  consumer groups. Clients in a consumer group must acknowledge processing of
+  each delivered Hash. Multiple consumer groups can read a Stream. A Stream
+  supports blocking commands to implement a stream with publishers and
+  subscribers. Each Hash will be delivered to all subscribers by default. After
+  delivery a Hash remains indefinitely in the Stream, unless explicitly removed
+
+** Transactions and locks
+
+- Transactions =multi ... exec/discard= :: Transactions provide atomic execution
+  of a group of queued commands without a rollback on failure. Command queuing
+  errors discard the transaction. After queuing all commands are executed even
+  if some commands fail
+- Optimistic locking =watch/unwatch ... exec/discard= :: Optimistic locking
+  provides the check-and-set monitoring of keys before =exec=. If at least one
+  key is modified the transaction is aborted
 - Distributed lock ::
   - Acquire a lock =set lock:resource lock_id nx ex 30=
   - Release a lock =delifeq lock:resource lock_id=
   - Otherwise a lock will be expired
-- Valkey design patterns
-  - Prefer efficient single key design to minimize the number of keys involved
-    in a request
-  - Design for expiration and explicit deletion of every key. Use TTL
-    aggressively for ephemeral state to automatically remove expired data
-  - Choose the data type by access pattern, not by data shape. Strings for
-    values and counters. Hashes for structures of related data. Lists for
-    efficient edge push and pop. Sets for efficient membership check of unique
-    values. SortedSets for efficient ranking and range queries
-  - Prefer non-blocking incremental scans over blocking full dumps of large
-    collections
-  - Use server-side Lua scripts for multi-step atomic logic e.g. check-then-act,
-    read-modify-write, instead of =watch ... exec= optimistic locking with
-    client-side checks and retries
+
+** Valkey design patterns
+
+- Prefer efficient single key design to minimize the number of keys involved in
+  a request
+- Design for expiration and explicit deletion of every key. Use TTL aggressively
+  for ephemeral state to automatically remove expired data
+- Choose the data type by access pattern, not by data shape. Strings for values
+  and counters. Hashes for structures of related data. Lists for efficient edge
+  push and pop. Sets for efficient membership check of unique values. SortedSets
+  for efficient ranking and range queries
+- Prefer non-blocking incremental scans over blocking full dumps of large
+  collections
+- Use server-side Lua scripts for multi-step atomic logic e.g. check-then-act,
+  read-modify-write, instead of =watch ... exec= optimistic locking with
+  client-side checks and retries
 
 ** TODO
 
