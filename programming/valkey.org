@@ -135,14 +135,15 @@ docker run --interactive --tty --network sem_default \
     - Implement sliding window rate limiter
     - Order time series by a timestamp score
     - Implement a priority queue
-- Secondary indices ::
-  - Numeric field range query index :: Use a SortedSet =zadd/zrange= to build
-    and range query an index on a numeric field mapping to a Hash ID
-  - Lexicographical index :: Use a SortedSet =zadd/zrange= with the same 0 score
-    for all elements. Every element can have appended extra fields (possibly
-    padded) separated by =:= e.g. a frequency suffix that influences the rank of
-    the element (composite index). The elements are sorted by their byte
-    representation
+- Secondary index ::
+  - SortedSet by score index :: The index =zadd= provides efficient
+    =zrange/byscore= range queries by numeric values e.g. integers, timestamps.
+    A secondary index is composed of a =SortedSet(score, Hash key)= efficient
+    mapping, and a =key => Hash= structured storage. The index lookup combines
+    two operations =zrange/byscore => Hash key=, =hgetall => Hash values=
+  - SortedSet lexicographical index :: The index =zadd= provides efficient range
+    =zrange/bylex= queries by representation bytes of Strings with the same 0
+    score. Strings can have padded prefixes or suffixes that change the ordering
 
 ** Streaming
 
@@ -190,33 +191,6 @@ docker run --interactive --tty --network sem_default \
   client-side checks and retries
 
 ** TODO
-
-*** Development
-
-- Key by entry vs Hash under a single key
-- Bit fields
-- Bit maps
-- Bloom filters probabilistic
-- HyperLogLog probabilistic
-- DONE. Data types
-- DONE. Distributed locks
-- DONE. Hashes
-- DONE. Key eviction
-- DONE. Keyspace
-- DONE. Lists
-- DONE. Patterns example
-- DONE. Pipelining
-- DONE. Pub/Sub
-- DONE. Sets
-- DONE. Sorted sets
-- DONE. Secondary indices
-- DONE. Streams
-- DONE. Strings
-- DONE. Transactions
-- Valkey JSON module
-- Valkey search module
-
-*** Deployment
 
 - Configuration
 - Persistence
