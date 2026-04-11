@@ -56,7 +56,7 @@ docker run --interactive --tty --network sem_default \
     - Cache structures and objects
 - List :: A List is a doubly linked list (quicklist) of small arrays (listpacks)
   of ordered String values with constant time operations on the edges. A List
-  supports blocking commands to implement a queue with producers and consumers.
+  supports blocking operations to implement a queue with producers and consumers.
   A String is consumed by exactly one consumer. After consumption a String is
   removed from the List
   - List operations ::
@@ -145,20 +145,38 @@ docker run --interactive --tty --network sem_default \
     =zrange/bylex= queries by representation bytes of Strings with the same 0
     score. Strings can have padded prefixes or suffixes that change the ordering
 
-** Streaming
+** Stream
 
-- Pub/Sub :: A Pub/Sub provides the at-most-once delivery of published messages
-  to subscribes. A Pub/Sub is totally independent from the keyspace. A published
-  message is delivered to all subscribers. A published message is lost if there
-  are no subscribers
-- Stream :: A Stream is an append-only log of Hashes under monotonically
-  increasing server-generated IDs =millisTime-sequenceNumber= with efficient
-  random access, efficient range queries by ID, and fan out consumption via
-  consumer groups. Clients in a consumer group must acknowledge processing of
-  each delivered Hash. Multiple consumer groups can read a Stream. A Stream
-  supports blocking commands to implement a stream with publishers and
-  subscribers. Each Hash will be delivered to all subscribers by default. After
-  delivery a Hash remains indefinitely in the Stream, unless explicitly removed
+- Stream :: A Stream is an append-only, persistent, time-ordered log of
+  Hash-like field-value messages under monotonically increasing server-generated
+  IDs =ms-seq=. A Stream provides a time-ordered sequence of messages, fan-out
+  broadcast of every message to all consumers, workload distribution of messages
+  between consumers in a consumer group, at-least-once delivery of messages in a
+  consumer group. Each delivered message must be acknowledged by a consumer in a
+  consumer group. Unacknowledged messages will be re-delivered to another
+  consumer in a consumer group. After delivery a message remains indefinitely in
+  the Stream, unless explicitly removed. A Stream supports blocking operations
+  to implement a stream with producers and consumers. A stream is a radix tree
+  of listpacks with efficient lookup by message ID and efficient range queries
+  by ID prefix
+  - Stream operations ::
+    - =xadd= O(1)
+    - =xlen= O(1)
+    - =xread= O(log(n)) supports blocking, non-consumer group
+    - =xrange, xrevrange= O(n)
+    - =xack= O(1)
+    - =xdel= O(1)
+    - =xtrim= O(1)
+    - =xgroup= O(1)
+    - =xreadgroup= O(1) read new messages and assign ownership within a consumer
+      group
+    - =xautoclaim= O(1) change ownership of unacknowledged messages in a
+      consumer group
+  - Stream use cases ::
+    - Message broker with acknowledge-based, reliable delivery of messages
+    - Job queue with workload distribution between consumers in a consumer group
+    - Event sourcing of time-ordered message log e.g. audit log
+    - Replay messages on recovery. Re-read the whole message history
 
 ** Transactions and locks
 
