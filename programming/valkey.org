@@ -162,14 +162,15 @@ docker run --interactive --tty --network sem_default \
   - Stream operations ::
     - =xadd= O(1)
     - =xlen= O(1)
-    - =xread= O(log(n)) supports blocking, non-consumer group
+    - =xread= O(log(n)) no consumer group, no automatic state tracking, no
+      message ownership, no ack required, supports blocking
     - =xrange, xrevrange= O(n)
     - =xack= O(1)
     - =xdel= O(1)
     - =xtrim= O(1)
     - =xgroup= O(1)
     - =xreadgroup= O(1) read new messages and assign ownership within a consumer
-      group
+      group, automatic server-side state tracking, requires ack
     - =xautoclaim= O(1) change ownership of unacknowledged messages in a
       consumer group
   - Stream use cases ::
@@ -178,19 +179,38 @@ docker run --interactive --tty --network sem_default \
     - Event sourcing of time-ordered message log e.g. audit log
     - Replay messages on recovery. Re-read the whole message history
 
-** Transactions and locks
+** Transactions
 
-- Transactions =multi ... exec/discard= :: Transactions provide atomic execution
-  of a group of queued commands without a rollback on failure. Command queuing
-  errors discard the transaction. After queuing all commands are executed even
-  if some commands fail
-- Optimistic locking =watch/unwatch ... exec/discard= :: Optimistic locking
-  provides the check-and-set monitoring of keys before =exec=. If at least one
-  key is modified the transaction is aborted
-- Distributed lock ::
-  - Acquire a lock =set lock:resource lock_id nx ex 30=
-  - Release a lock =delifeq lock:resource lock_id=
+- Transactions =multi cmds... exec/discard= :: Transactions provide atomic
+  execution without interruption of a group of queued commands without a
+  rollback on failure. Errors during command queuing discard the transaction.
+  If a command fails during execution other commands are still executed
+- Optimistic locking =watch/unwatch keys... multy cmds... exec/discard= ::
+  Optimistic locking provides the check-and-set monitoring of keys before
+  =exec=. If at least one key is modified between =watch= and =exec= the
+  transaction is aborted, and the client must retry
+
+** Locks
+
+- Distributed lock :: A distributed lock on a single Valkey instance is a mutual
+  exclusion with a lease window that coordinates access of multiple concurrent
+  processes to a shared resource
+  - Acquire a lock =set lock:resource lock_id nx ex 3=. Set expiration to
+    prevent deadlocks. On failure, the current process waits, as the lock is
+    already acquired by another process
+  - Release a lock (only owner) =delifeq lock:resource lock_id=. The lock ID
+    condition prevents incorrect release of a new lock by a delayed old owner,
+    whose lease has already expired
   - Otherwise a lock will be expired
+
+** Persistence
+
+- RDB ::
+- AOF ::
+
+** Security
+
+- ACL ::
 
 ** Valkey design patterns
 
@@ -208,10 +228,3 @@ docker run --interactive --tty --network sem_default \
   read-modify-write, instead of =watch ... exec= optimistic locking with
   client-side checks and retries
 
-** TODO
-
-- Configuration
-- Persistence
-- Replication
-- Security
-- ACL
