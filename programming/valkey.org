@@ -205,8 +205,23 @@ docker run --interactive --tty --network sem_default \
 
 ** Persistence
 
-- RDB ::
-- AOF ::
+- RDB :: RDB is a point-in-time compact binary snapshot of the entire database
+  stored on disk by a forked child process, with minimal impact on the serving
+  parent process. The snapshot is either blocking =save= or non-blocking
+  =bgsave=. RDB provides low runtime fork overhead, and fast restarts at the
+  cost of bigger data loss (seconds to minutes). RDB is used as a periodic full
+  backup
+- AOF :: AOF is an append-only log of every write command that is replayed on
+  restart. Every command is logged =appendfsync always=, or all commands since 1
+  second are logged =appendfync everysec=. Background log compaction produces a
+  minimal equivalent state. AOF provides minimal data loss (1 second) or no data
+  loss at all at the cost of continuous runtime IO overhead, and slower restarts
+  due to command replay. AOF is used to guarantee data durability
+- ElastiCache multi-AZ :: The ElastiCache multi-AZ setup provides async data
+  replication with automatic failover that promotes the stand by instance and
+  replaces the crashed instance with a new stand by instance rebuilt from the
+  current RDS snapshot and the recently buffered latest changes. ElastiCache
+  Valkey does not support AOF
 
 ** Security
 
