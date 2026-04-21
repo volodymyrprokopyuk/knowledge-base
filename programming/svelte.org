@@ -1,0 +1,104 @@
+* Svelte
+
+- Svelte :: Svelte is a compiler to build web components
+
+* SvelteKit
+
+- SvelteKit :: SvelteKit is a tool to build web applications. SvelteKit support
+  SSR for traditional MPA and SEO, CSR for modern SPA, and SSG for static web
+  sites and web applications distributed via CDN. SvelteKit adapters fine tune
+  application builds to deployment targets e.g. =adapter-static= for SSG
+- File system-based routing :: The application root page and the error root page
+  are defined in the =src/app.html= and =src/error.html= files. Folders in the
+  =src/routes= define nested URL path segments. Page success and error content
+  is defined in the =+page.svetle= and =+error.svelte= files. The page content
+  is reloaded on every page visit
+  - Dynamic routes ::
+| Folders              | Description             |
+|----------------------+-------------------------|
+| =/path/[mandatory]=  | Mandatory path segment  |
+| =/path/[[optional]]= | Optional path segment   |
+| =/path/[...rest]=    | Catch all path segments |
+- Initial data load :: The =load()= function is defined in the =+page.js= file
+  and loads data when navigating to the page before rendering the
+  =+page.svelte=. The load function is executed on the initial navigation to the
+  page. The loaded data is available to the page as the =data= property
+  src_js{let{data} = $props()}. A nested page has access to the loaded data of
+  all parent layouts and app parent pages. If the load function throws an error
+  the nearest =+error.svelte= is rendered. Prefer =load()= over =fetch()= inside
+  a page script
+#+begin_src js
+// src/routes/dynamic/[slug]/+page.js
+export function load({
+  url, // Full URL including query stirng
+  params, // Dynamic route params e.g. [slug]
+  fetch, // Prefer SvelteKit fetch() over global fetch()
+  parent, // Parent layout data
+  depends, // Declare invalidation dependencies (to re-execute load)
+}) {
+  return {title: `Title ${params.slug}`}
+}
+#+end_src
+#+begin_src web
+<!-- src/routes/dynamic/[slug]/+page.svelte -->
+<script>
+ let {data} = $props() // Merged layout and page data
+</script>
+
+<h1>{data.title}</h1>
+#+end_src
+- Load re-execution :: The load function depends on a URL if it calls
+  =fetch(url)= or =depends(custom:ID)=. =invalidate(url)= or
+  =invalidate(custom:ID)= to re-execute the load function
+#+begin_src js
+// src/routes/+page.js
+export function load({depends}) {
+  depends("app:random")
+  return {random: Math.random()}
+}
+#+end_src
+#+begin_src web
+<!-- src/routes/+page.svelte -->
+<script>
+ import {invalidate} from "$app/navigation"
+ let {data} = $props()
+ function reload() {
+   invalidate("app:random")
+ }
+</script>
+
+<p>Random: {data.random}</p>
+<button onclick={reload}>Reload</button>
+#+end_src
+- Shared layout :: The shared layout content is defined in the =+layout.svelte=
+  file and applies to all nested pages and. The =load()= function is defined in
+  the =+layout.js= file and loads data for the =+layout.svelte=. The loaded data
+  is also available to all nested pages. The layout content is not re-rendered
+  on every page visit
+#+begin_src js
+// src/routes/+layout.js
+export const prerender = true
+export const trailingSlash = "always"
+
+export function load() {
+  return {
+    layout: "Layout content"
+  }
+}
+#+end_src
+#+begin_src web
+<!-- src/routes/+layout.svelte -->
+<script>
+ import {page} from "$app/state"
+ let {children} = $props()
+</script>
+
+<nav>
+  <a href="/">Home</a>
+  <a href="/about">About</a>
+</nav>
+
+{@render children()}
+
+<p>Child page data: {page.data.title}</p>
+#+end_src
