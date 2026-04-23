@@ -1,6 +1,64 @@
 * Svelte
 
 - Svelte :: Svelte is a compiler to build web components
+- Rune :: A rune is a keyword of the Svelte language used in =*.svelte= and
+  =*.svelte.js= files to control the Svelte compiler
+- =$state= rune :: The =$state= rune creates a deeply reactive state proxy that
+  automatically updates the UI when the state value changes including object
+  fields and array elements
+- =$derived= rune :: The =$derived= rune applies pure transformations without
+  side effect to state values and returns the result. Derived expressions are
+  re-evaluated each time their dependencies change
+- Push-pull reactivity :: Push is when the state is updated, everything that
+  directly or indirectly depends on the state is immediately notified of the
+  change. Pull means that derived values are only re-evaluated when they are
+  actually read
+- Define Svelte component ::
+#+begin_src web
+<!-- src/lib/component/ClickCount.svelte -->
+<script>
+ let count = $state(0)
+ let double = $derived(count * 2)
+ function increment() {
+   count++
+ }
+</script>
+
+<button onclick={increment}>Click count {count}</button>
+<p>Double count {double}</p>
+#+end_src
+- Use Svelte component ::
+#+begin_src web
+<script>
+ import ClickCount from "$lib/component/ClickCount.svelte"
+</script>
+
+<ClickCount/>
+#+end_src
+- =$effect= rune :: The =$effect= rune executes a function for its side effects
+  each time the state changes. The effect function can return a tear down
+  function that will be executed before the next execution of the effect
+  function or when the component is destroyed
+#+begin_src web
+<script>
+ let count = $state(0)
+ let millis = $state(500)
+ function slower() {
+   millis *= 2
+ }
+ function faster() {
+   millis /= 2
+ }
+ $effect(() => {
+   const timer = setInterval(() => count++, millis)
+   return () => clearInterval(timer) // Tear down function
+ })
+</script>
+
+<p>Count {count}</p>
+<button onclick={slower}>Slower</button>
+<button onclick={faster}>Faster</button>
+#+end_src
 
 * SvelteKit
 

@@ -146,8 +146,8 @@
 ** Direct connect
 
 - Direct connect :: The Direct connect is a service that provides dedicated,
-  private (not over the Internet), high-latency, low-bandwidth network
-  connections between an on-premises data center and VPCs and AWS resources. The
+  private (not over the Internet), low-latency, high-bandwidth network
+  connections between an on-premises data center and VPCs, AWS resources. The
   Direct connect can use a VPN connection over Internet as a failover
 
 ** PrivateLink
