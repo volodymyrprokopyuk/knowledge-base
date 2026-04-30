@@ -1,18 +1,29 @@
 * Svelte
 
-- Svelte :: Svelte is a compiler to build web components
-- Rune :: A rune is a keyword of the Svelte language used in =*.svelte= and
-  =*.svelte.js= files to control the Svelte compiler
-- =$state= rune :: The =$state= rune creates a deeply reactive state proxy that
-  automatically updates the UI when the state value changes including object
-  fields and array elements
-- =$derived= rune :: The =$derived= rune applies pure transformations without
-  side effect to state values and returns the result. Derived expressions are
-  re-evaluated each time their dependencies change
-- Push-pull reactivity :: Push is when the state is updated, everything that
-  directly or indirectly depends on the state is immediately notified of the
-  change. Pull means that derived values are only re-evaluated when they are
-  actually read
+- Svelte :: Svelte is a compiler to build web components. Svelte provides
+  compile-time reactivity with minimal runtime overhead, fine-grained DOM
+  updates, and minimal boilerplate
+
+** Svelte runes
+
+- Runes :: Svelte runes are keywords of the Svelte language used in =*.svelte=
+  and =*.svelte.js= files to control the Svelte compiler. Runes provide
+  component-level reactive state, one-way parent-to-child (default), and two-way
+  child-to-parent (=$bindable=) binding of properties
+- =$state= rune :: The =$state= rune creates a deeply reactive state proxy for
+  state values, objects, and arrays that automatically updates the component UI
+  when the state changes. If large object are only reassigned, and never mutated
+  e.g. API response, use the shallow =$state.raw= proxy to avoid performance
+  overhead of the deeply reactive =$state= proxy
+- =$derived= rune :: The =$derived= rune creates reactive computed values by
+  applying pure transformations without side effects to state values and always
+  returning the result. Derived expressions are re-evaluated each time their
+  dependencies change. For complex transformations use the =$derived.by=
+  function, instead of the =$derived= expression
+- Push-pull reactivity :: Push (reactive) is when the state is updated,
+  everything that directly or indirectly depends on the state is immediately
+  notified of the change. Pull (lazy) means that derived values are only
+  re-evaluated when they are actually read
 - Define Svelte component ::
 #+begin_src web
 <!-- src/lib/component/ClickCount.svelte -->
@@ -36,10 +47,13 @@
 <ClickCount/>
 #+end_src
 - =$effect= rune :: The =$effect= rune executes a function for its side effects
-  each time the state changes. The effect function can return a tear down
-  function that will be executed before the next execution of the effect
-  function or when the component is destroyed
+  each time the dependency change. The effect function automatically tracks
+  reactive values that are synchronously accessed in the function body (async
+  values are not tracked). The effect function can return a tear down function
+  that will be executed before the next re-execution of the effect function or
+  when the component is destroyed
 #+begin_src web
+<!-- src/lib/component/SlowerFaster.svelte -->
 <script>
  let count = $state(0)
  let millis = $state(500)
@@ -59,6 +73,108 @@
 <button onclick={slower}>Slower</button>
 <button onclick={faster}>Faster</button>
 #+end_src
+- =$props= rune :: The =$props= rune provides access to the properties
+  (attributes) of a component. Component properties have one-way parent-to-child
+  data binding by default. Values computed on =$props= must be =$derived= to be
+  reactive
+#+begin_src web
+<!-- src/lib/component/Properties.svelte -->
+<script>
+ let { attribute, count } = $props()
+</script>
+
+<p>Attribute: {attribute}</p>
+<p>Count: {count}</p>
+
+<!-- src/routes/+page.svelte -->
+<script>
+ import Properties from "$lib/component/Properties.svelte"
+ let count = $state(0)
+ setInterval(() => count++, 1000)
+</script>
+
+<Properties attribute="value" {count}/>
+#+end_src
+- =$bindable= rune :: The =$bindable= rune enables two-way binding of properties
+  including child-to-parent data flow
+#+begin_src web
+<!-- src/lib/component/Bindable.svelte -->
+<script>
+ let { value = $bindable() } = $props()
+</script>
+
+<input bind:value={value}/>
+
+<!-- src/routes/+page.svelte -->
+<script>
+ import Bindable from "$lib/component/Bindable.svelte"
+ let message = $state("default")
+</script>
+
+<label>Two-way data binding:
+  <Bindable bind:value={message}/>
+</label>
+<label>One-way data binding:
+  <Bindable value={message}/>
+</label>
+<p>Message: {message}</p>
+#+end_src
+
+** Svelte templates
+
+- Conditional :: ~{#if expr}...{:else if expr}...{:else}...{/if}~
+- Loop :: Incremental updates preserving identity of a component
+  - Named and indexed ~{#each expr as name[, index]}...{/each}~
+  - Keyed ~{#each expr as name[, index] (key)}...{/each}~ for efficient and
+    minimal updates of updated DOM elements by unique keys
+  - Destructuring object ~{#each expr as {key, ...rest}}...{/each}~
+  - Destructuring array ~{#each expr as [elem, ...rest]}...{/each}~
+  - Side effects ~{#each expr}...{/each}~
+  - Else block ~{#each expr as name}...{:else}...{/each}~
+- Destroy re-create on state change :: ~{#key expr}...{/key}~
+- Async block ::
+  - Complete
+    ~{#await promise}pending{:then value}fulfilled{:catch error}rejected{/await}~
+  - Success only ~{#await promise then value}fulfilled{/await}~
+  - Failure only ~{#await promise catch error}rejected{/await}~
+- Reusable markup :: Snippets are values and can be passed to components as
+  properties
+  - Define snippet ~{#snippet name(...args)}...{/snippet}~
+  - Render snippet ~{@render name(args...)}~
+- Component classes ::
+  - Primitive class ~<div class={"value"}></div>~
+  - Object class ~<div class={{value: true}}></div>~
+  - Array class ~<div class={["value"]}></div>~
+- Child-to-parent data binding :: Data flows from parent to child by default.
+  The =$bind:= directive enables the child-to-parent data binding
+  - L-value binding ~bind:property={lvalue}~
+  - Get/set binding ~bind:property={get(), set()}~
+
+** Svelte styling
+
+- Scoped styles :: The scoped style is defined in the =<style>...</style>= block
+  of the component and apply only to the component. Scoped styles have more
+  specificity and take precedence over global styles for the same element
+#+begin_src web
+<style>
+ div {
+   margin: 0;
+ }
+</style>
+#+end_src
+- Global styles ::
+#+begin_src web
+<style>
+ :global(strong) {
+   margin: 0;
+ }
+ :global {
+   div {
+     margin: 0;
+   }
+ }
+</style>
+#+end_src
 
 * SvelteKit
 
@@ -66,6 +182,9 @@
   SSR for traditional MPA and SEO, CSR for modern SPA, and SSG for static web
   sites and web applications distributed via CDN. SvelteKit adapters fine tune
   application builds to deployment targets e.g. =adapter-static= for SSG
+
+** SvelteKit routing
+
 - File system-based routing :: The application root page and the error root page
   are defined in the =src/app.html= and =src/error.html= files. Folders in the
   =src/routes= define nested URL path segments. Page success and error content
@@ -77,6 +196,9 @@
 | =/path/[mandatory]=  | Mandatory path segment  |
 | =/path/[[optional]]= | Optional path segment   |
 | =/path/[...rest]=    | Catch all path segments |
+
+** SvelteKit data loading
+
 - Initial data load :: The =load()= function is defined in the =+page.js= file
   and loads data when navigating to the page before rendering the
   =+page.svelte=. The load function is executed on the initial navigation to the
@@ -111,7 +233,7 @@ export function load({
 #+begin_src js
 // src/routes/+page.js
 export function load({depends}) {
-  depends("app:random")
+  depends("")
   return {random: Math.random()}
 }
 #+end_src
@@ -128,6 +250,9 @@ export function load({depends}) {
 <p>Random: {data.random}</p>
 <button onclick={reload}>Reload</button>
 #+end_src
+
+** SvelteKit shared layout
+
 - Shared layout :: The shared layout content is defined in the =+layout.svelte=
   file and applies to all nested pages and. The =load()= function is defined in
   the =+layout.js= file and loads data for the =+layout.svelte=. The loaded data
