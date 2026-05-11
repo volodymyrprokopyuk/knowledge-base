@@ -1,0 +1,59 @@
+* HTMX
+
+** Hypermedia
+
+- Hypermedia :: Hypermedia is a structured document (HTML) that contains content
+  hypermarks, non-linear links to other documents, and hypermedia controls
+- URL :: Uniform Resource Locator URL is a reference to a resource on a network
+  that indicates a protocol to access the resource
+#+begin_src fish
+scheme://user@host:port/path?query#fragment
+#+end_src
+- Hypermedia controls ::
+  - Anchor (navigate and read) :: The anchor tag specifies a hyper reference to
+    another document
+#+begin_src web
+<a href="https://hypermedia.systems/">Hypermedia</a>
+#+end_src
+  - Form (update) :: The form tag collects information and updates a resource
+#+begin_src web
+<form action="/signup" method="POST">
+  <input type="text" name="email"/>
+  <input type="password" name="password"/>
+  <button type="submit">Sign up</buttong>
+</form>
+#+end_src
+- REST :: REpresentational State Transfer REST is a client-server architecture
+  with stateless communication through the uniform interface that allows for
+  caching
+- Uniform interface :: The uniform interface requires
+  - Uniform identification of resources through URLs
+  - Uniform manipulation of resources through HTTP verbs
+  - Negotiation of resource representation through Accept and Content-Type HTTP
+    headers
+  - Self-contained messages contain all necessary information to process the
+    request
+  - Hypermedia As The Engine Of Application State HATEOAS encodes actions
+    available for a resource directly withing the hypermedia response. A browser
+    does not need to understand anything about the rendered resource
+- Hypermedia system :: The hypermedia system adheres to the REpresentational
+  State Transfer REST network architecture, HTML language, HTTP protocol,
+  uniform interface between hypermedia clients and servers, and native browser
+  capabilities
+- Hypermedia-driven applications :: Hypermedia-driven applications use HTML as
+  the application protocol/API, a hypermedia-oriented library to extend HTML
+  interactivity, and take full advantage of the hypermedia system of the web
+  - Server hypermedia response is the single authoritative source of truth
+  - High tolerance of hypermedia-driven applications to API and UI changes
+    (loose coupling)
+  - Highly interactive, simple clients that exchange hypermedia with the server
+#+begin_src web
+<!-- Replace #contact with HTML fragment from GET /contact response -->
+<button hx-get="/contact" hx-target="#contact">Contact</button>
+#+end_src
+- JSON API and SPA :: JSON API provides structured data that lacks hypermedia
+  controls, hence must be interpreted by a custom tailored SPA to render
+  correctly (not a uniform interface). SPA replaces hypermedia system with JSON
+  data exchange, introduces a lot of complexity by implementing sophisticated
+  two-way data binding between the in-memory data model and the HTML UI (tight
+  coupling), and renders all content on the same page without navigation

@@ -74,9 +74,9 @@
 <button onclick={faster}>Faster</button>
 #+end_src
 - =$props= rune :: The =$props= rune provides access to the properties
-  (attributes) of a component. Component properties have one-way parent-to-child
-  data binding by default. Values computed on =$props= must be =$derived= to be
-  reactive
+  (attributes) of a component. The values returned from =$props= are deeply
+  reactive. Component properties have one-way parent-to-child data binding by
+  default. Values computed on =$props= must be =$derived= to be reactive
 #+begin_src web
 <!-- src/lib/component/Properties.svelte -->
 <script>
