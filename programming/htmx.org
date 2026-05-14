@@ -26,16 +26,20 @@ scheme://user@host:port/path?query#fragment
 - REST :: REpresentational State Transfer REST is a client-server architecture
   with stateless communication through the uniform interface that allows for
   caching
-- Uniform interface :: The uniform interface requires
+- Uniform interface :: The uniform interface provides a rolling-release
+  continuous updates, and avoids complexities of JSON API versioning
   - Uniform identification of resources through URLs
   - Uniform manipulation of resources through HTTP verbs
-  - Negotiation of resource representation through Accept and Content-Type HTTP
-    headers
-  - Self-contained messages contain all necessary information to process the
-    request
-  - Hypermedia As The Engine Of Application State HATEOAS encodes actions
-    available for a resource directly withing the hypermedia response. A browser
-    does not need to understand anything about the rendered resource
+  - Negotiation of resource representation through the Accept and Content-Type
+    HTTP headers
+  - Self-describing request and response messages contain all necessary
+    information to process the request and navigate the application. Once a
+    hypermedia application is entered into, all functionality and resources are
+    automatically discovered through self-describing messages
+  - Hypermedia As The Engine Of Application State HATEOAS encodes the state of a
+    resource and the actions available on the resource directly withing the
+    hypermedia response. A browser does not need to understand anything about
+    the rendered resource
 - Hypermedia system :: The hypermedia system adheres to the REpresentational
   State Transfer REST network architecture, HTML language, HTTP protocol,
   uniform interface between hypermedia clients and servers, and native browser
@@ -55,5 +59,40 @@ scheme://user@host:port/path?query#fragment
   controls, hence must be interpreted by a custom tailored SPA to render
   correctly (not a uniform interface). SPA replaces hypermedia system with JSON
   data exchange, introduces a lot of complexity by implementing sophisticated
-  two-way data binding between the in-memory data model and the HTML UI (tight
-  coupling), and renders all content on the same page without navigation
+  two-way data binding between the in-memory data model, the server and the DOM
+  (tight coupling), and renders all content on the same page without navigation
+
+** =htmx= generalizations
+
+- =htmx= generalizations ::
+  - Any HTML element can issue HTTP requests and is a hypermedia control
+    - =hx-boost= makes all children anchors and forms to issue async =fetch=,
+      swap the =body= with the response without re-processing the =head=
+      (scripts, style sheets), and updating the browser location bar
+  - Any HTTP verb can be used in HTTP requests (=hx-get=, =hx-post=, =hx-put=,
+    =hx-patch=, =hx-delete=)
+  - Any event on any element can trigger HTTP requests (=hx-trigger=)
+  - HTML fragment from the response can replace the target DOM subtree within
+    the current document without the full page reload (=hx-target=, =hx-swap=)
+    - =tx-select= selects a subtree from a response to swap the target
+- HTML form submission ::
+  - Explicit form :: All form inputs are serialized into the request from any
+    element within the form
+#+begin_src web
+<form>
+  <label>
+    <span>Search</span>
+    <input type="search" name="query" value="{{request.body.query}}"/>
+  </label>
+  <button hx-post="/contact" hx-target="#contact">Search</button>
+</form>
+#+end_src
+  - Explicit input include :: Explicitly select input elements (potentially
+    outside of the form element) to be included in the request
+#+begin_src web
+<label>
+  <span>Search</span>
+  <input type="search" name="query" value="{{request.body.query}}" id="search"/>
+</label>
+<button hx-post="/contact" hx-target="#contact" hx-include="#search">Search</button>
+#+end_src

@@ -1,11 +1,13 @@
 * Valkey
 
-- Valkey :: Valkey is a distributed (async replication), in-memory, flat TTL
-  keyspace of prefixed keys mapped to typed values. Valkey is a remote data
-  structure server that provides atomic operations on String, Hash, List, Set,
-  SortedSet in-memory data structures. Valkey acts as a fast, ephemeral
+- Valkey :: Valkey is a distributed (async data replication), in-memory (fast),
+  flat keyspace of prefixed TTL (automatic eviction) keys (entity logical
+  separation) mapped to typed values. Valkey is a remote data structure server
+  that provides atomic operations (single thread execution) on String (text,
+  integer, binary), Hash (object), List (ordered), Set (unordered), SortedSet
+  (ordered) in-memory data structures. Valkey acts as a fast, ephemeral
   operational store e.g. cache, session store, event store, rate limiting,
-  message blocker, streaming engine
+  message broker, streaming engine
 #+begin_src fish
 docker run --interactive --tty --network sem_default \
   --rm valkey/valkey-bundle:9-trixie valkey-cli -h valkey
@@ -13,128 +15,147 @@ docker run --interactive --tty --network sem_default \
 
 ** Data structures
 
+*** String
+
 - String :: A String is a sequence of bytes that can store any type of data e.g.
-  text, numeric, bitmap, binary. A String is implemented using a Simple Dynamic
-  String SDS with a constant time length lookup, binary safety, and
-  type-dependent dynamic encoding e.g integer, header-embedded small strings,
+  text, numeric, bitmap, bit field, binary. A String is implemented using a
+  Simple Dynamic String with a constant time length lookup, binary safety, and
+  type-dependent dynamic encoding e.g. integer, header-embedded small strings,
   header-separated large strings
-  - String operations ::
-    - =set, get= O(1)
-    - =mset, mget= O(1) multiple keys
-    - =setrange, getrange= O(n)
-    - =incr, decr= O(1) integer value
-    - =incrby, decrby= O(1)
-    - =append= O(1)
-    - =strlen= O(1)
-    - =getdel, getset= O(1)
-    - =delifeq= O(1)
-    - =setbit, getbit= O(1) memory-efficient array of bits
-    - =bitop= O(n) and, or, xor, not
-    - =bitcount= O(n) 0/1 total count
-    - =bitpos= O(n) first 0/1 position
-    - =bitfield= O(1) packed counters of arbitrary size signed/unsigned integers
-  - String use cases ::
-    - Cache text or binary data
-    - Store blobs and serialized objects
-    - Track real-time counters and metrics
-    - Store session tokens and user information
-    - Track bitmaps of user presence, preferences, or feature flags
-    - Atomic acquire/release locks
-- Hash :: A Hash is a structure of String field-value pairs with efficient field
-  level query and update under a single key. A Hash is a hash table
-  - Hash operations ::
-    - =hset, hget= O(1)
-    - =hmset, hmget= O(1) set, get multiple fields
-    - =hincrby= O(1)
-    - =hexists= O(1)
-    - =hdel= O(1)
-    - =hlen= O(1)
-    - =hkeys, hvals, hgetall= O(n)
-    - =hscan= O(n)
-  - Hash use cases ::
-    - Store structures and objects e.g. user profile, user session
-    - Cache structures and objects
+- String operations ::
+  - =set, get= O(1)
+  - =mset, mget= O(1) set, get multiple keys
+  - =setrange, getrange= O(n)
+  - =incr, decr= O(1) integer value
+  - =incrby, decrby= O(1) arbitrary integer
+  - =append= O(1)
+  - =strlen= O(1)
+  - =getdel, getset= O(1)
+  - =delifeq= O(1)
+  - =setbit, getbit= O(1) memory-efficient array of bits (bitmap)
+  - =bitop= O(n) and, or, xor, not
+  - =bitcount= O(n) 0/1 total count
+  - =bitpos= O(n) first 0/1 position
+  - =bitfield= O(1) packed counters of arbitrary size signed/unsigned integers
+- String use cases ::
+  - Cache text, numeric, bitmap, bit field, or binary data
+  - Store blobs and serialized objects
+  - Track real-time counters and metrics
+  - Store session tokens and user information
+  - Track bitmaps of user presence, preferences, or feature flags
+  - Atomic acquire/release locks
+
+*** Hash
+
+- Hash :: A Hash is a structure of String field-value pairs with efficient
+  field-level query and update under a single key. A Hash is a hash table
+- Hash operations ::
+  - =hset, hget= O(1)
+  - =hmset, hmget= O(1) set, get multiple fields
+  - =hincrby= O(1) arbitrary integer
+  - =hexists= O(1)
+  - =hdel= O(1)
+  - =hlen= O(1)
+  - =hkeys, hvals, hgetall= O(n) whole object
+  - =hscan= O(n)
+- Hash use cases ::
+  - Store structures and objects e.g. user profile, user session
+  - Cache structures and objects
+
+*** List
+
 - List :: A List is a doubly linked list (quicklist) of small arrays (listpacks)
   of ordered String values with constant time operations on the edges. A List
-  supports blocking operations to implement a queue with producers and consumers.
-  A String is consumed by exactly one consumer. After consumption a String is
-  removed from the List
-  - List operations ::
-    - =lpush, rpush= O(1)
-    - =lpop, rpop= O(1)
-    - =blpop, brpop= O(1) blocking pop
-    - =lmove, blmove= O(1) between two lists
-    - =llen= O(1)
-    - =lrange= O(n)
-    - =lset= O(n) set by index
-    - =lindex= O(n) get by index
-    - =lpos= O(n) index of the first value
-    - =linsert= O(n) before or after the first value
-    - =lrem= O(n) remove by value
-    - =ltrim= O(n)
-  - List use cases ::
-    - Schedule jobs for in-order processing
-    - Store the last N items (via =ltrim=)
-    - Implement a blocking queue
-    - Implement a blocking stack
+  supports blocking operations to implement a queue with producers and
+  consumers. A String is consumed by exactly one consumer. After consumption the
+  String is removed from the List
+- List operations ::
+  - =lpush, rpush= O(1)
+  - =lpop, rpop= O(1)
+  - =blpop, brpop= O(1) blocking pop
+  - =lmove, blmove= O(1) between two lists
+  - =llen= O(1)
+  - =lrange= O(n)
+  - =lset= O(n) set by index
+  - =lindex= O(n) get by index
+  - =lpos= O(n) index of the first value
+  - =linsert= O(n) before or after the first value
+  - =lrem= O(n) remove by value
+  - =ltrim= O(n)
+- List use cases ::
+  - Schedule jobs for in-order processing (queue)
+  - Store the last N items (via =ltrim=)
+  - Implement a blocking queue
+  - Implement a blocking stack
+
+*** Set
+
 - Set :: A Set is an unordered collection of unique Strings with efficient
-  membership check and efficient union, intersection, and difference operations.
-  A Set is a hash table
-  - Set operations ::
-    - =sadd= O(1)
-    - =sismember= O(1)
-    - =srem= O(1)
-    - =smove= O(1)
-    - =scard= O(1)
-    - =srandmember, spop= O(1) get, remove random element
-    - =smembers= O(n) blocking, return all members at onece
-    - =sscan= O(n) non-blocking, cursor-based, incremental iteration
-    - =sunion, sunionstore= O(n)
-    - =sinter, sinterstore= O(n)
-    - =sdiff, sdiffstore= O(n)
-  - Set use cases ::
-    - Store unique values without duplicates e.g. tags, categories, permissions
-    - Check membership and find out mutual friends
-    - Perform set operations e.g. union, intersection, difference
+  membership check, and efficient union, intersection, and difference
+  operations. A Set is a hash table
+- Set operations ::
+  - =sadd= O(1)
+  - =sismember= O(1)
+  - =srem= O(1)
+  - =smove= O(1) between two sets
+  - =scard= O(1)
+  - =srandmember, spop= O(1) get, remove random element
+  - =smembers= O(n) blocking, return all members at onece
+  - =sscan= O(n) non-blocking, cursor-based, incremental iteration
+  - =sunion, sunionstore= O(n)
+  - =sinter, sinterstore= O(n)
+  - =sdiff, sdiffstore= O(n)
+- Set use cases ::
+  - Store unique values without duplicates e.g. tags, categories, permissions
+  - Check membership and find out mutual friends
+  - Perform set operations e.g. union, intersection, difference
+
+*** SortedSet
+
 - SortedSet :: A SortedSet is an ordered by a double precision score collection
-  of unique Strings with efficient rank and range operations. Different Strings
-  with the same score are ordered lexicographically by their representation
-  bytes. A SortedSet consists of a hash table mapping a value to a score, and a
-  skip list for efficient insertion, deletion, range, and rank operations
-  ordered by score (similar to a balanced tree)
-  - Skip list :: A skip list is a probabilistic ordered data structure that
-    consists of multiple layered linked lists with logarithmic insert, delete,
-    and search operations. A skip list provides an efficient range traversal
-    with good CPU cache locality. A skip list requires minimal contained locks
-    for concurrent access. The skip list delete operation has always predictable
-    time without rebalancing rotations. A skip list is probabilistic, while
-    balanced trees are deterministic. A skip list has a simpler implementation
-    compared to balanced trees. A skip list consumes more memory than balanced
-    trees
-  - SortedSet operations ::
-    - =zadd= O(log(n)) add member or update score of member
-    - =zrem= O(log(n))
-    - =zremrangebyscore, zremrangebyrank= O(log(n))
-    - =zscore= O(1) return score of member
-    - =zrandmember= O(1)
-    - =zcard= O(1)
-    - =zcount= O(log(n)) count members within range by score
-    - =zrank, zrevrank= O(log(n)) return in-order position or index
-    - =zrange, zrevrange= O(log(n)) range by rank, by score, by lex
-    - =zpopmin, zpopmax= O(log(n))
-    - =bzpopmin, bzpopmax= O(log(n)) blocking
-    - =zincrby= O(log(n)) increment score of member
-    - =zscan= O(n) non-blocking, cursor-based, incremental iteration
-    - =zunion, zunionstore= O(n)
-    - =zinter, zinterstore= O(n)
-    - =zdiff, zdiffstore= O(n)
-  - SortedSet use cases ::
-    - Store leaderboards and rankings
-    - Query top N elements
-    - Schedule jobs priority-based processing
-    - Implement sliding window rate limiter
-    - Order time series by a timestamp score
-    - Implement a priority queue
+  of unique Strings with efficient rank (position) and range (iteration)
+  operations. Different Strings with the same score are ordered
+  lexicographically by their byte representation. A SortedSet consists of a hash
+  table mapping a unique value to a score, and a skip list (ordered) for
+  efficient insertion, deletion, range, and rank operations ordered by score
+  (similar to a balanced search tree)
+- Skip list :: A skip list is a probabilistic ordered data structure that
+  consists of multiple layered linked lists with logarithmic insert, delete, and
+  search operations. A skip list provides an efficient range traversal with good
+  CPU cache locality. A skip list requires minimal contained locks for
+  concurrent access. The skip list delete operation has always predictable time
+  without rebalancing rotations. A skip list is probabilistic, while balanced
+  trees are deterministic. A skip list has a simpler implementation compared to
+  balanced trees. A skip list consumes more memory than balanced trees
+- SortedSet operations ::
+  - =zadd= O(log(n)) add member or update score of member
+  - =zrem= O(log(n))
+  - =zremrangebyscore, zremrangebyrank= O(log(n))
+  - =zscore= O(1) return score of member
+  - =zrandmember= O(1)
+  - =zcard= O(1)
+  - =zcount= O(log(n)) count members within range by score
+  - =zrank, zrevrank= O(log(n)) return in-order position or index
+  - =zrange, zrevrange= O(log(n)) range by rank, by score, by lex
+  - =zpopmin, zpopmax= O(log(n))
+  - =bzpopmin, bzpopmax= O(log(n)) blocking
+  - =zincrby= O(log(n)) increment score of member (double precision)
+  - =zscan= O(n) non-blocking, cursor-based, incremental iteration
+  - =zunion, zunionstore= O(n)
+  - =zinter, zinterstore= O(n)
+  - =zdiff, zdiffstore= O(n)
+- SortedSet use cases ::
+  - Store leaderboards and rankings
+  - Query top N elements
+  - Schedule priority-based jobs
+  - Implement sliding window rate limiter
+  - Order time series by a timestamp score
+  - Implement a priority queue
+- Sliding window rate limiter ::
+  - Clear expired requests outside the sliding window =zremrangebyscore=
+  - Count current requests within the sliding window =zcard=
+  - Deny request is the request threshold for the sliding window is exceeded
+  - Add the request to the current sliding window =zadd= with a TTL
 - Secondary index ::
   - SortedSet by score index :: The index =zadd= provides efficient
     =zrange/byscore= range queries by numeric values e.g. integers, timestamps.
@@ -148,36 +169,36 @@ docker run --interactive --tty --network sem_default \
 ** Stream
 
 - Stream :: A Stream is an append-only, persistent, time-ordered log of
-  Hash-like field-value messages under monotonically increasing server-generated
-  IDs =ms-seq=. A Stream provides a time-ordered sequence of messages, fan-out
-  broadcast of every message to all consumers, workload distribution of messages
-  between consumers in a consumer group, at-least-once delivery of messages in a
-  consumer group. Each delivered message must be acknowledged by a consumer in a
-  consumer group. Unacknowledged messages will be re-delivered to another
-  consumer in a consumer group. After delivery a message remains indefinitely in
-  the Stream, unless explicitly removed. A Stream supports blocking operations
-  to implement a stream with producers and consumers. A stream is a radix tree
-  of listpacks with efficient lookup by message ID and efficient range queries
-  by ID prefix
-  - Stream operations ::
-    - =xadd= O(1)
-    - =xlen= O(1)
-    - =xread= O(log(n)) no consumer group, no automatic state tracking, no
-      message ownership, no ack required, supports blocking
-    - =xrange, xrevrange= O(n)
-    - =xack= O(1)
-    - =xdel= O(1)
-    - =xtrim= O(1)
-    - =xgroup= O(1)
-    - =xreadgroup= O(1) read new messages and assign ownership within a consumer
-      group, automatic server-side state tracking, requires ack
-    - =xautoclaim= O(1) change ownership of unacknowledged messages in a
-      consumer group
-  - Stream use cases ::
-    - Message broker with acknowledge-based, reliable delivery of messages
-    - Job queue with workload distribution between consumers in a consumer group
-    - Event sourcing of time-ordered message log e.g. audit log
-    - Replay messages on recovery. Re-read the whole message history
+  Hash-like field-values (ID:message) under monotonically increasing,
+  server-generated ~ID = ms-seq~. A Stream provides a time-ordered sequence of
+  messages, fan-out broadcast of every message to all consumers, workload
+  distribution of messages between consumers in a consumer group, at-least-once
+  delivery of messages in a consumer group. Each delivered message must be
+  acknowledged by a consumer in a consumer group. Unacknowledged messages will
+  be re-delivered to another consumer in a consumer group. After a delivery a
+  message remains indefinitely in the Stream, unless explicitly removed. A
+  Stream supports blocking operations to implement a stream with producers and
+  consumers. A stream is a radix tree of listpacks with efficient lookup by
+  message ID and efficient range queries by ID prefix
+- Stream operations ::
+  - =xadd= O(1)
+  - =xlen= O(1)
+  - =xread= O(log(n)) no consumer group, no automatic state tracking, no
+    message ownership, no ack required, supports blocking
+  - =xrange, xrevrange= O(n)
+  - =xack= O(1)
+  - =xdel= O(1)
+  - =xtrim= O(1)
+  - =xgroup= O(1)
+  - =xreadgroup= O(1) read new messages and assign ownership within a consumer
+    group, automatic server-side state tracking, requires ack
+  - =xautoclaim= O(1) change ownership of unacknowledged messages in a
+    consumer group
+- Stream use cases ::
+  - Message broker with acknowledge-based, reliable delivery of messages
+  - Job queue with workload distribution between consumers in a consumer group
+  - Event sourcing of time-ordered message log e.g. audit log
+  - Replay messages on recovery. Re-read the whole message history
 
 ** Transactions
 
@@ -193,8 +214,8 @@ docker run --interactive --tty --network sem_default \
 ** Locks
 
 - Distributed lock :: A distributed lock on a single Valkey instance is a mutual
-  exclusion with a lease window that coordinates access of multiple concurrent
-  processes to a shared resource
+  exclusion (mutex) with a lease window that coordinates access of multiple
+  concurrent processes to a shared resource
   - Acquire a lock =set lock:resource lock_id nx ex 3=. Set expiration to
     prevent deadlocks. On failure, the current process waits, as the lock is
     already acquired by another process
@@ -231,15 +252,14 @@ docker run --interactive --tty --network sem_default \
 
 - Prefer efficient single key design to minimize the number of keys involved in
   a request
-- Design for expiration and explicit deletion of every key. Use TTL aggressively
+- Design for expiration or explicit deletion of every key. Use TTL aggressively
   for ephemeral state to automatically remove expired data
 - Choose the data type by access pattern, not by data shape. Strings for values
   and counters. Hashes for structures of related data. Lists for efficient edge
   push and pop. Sets for efficient membership check of unique values. SortedSets
   for efficient ranking and range queries
-- Prefer non-blocking incremental scans over blocking full dumps of large
-  collections
+- Prefer non-blocking, cursor-based, incremental scans over blocking full dumps
+  of large collections
 - Use server-side Lua scripts for multi-step atomic logic e.g. check-then-act,
   read-modify-write, instead of =watch ... exec= optimistic locking with
   client-side checks and retries
-
