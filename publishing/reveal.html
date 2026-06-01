@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reveal.js HTML presentation framewor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/theme/beige.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/highlight/zenburn.css">
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+
+        <section>
+          <h1>Key bindings</h1>
+          <ul>
+            <li class="fragment"><code>Spc/S-Spc</code> Next/previous slide</li>
+            <li class="fragment"><code>C-click/M-click</code> Zoom in/out</li>
+            <li class="fragment"><code>C-S-f</code> Toggle search</li>
+            <li class="fragment"><code>Esc</code> Toggle overview</li>
+            <li class="fragment"><code>S/C-w</code> Show/hide speaker notes</li>
+          </ul>
+          <aside class="notes">
+            Key bindings speed up navigation
+          </aside>
+        </section>
+
+        <section>
+          <h1>Code block</h1>
+          <pre>
+            <code class="language-javascript" data-trim data-line-numbers="1-4|5,6">
+// Highlight step 1
+const greet = name => {
+  console.log(`Hello, ${name}!`);
+};
+// Highlight step 2
+greet("world");
+            </code>
+          </pre>
+        </section>
+
+        <section>
+          <section>
+            <h1>Nested slide (Top)</h1>
+            <p>Move down for more content.</p>
+          </section>
+          <section>
+            <h1>Nested slide (Bottom)</h1>
+            <p>Vertical slide content.</p>
+          </section>
+        </section>
+
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/highlight.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/notes.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/search.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/zoom.js"></script>
+    <script>
+     Reveal.initialize({
+       hash: true,
+       slideNumber: true,
+       respondToHashChanges: true,
+       plugins: [
+         RevealHighlight,
+         RevealNotes,
+         RevealSearch,
+         RevealZoom,
+       ],
+     });
+    </script>
+  </body>
+</html>

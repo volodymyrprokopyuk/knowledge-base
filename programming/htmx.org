@@ -3,7 +3,9 @@
 ** Hypermedia
 
 - Hypermedia :: Hypermedia is a structured document (HTML) that contains content
-  hypermarks, non-linear links to other documents, and hypermedia controls
+  hypermarks, non-linear links to other documents, and hypermedia controls.
+  Hypermedia simultaneously provides structure to the document and controls for
+  the application data
 - URL :: Uniform Resource Locator URL is a reference to a resource on a network
   that indicates a protocol to access the resource
 #+begin_src fish
@@ -26,6 +28,17 @@ scheme://user@host:port/path?query#fragment
 - REST :: REpresentational State Transfer REST is a client-server architecture
   with stateless communication through the uniform interface that allows for
   caching
+  - Hypermedia API ::
+    - Can evolve in backward incompatible ways following a rolling release
+    - Can be tailored to specific hypermedia-driven application
+    - Can use session automatically handled cookie-based authentication for
+      clients
+  - JSON API ::
+    - Must be stable and backward-compatible within major versions in order to
+      not break clients
+    - Must be generic to support variety of clients e.g. mobile, third-party
+      systems and scripts
+    - Requires explicitly managed token-based authentication of clients
 - Uniform interface :: The uniform interface provides a rolling-release
   continuous updates, and avoids complexities of JSON API versioning
   - Uniform identification of resources through URLs
@@ -39,7 +52,7 @@ scheme://user@host:port/path?query#fragment
   - Hypermedia As The Engine Of Application State HATEOAS encodes the state of a
     resource and the actions available on the resource directly withing the
     hypermedia response. A browser does not need to understand anything about
-    the rendered resource
+    the rendered resource and the application beyond the entry point URL
 - Hypermedia system :: The hypermedia system adheres to the REpresentational
   State Transfer REST network architecture, HTML language, HTTP protocol,
   uniform interface between hypermedia clients and servers, and native browser
@@ -55,6 +68,38 @@ scheme://user@host:port/path?query#fragment
 <!-- Replace #contact with HTML fragment from GET /contact response -->
 <button hx-get="/contact" hx-target="#contact">Contact</button>
 #+end_src
+- Scripting in hypermedia-driven applications :: Business logic and presentation
+  structure should be kept on the hypermedia server. Client-side interactivity
+  should be delegated to scripting
+  - Hypermedia data exchange format between a browser and a server must be
+    preserved when using scripting. Scripting does not directly exchange
+    hypermedia with the server. Avoid JSON API
+  - Client-side state managed by scripting, outside of DOM, must be kept to a
+    minimum. Store state in DOM e.g. element attributes, so state is
+    automatically exchanged with the server without client-side data modeling
+  - Prefer listening on standard and custom events over registering callbacks on
+    selectors
+#+begin_src web
+<script>
+ function sweetConfirm(el, config) {
+   const res = await Swal.fire(config)
+   if (res.isConfirmed) {
+     el.dispatchEvent(new Event("confirmed"))
+   }
+ }
+</script>
+
+<button type="button"
+  hx-delete="/contact"
+  hx-target="body"
+  hx-trigger="confirmed"
+  @click='sweetConfirm($el, {title:"Delete contacts?"})'>
+  Delete contacts
+</button>
+#+end_src
+- Locality of Behavior LoB :: The LoB states that behavior of a unit of code
+  should be as obvious as possible by looking only at that unit of code. The LoB
+  design pattern is the opposite of the SoC design pattern
 - JSON API and SPA :: JSON API provides structured data that lacks hypermedia
   controls, hence must be interpreted by a custom tailored SPA to render
   correctly (not a uniform interface). SPA replaces hypermedia system with JSON
@@ -72,8 +117,13 @@ scheme://user@host:port/path?query#fragment
   - Any HTTP verb can be used in HTTP requests (=hx-get=, =hx-post=, =hx-put=,
     =hx-patch=, =hx-delete=)
   - Any event on any element can trigger HTTP requests (=hx-trigger=)
+    - =hx-sync= synchronizes async requests from all children, so only one
+      request at a time is issued, preventing concurrent async requests and
+      uncontrolled swapping of DOM
   - HTML fragment from the response can replace the target DOM subtree within
     the current document without the full page reload (=hx-target=, =hx-swap=)
+    - =hx-target= is automatically inherited by all child elements, so the
+      children will target this outermost element
     - =tx-select= selects a subtree from a response to swap the target
 - HTML form submission ::
   - Explicit form :: All form inputs are serialized into the request from any
@@ -95,4 +145,79 @@ scheme://user@host:port/path?query#fragment
   <input type="search" name="query" value="{{request.body.query}}" id="search"/>
 </label>
 <button hx-post="/contact" hx-target="#contact" hx-include="#search">Search</button>
+#+end_src
+
+* Templ
+
+- Pure components :: Pure components depend only on passed arguments, without
+  relaying on a global state, file system access, database queries, network
+  calls
+- Implicit context :: Templ components have an explicit =ctx= variable passed
+  from the component =Render()= function. This context can be used to avoid
+  property drilling by accessing shared by context values only in the specific
+  component down in the hierarchy
+#+begin_src web
+package web
+
+import "context"
+
+func getUserID(ctx context.Context) string {
+  userID, assert := ctx.Value("userID").(string)
+  if !assert {
+    return ""
+  }
+  return userID
+}
+
+templ SubComponent(content string) {
+  <span>{content}</span>
+  {children...}
+}
+
+templ Component(
+  name, content string,
+  attrs templ.Attributes,
+  classes []string,
+  subComponent templ.Component,
+) {
+  {{value := "scoped inline code"}}
+  <div
+    name={name}
+    required?={true}
+    {"data-" + name}={value}
+    {attrs...}
+    class={classes}
+    class={templ.KV("primary", true)}
+    if true {
+      class={"active", name}
+    }
+  >
+    Component {content} {getUserID(ctx)}
+    @SubComponent("embedded") {
+      <span>Children</span>
+    }
+    @subComponent
+  </div>
+}
+#+end_src
+
+#+begin_src go
+func main() {
+  ctx := context.WithValue(context.Background(), "userID", "usr1234")
+  name, content := "component", "content"
+  attrs := map[string]any{
+    "int": 1,
+    "str": "two",
+    "bool": true,
+  }
+  classes := []string{"a", "b", "c"}
+  comp := web.Component(
+    name, content, attrs, classes, web.SubComponent("embedded2"),
+  )
+  err := comp.Render(ctx, os.Stdout)
+  if err != nil {
+    fmt.Fprintf(os.Stderr, "%s\n", err)
+    os.Exit(1)
+  }
+}
 #+end_src
