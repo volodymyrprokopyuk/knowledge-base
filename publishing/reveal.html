@@ -5,28 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reveal.js HTML presentation framewor</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/theme/beige.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/theme/moon.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/highlight/zenburn.css">
   </head>
   <body>
     <div class="reveal">
       <div class="slides">
 
-        <section>
+        <section id="key-bindings">
           <h1>Key bindings</h1>
           <ul>
-            <li class="fragment"><code>Spc/S-Spc</code> Next/previous slide</li>
+            <li class="fragment"><code>Esc/o</code> Toggle overview</li>
+            <li class="fragment"><code>g 1/2 Ret</code> Go to slide n/m</li>
             <li class="fragment"><code>C-click/M-click</code> Zoom in/out</li>
-            <li class="fragment"><code>C-S-f</code> Toggle search</li>
-            <li class="fragment"><code>Esc</code> Toggle overview</li>
-            <li class="fragment"><code>S/C-w</code> Show/hide speaker notes</li>
+            <li class="fragment"><code>?</code> Show key bindings</li>
           </ul>
           <aside class="notes">
             Key bindings speed up navigation
           </aside>
         </section>
 
-        <section>
+        <section data-transition="zoom">
           <h1>Code block</h1>
           <pre>
             <code class="language-javascript" data-trim data-line-numbers="1-4|5,6">
@@ -38,16 +37,18 @@ const greet = name => {
 greet("world");
             </code>
           </pre>
+          <p>Zoom</p>
+          <a href="#/key-bindings">Back to key bindings</a>
         </section>
 
         <section>
-          <section>
-            <h1>Nested slide (Top)</h1>
-            <p>Move down for more content.</p>
+          <section data-transition="convex">
+            <h1>Nested top slide</h1>
+            <p>Convex</p>
           </section>
-          <section>
-            <h1>Nested slide (Bottom)</h1>
-            <p>Vertical slide content.</p>
+          <section data-transition="concave">
+            <h1>Nested bottom slide</h1>
+            <p>Concave</p>
           </section>
         </section>
 
@@ -62,8 +63,8 @@ greet("world");
     <script>
      Reveal.initialize({
        hash: true,
-       slideNumber: true,
        respondToHashChanges: true,
+       transition: "convex",
        plugins: [
          RevealHighlight,
          RevealNotes,
