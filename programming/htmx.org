@@ -56,7 +56,9 @@ scheme://user@host:port/path?query#fragment
 - Hypermedia system :: The hypermedia system adheres to the REpresentational
   State Transfer REST network architecture, HTML language, HTTP protocol,
   uniform interface between hypermedia clients and servers, and native browser
-  capabilities
+  capabilities. The backend acts as a hypermedia creator, while the browser is
+  zero-knowledge hypermedia presenter. Only the backend interacts with external
+  APIs, while the browser only interacts with the hypermedia creator
 - Hypermedia-driven applications :: Hypermedia-driven applications use HTML as
   the application protocol/API, a hypermedia-oriented library to extend HTML
   interactivity, and take full advantage of the hypermedia system of the web
@@ -146,16 +148,20 @@ scheme://user@host:port/path?query#fragment
 </label>
 <button hx-post="/contact" hx-target="#contact" hx-include="#search">Search</button>
 #+end_src
+- Error handling :: By default htmx does not swaps content on 4xx and 5xx status
+  codes, unless explicitly configured otherwise
 
 * Templ
+
+** Component embedding
 
 - Pure components :: Pure components depend only on passed arguments, without
   relaying on a global state, file system access, database queries, network
   calls
-- Implicit context :: Templ components have an explicit =ctx= variable passed
-  from the component =Render()= function. This context can be used to avoid
-  property drilling by accessing shared by context values only in the specific
-  component down in the hierarchy
+- Implicit context :: Templ components have an implicit =ctx= variable passed
+  from the component =Render()= function. This context avoids property drilling,
+  and provides access to values shared by the context in specific components
+  down the line
 #+begin_src web
 package web
 
@@ -202,6 +208,7 @@ templ Component(
 #+end_src
 
 #+begin_src go
+// > templ generate
 func main() {
   ctx := context.WithValue(context.Background(), "userID", "usr1234")
   name, content := "component", "content"
@@ -218,6 +225,40 @@ func main() {
   if err != nil {
     fmt.Fprintf(os.Stderr, "%s\n", err)
     os.Exit(1)
+  }
+}
+#+end_src
+
+** Layout hierarchy
+
+#+begin_src web
+package web
+
+// Component
+templ Component(content string) {
+  <div>{content}</div>
+}
+
+// Layout
+templ Base(title string, component templ.Component) {
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+      <title>{title}</title>
+  </head>
+  <body>
+      @component
+      {children...}
+  </body>
+  </html>
+}
+
+// Page
+templ Index() {
+  @Base("Title", Component("Component")) {
+    <div>Children</div>
   }
 }
 #+end_src
