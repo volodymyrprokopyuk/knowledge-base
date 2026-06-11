@@ -2,22 +2,29 @@
 
 ** Hypermedia
 
-- Hypermedia :: Hypermedia is a structured document (HTML) that contains content
-  hypermarks, non-linear links to other documents, and hypermedia controls.
-  Hypermedia simultaneously provides structure to the document and controls for
-  the application data
-- URL :: Uniform Resource Locator URL is a reference to a resource on a network
-  that indicates a protocol to access the resource
-#+begin_src fish
-scheme://user@host:port/path?query#fragment
-#+end_src
-- Hypermedia controls ::
-  - Anchor (navigate and read) :: The anchor tag specifies a hyper reference to
-    another document
+- Hypermedia :: Hypermedia is an HTML document that simultaneously provides
+  markup structure for the document, and hypermedia controls (hyperlinks, form
+  actions) for the application data. Hypermedia content is self-contained: it
+  contains data, presentation markup, and operational hypermedia controls.
+  Hypermedia is used as the primary engine for the application state HATEOAS
+  - Server-driven UI :: The server is the single source of truth for the current
+    application state, and possible next interactions
+  - Zero-knowledge browser :: The browser acts purely as a hypermedia rendering
+    engine with zero-knowledge about the application
+  - HTML as API :: HTML is the primary API between the server and the browser
+- Hypermedia controls :: Hypermedia controls transform static documents into an
+  interactive applications with cross-document navigation and data submission
+  capabilities. HTMX extends HTML by turning any HTML element into a hypermedia
+  control. Hypermedia controls allow the browser to automatically and
+  incrementally discover the application without any prior knowledge about the
+  application
+  - Hyperlink :: A hyperlink (anchor) tag navigates to and reads another HTML
+    document specified by a hyper reference
 #+begin_src web
 <a href="https://hypermedia.systems/">Hypermedia</a>
 #+end_src
-  - Form (update) :: The form tag collects information and updates a resource
+  - Form action :: The form tag submits collected information to a resource
+    identified by URL on the server
 #+begin_src web
 <form action="/signup" method="POST">
   <input type="text" name="email"/>
@@ -25,34 +32,82 @@ scheme://user@host:port/path?query#fragment
   <button type="submit">Sign up</buttong>
 </form>
 #+end_src
+- URL :: Uniform Resource Locator URL is a reference including the access
+  protocol to a resource on a network
+#+begin_src fish
+scheme://user@host:port/path?query#fragment
+#+end_src
+
+** REST
+
 - REST :: REpresentational State Transfer REST is a client-server architecture
   with stateless communication through the uniform interface that allows for
   caching
-  - Hypermedia API ::
-    - Can evolve in backward incompatible ways following a rolling release
-    - Can be tailored to specific hypermedia-driven application
-    - Can use session automatically handled cookie-based authentication for
-      clients
-  - JSON API ::
-    - Must be stable and backward-compatible within major versions in order to
-      not break clients
-    - Must be generic to support variety of clients e.g. mobile, third-party
-      systems and scripts
-    - Requires explicitly managed token-based authentication of clients
-- Uniform interface :: The uniform interface provides a rolling-release
+- Uniform interface :: The uniform interface provides rolling release for
   continuous updates, and avoids complexities of JSON API versioning
-  - Uniform identification of resources through URLs
-  - Uniform manipulation of resources through HTTP verbs
-  - Negotiation of resource representation through the Accept and Content-Type
-    HTTP headers
-  - Self-describing request and response messages contain all necessary
-    information to process the request and navigate the application. Once a
-    hypermedia application is entered into, all functionality and resources are
-    automatically discovered through self-describing messages
-  - Hypermedia As The Engine Of Application State HATEOAS encodes the state of a
-    resource and the actions available on the resource directly withing the
-    hypermedia response. A browser does not need to understand anything about
-    the rendered resource and the application beyond the entry point URL
+  - Resource identification :: Uniform identification of resources through URLs
+    automatically discovered from hypermedia responses
+  - Resource representation :: Automatic negotiation of resource representation
+    through the =Accept= and =Content-Type= HTTP headers
+  - Resource manipulation :: Uniform manipulation of resources through HTTP
+    verbs and semantic response status codes
+| Verb   | Operation      | Characteristic |
+|--------+----------------+----------------|
+| POST   | Create         | Non-idempotent |
+| PUT    | Full update    | Idempotent     |
+| PATCH  | Partial update | Idempotent     |
+| GET    | Read           | Read-only      |
+| DELETE | Delete         | Idempotent     |
+
+| Status code                  | Meaning                                         |
+|------------------------------+-------------------------------------------------|
+| 200 OK                       | Query success (read only)                       |
+| 201 Created                  | Create success (non-idempotent)                 |
+| 202 Accepted                 | Async processing (implies async notification)   |
+| 204 No Content               | Update and delete success (idempotent)          |
+|------------------------------+-------------------------------------------------|
+| 400 Bad Request              | Invalid request format                          |
+| 401 Unauthorized             | Missing authentication                          |
+| 403 Forbidden                | Insufficient permissions                        |
+| 404 Not Found                | Non-existing resource                           |
+| 409 Conflict                 | Already existing resource (state conflict)      |
+| 413 Request Entity Too Large | Request body exceeds limits                     |
+| 422 Unprocessable Entity     | Invalid request semantic (constraint violation) |
+| 429 Too Many Requests        | Rate-limit rejected request                     |
+|------------------------------+-------------------------------------------------|
+| 500 Internal Server Error    | Unexpected error (default)                      |
+| 502 Bad Gateway              | Unavailable downstream service                  |
+| 503 Service Unavailable      | Unavailable current service                     |
+  - Self-describing messages, stateless communication :: Self-describing request
+    and response messages including request and response headers contain all
+    necessary information to process the request server-side and navigate the
+    application client-side. Once a hypermedia application is entered into, all
+    functionality and resources are automatically discovered through
+    self-describing messages. The server handles requests without the need to
+    remember previous requests
+  - HATEOAS :: Hypermedia As The Engine Of Application State HATEOAS encodes the
+    state of a resource in the markup and the actions available on the resource
+    through hypermedia controls directly within the hypermedia response. A
+    browser has zero knowledge about the resource to render and the application
+    beyond the entry point URL
+  - Caching :: Responses should specify caching behavior through the
+    =Cache-Control= HTTP header
+- Hypermedia API ::
+  - Tailored HTML API :: Hypermedia API is tailored to a single HDA
+  - Rolling release :: Hypermedia API can evolve in backward incompatible ways
+    without breaking clients
+  - Cookie-based session :: Hypermedia API uses a cookie-based, browser-handled
+    session to authenticate clients
+- JSON API ::
+  - Generic JSON API :: JSON API must be generic to support variety of clients
+    e.g. web, mobile, third-party systems, and scripts
+  - Requires versioning :: JSON API must be stable and backward-compatible
+    within each major version in order to not break clients
+  - Token-based session :: JSON API requires explicitly managed token-based
+    authentication of clients
+
+** Hypermedia system
+
 - Hypermedia system :: The hypermedia system adheres to the REpresentational
   State Transfer REST network architecture, HTML language, HTTP protocol,
   uniform interface between hypermedia clients and servers, and native browser
