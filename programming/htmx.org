@@ -106,36 +106,31 @@ scheme://user@host:port/path?query#fragment
   - Token-based session :: JSON API requires explicitly managed token-based
     authentication of clients
 
-** Hypermedia system
+** Hypermedia-driven application
 
-- Hypermedia system :: The hypermedia system adheres to the REpresentational
-  State Transfer REST network architecture, HTML language, HTTP protocol,
-  uniform interface between hypermedia clients and servers, and native browser
-  capabilities. The backend acts as a hypermedia creator, while the browser is
-  zero-knowledge hypermedia presenter. Only the backend interacts with external
-  APIs, while the browser only interacts with the hypermedia creator
-- Hypermedia-driven applications :: Hypermedia-driven applications use HTML as
-  the application protocol/API, a hypermedia-oriented library to extend HTML
-  interactivity, and take full advantage of the hypermedia system of the web
-  - Server hypermedia response is the single authoritative source of truth
-  - High tolerance of hypermedia-driven applications to API and UI changes
-    (loose coupling)
-  - Highly interactive, simple clients that exchange hypermedia with the server
+- Hypermedia-driven application HDA :: A hypermedia-driven application HDA
+  adheres to the REST network architecture, the HTML markup, the HTTP protocol,
+  the uniform interface between hypermedia presenters (browsers) and hypermedia
+  creators (servers), and native browser capabilities. Only hypermedia creators
+  interact with external API e.g. identity providers, authorization servers,
+  while hypermedia presenters only interact with hypermedia creators
 #+begin_src web
 <!-- Replace #contact with HTML fragment from GET /contact response -->
 <button hx-get="/contact" hx-target="#contact">Contact</button>
 #+end_src
-- Scripting in hypermedia-driven applications :: Business logic and presentation
-  structure should be kept on the hypermedia server. Client-side interactivity
-  should be delegated to scripting
-  - Hypermedia data exchange format between a browser and a server must be
-    preserved when using scripting. Scripting does not directly exchange
-    hypermedia with the server. Avoid JSON API
-  - Client-side state managed by scripting, outside of DOM, must be kept to a
-    minimum. Store state in DOM e.g. element attributes, so state is
-    automatically exchanged with the server without client-side data modeling
-  - Prefer listening on standard and custom events over registering callbacks on
-    selectors
+- Locality of Behavior LoB :: The Locality of Behavior LoB states that behavior
+  of a unit of code should be obvious from looking only at that unit of code.
+  The LoB design pattern is the opposite of the SoC design pattern
+- Scripting in hypermedia-driven applications :: Data, presentation, and
+  behavior of HDA are controlled by the hypermedia created, the server.
+  Client-side interactivity is delegated to scripting
+  - Hypermedia format :: Scripting must preserve the hypermedia format (HTML
+    over HTTP) between the browser and the server
+  - DOM-managed state :: Scripting should store state in the DOM (element
+    attributes), so the state is automatically exchanged with the server without
+    client-side data modeling
+  - Listen to events :: Scripting should listen to standard and custom events,
+    instead of registering callbacks on fragile selectors
 #+begin_src web
 <script>
  function sweetConfirm(el, config) {
@@ -150,19 +145,17 @@ scheme://user@host:port/path?query#fragment
   hx-delete="/contact"
   hx-target="body"
   hx-trigger="confirmed"
-  @click='sweetConfirm($el, {title:"Delete contacts?"})'>
-  Delete contacts
-</button>
+  @click='sweetConfirm($el, {title:"Delete contacts?"})'
+>Delete contacts</button>
 #+end_src
-- Locality of Behavior LoB :: The LoB states that behavior of a unit of code
-  should be as obvious as possible by looking only at that unit of code. The LoB
-  design pattern is the opposite of the SoC design pattern
-- JSON API and SPA :: JSON API provides structured data that lacks hypermedia
-  controls, hence must be interpreted by a custom tailored SPA to render
-  correctly (not a uniform interface). SPA replaces hypermedia system with JSON
-  data exchange, introduces a lot of complexity by implementing sophisticated
-  two-way data binding between the in-memory data model, the server and the DOM
-  (tight coupling), and renders all content on the same page without navigation
+- JSON API :: JSON API provides only structured data without hypermedia
+  controls, not a uniform interface. JSON API must be interpreted by a tailored
+  custom SPA to render correctly
+- Single Page Application SPA :: A Single Page Application SPA completely
+  replaces the browser-native hypermedia system with structured JSON data
+  exchange, complex client-side data modeling and state management,
+  sophisticated two-way data binding between the in-memory client-side data
+  model, the server state, and the DOM (tight coupling)
 
 ** =htmx= generalizations
 
