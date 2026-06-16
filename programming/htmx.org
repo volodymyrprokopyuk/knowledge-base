@@ -92,6 +92,9 @@ scheme://user@host:port/path?query#fragment
     beyond the entry point URL
   - Caching :: Responses should specify caching behavior through the
     =Cache-Control= HTTP header
+
+*** Hypermedia API vs JSON API
+
 - Hypermedia API ::
   - Tailored HTML API :: Hypermedia API is tailored to a single HDA
   - Rolling release :: Hypermedia API can evolve in backward incompatible ways
@@ -148,6 +151,9 @@ scheme://user@host:port/path?query#fragment
   @click='sweetConfirm($el, {title:"Delete contacts?"})'
 >Delete contacts</button>
 #+end_src
+
+*** JSON API and SPA
+
 - JSON API :: JSON API provides only structured data without hypermedia
   controls, not a uniform interface. JSON API must be interpreted by a tailored
   custom SPA to render correctly
@@ -157,27 +163,98 @@ scheme://user@host:port/path?query#fragment
   sophisticated two-way data binding between the in-memory client-side data
   model, the server state, and the DOM (tight coupling)
 
-** =htmx= generalizations
+** HTMX generalizations
 
-- =htmx= generalizations ::
-  - Any HTML element can issue HTTP requests and is a hypermedia control
-    - =hx-boost= makes all children anchors and forms to issue async =fetch=,
-      swap the =body= with the response without re-processing the =head=
-      (scripts, style sheets), and updating the browser location bar
-  - Any HTTP verb can be used in HTTP requests (=hx-get=, =hx-post=, =hx-put=,
-    =hx-patch=, =hx-delete=)
-  - Any event on any element can trigger HTTP requests (=hx-trigger=)
-    - =hx-sync= synchronizes async requests from all children, so only one
-      request at a time is issued, preventing concurrent async requests and
-      uncontrolled swapping of DOM
-  - HTML fragment from the response can replace the target DOM subtree within
-    the current document without the full page reload (=hx-target=, =hx-swap=)
-    - =hx-target= is automatically inherited by all child elements, so the
-      children will target this outermost element
-    - =tx-select= selects a subtree from a response to swap the target
-- HTML form submission ::
-  - Explicit form :: All form inputs are serialized into the request from any
-    element within the form
+- HTMX generalizations :: HTMX provides declarative access to modern browser
+  features directly from server-rendered HTML, rather than imperative
+  access from client-side JavaScript
+
+*** All elements as hypermedia controls
+
+- Any HTML element :: Any HTML element becomes a hypermedia control, and can
+  issue async HTTP requests
+- Any HTTP verb :: Any HTTP verb can be used in async =fetch= HTTP requests
+| HTTP verb  | Description                        |
+|------------+------------------------------------|
+| =hx-get=   | Idempotent, read-only. =hx-params= |
+| =hx-post=  | Non-idempotent                     |
+| =hx-put=   | Idempotent, full update            |
+| =hx-patch= | Idempotent, partial update         |
+| =hx-delte= | Idempotent                         |
+
+*** Request triggering
+
+- Any trigger event :: Any event on any element can trigger async HTTP requests
+  - =hx-trigger= specifies events and conditions that trigger async HTTP
+    requests
+| Trigger                         | Description                                   |
+|---------------------------------+-----------------------------------------------|
+| =click=, =keyup=, =mouseup=     | Standard events                               |
+| =click[boolean JS expression]=  | Event filter. Scope: first event, then global |
+| =input changed delay:1s=        | Standard event modifiers (see below)          |
+| =load=, =revealed=, =intersect= | HTMX non-standard events                      |
+| =every <time> [boolean JS]=     | Periodic polling with optional filter         |
+| =load, click delay:1s=          | Multiple independent triggers                 |
+| =custom=                        | Custom events                                 |
+
+| Standard event modifier       | Description                                      |
+|-------------------------------+--------------------------------------------------|
+| =once=                        | Only on the first event                          |
+| =changed=                     | Only if the value has changed                    |
+| =delay:<time>=                | Next event before delay resets previous delay    |
+| =throttle:<time>=             | Next event before delay is ignored               |
+| =from:<selector>=             | Triggers on events from another element (=body=) |
+| =consume=                     | Not triggers any other htmx request on parents   |
+| =queue:<first,last,all,none>= | Event queuing during in-flight requests          |
+
+| HTML element                   | Default trigger event                         |
+|--------------------------------+-----------------------------------------------|
+| =input=, =textarea=, =select=  | =change= event                                |
+| =form=                         | =submit= event                                |
+| Other elements                 | =click= event                                 |
+  - =hx-sync= synchronizes async HTTP requests between this element and an
+    element identified by the CSS selector, so only one request at a time is
+    issued, preventing concurrent requests and uncontrolled swapping of DOM
+| Sync strategy                   | Description                                         |
+|---------------------------------+-----------------------------------------------------|
+| =drop= inter-element (default)  | Drop this new request, while in-flight old request  |
+|                                 | Lock the element until server responds e.g. pay     |
+| =abort= inter-element           | Abort in-flight old request, start this new request |
+|                                 | Prioritize the most recent user action e.g. search  |
+| =replace= same element          | Abort in-flight old request, start this new request |
+| =queue first,last,all=          | Queue this request, while in-flight old requests    |
+#+TBLFM: $1=drop= inter-element (default)
+
+*** Targeting and swapping
+
+- Any replace target :: HTML fragment from the response can replace any target
+  DOM subtree within the current document without page reload
+  - =hx-target= targets with a CSS selector a different element than the element
+    that issued the async HTTP request (default target ~hx-target="this"~) for
+    DOM swapping with the response fragment
+  - =tx-select= selects a subtree from the response to swap the target
+  - =hx-swap= specifies how a response fragment swaps the target. A swap is
+    either a full replacement of the target or a morph of the response fragment
+    with existing DOM elements of the target
+| Swap method   | Description                                         |
+|---------------+-----------------------------------------------------|
+| =innterHTML=  | Replaces inner HTML of the target element (default) |
+| =outerHTML=   | Repaces the target element with response fragment   |
+| =textContent= | Replaces only text content of the target element    |
+
+*** HTMX design features
+
+- HTMX attribute inheritance :: Most HTMX attributes are inherited and apply to
+  the root element and its children. HTMX attribute inheritance avoid code
+  duplication by hoisting HTMX attributes to the common parent element
+
+*** HTMX form submission
+
+- No POST/Redirect/GET :: HTMX forms no longer need to follow the
+  POST/Redirect/GET pattern. On successful form processing, the server directly
+  returns the response fragment without additional redirects and requests
+- Explicit form :: All form inputs within the enclosing =form= element are
+  serialized into the request
 #+begin_src web
 <form>
   <label>
@@ -187,8 +264,15 @@ scheme://user@host:port/path?query#fragment
   <button hx-post="/contact" hx-target="#contact">Search</button>
 </form>
 #+end_src
-  - Explicit input include :: Explicitly select input elements (potentially
-    outside of the form element) to be included in the request
+- Explicit input include :: Explicitly selected input elements (potentially
+  outside of the =form= element) are serialized into the request
+  - =hx-include= includes values of additional elements identified with the CSS
+    selector in the async HTTP request
+  - =hx-params= filters element values to be included into an async HTTP request
+| Params value         | Description  |
+|----------------------+--------------|
+| =param1, param2=     | Include list |
+| =not param1, param2= | Exclude list |
 #+begin_src web
 <label>
   <span>Search</span>
@@ -196,8 +280,6 @@ scheme://user@host:port/path?query#fragment
 </label>
 <button hx-post="/contact" hx-target="#contact" hx-include="#search">Search</button>
 #+end_src
-- Error handling :: By default htmx does not swaps content on 4xx and 5xx status
-  codes, unless explicitly configured otherwise
 
 * Templ
 
