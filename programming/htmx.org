@@ -26,11 +26,7 @@
   - Form action :: The form tag submits collected information to a resource
     identified by URL on the server
 #+begin_src web
-<form action="/signup" method="POST">
-  <input type="text" name="email"/>
-  <input type="password" name="password"/>
-  <button type="submit">Sign up</buttong>
-</form>
+<form action="/signup" method="POST"></form>
 #+end_src
 - URL :: Uniform Resource Locator URL is a reference including the access
   protocol to a resource on a network
@@ -127,13 +123,16 @@ scheme://user@host:port/path?query#fragment
 - Scripting in hypermedia-driven applications :: Data, presentation, and
   behavior of HDA are controlled by the hypermedia created, the server.
   Client-side interactivity is delegated to scripting
-  - Hypermedia format :: Scripting must preserve the hypermedia format (HTML
-    over HTTP) between the browser and the server
-  - DOM-managed state :: Scripting should store state in the DOM (element
-    attributes), so the state is automatically exchanged with the server without
-    client-side data modeling
-  - Listen to events :: Scripting should listen to standard and custom events,
-    instead of registering callbacks on fragile selectors
+  - Preserve hypermedia format :: Scripting must preserve the hypermedia format
+    (HTML over HTTP) between the browser and the server
+  - Leverage DOM-managed state :: Scripting should store state in the DOM
+    (element attributes), so the state is automatically exchanged with the
+    server without client-side data modeling
+  - Listen to events :: Scripting should listen to standard and custom events to
+    communicate between components, instead of registering callbacks on fragile
+    CSS selectors
+  - Events for inline scripting :: Events are the primary integration method
+    between HTMX and alpine.js inline scripting
 #+begin_src web
 <script>
  function sweetConfirm(el, config) {
@@ -247,12 +246,33 @@ scheme://user@host:port/path?query#fragment
 - HTMX attribute inheritance :: Most HTMX attributes are inherited and apply to
   the root element and its children. HTMX attribute inheritance avoid code
   duplication by hoisting HTMX attributes to the common parent element
+- =CamelCase=, =kebab-case= events :: HTMX fires events with both =CamelCase=,
+  =kebab-case=, which facilitates interoperability with other libraries
 
 *** HTMX form submission
 
-- No POST/Redirect/GET :: HTMX forms no longer need to follow the
-  POST/Redirect/GET pattern. On successful form processing, the server directly
-  returns the response fragment without additional redirects and requests
+- State-changing vs read-only operations ::
+  - =<a>= defines a read-only navigation via =GET=
+  - =<form>=, =<button>= define state-changing idempotent =PUT=, =PATCH=,
+    =DELETE=, or non-idempotent =POST= operations
+- POST/Redirect/GET :: Edit form URL should be pushed to the browser history.
+  Resource mutation URL should not be pushed to the browser history
+  - POST a create, update form. Authorize and mutate the resource
+    - Directly return the form fragment with validation errors
+  - 2xx with =HX-Location= response header for client-side automatic navigation
+    to the mutated resource without page reload
+  - GET the resource. Authorize and render the read-only view of the mutated
+    resource
+- HTMX form validation :: HTMX won't issue an async HTTP request or a WebSocket
+  send if the form has validation errors. Non-form inputs do not validate before
+  making the request by default, but =hx-validate= enables validation on
+  non-form inputs. HTMX fires validation events that can be used to implement
+  custom validation
+| Validation event           | Purpose                                       |
+|----------------------------+-----------------------------------------------|
+| =htmx:validation:validate= | Add custom validation before HTML5 validation |
+| =htmx:validation:failed=   | Show errors on invalid input                  |
+| =htmx:validation:halted=   | Show validation errors preventing the request |
 - Explicit form :: All form inputs within the enclosing =form= element are
   serialized into the request
 #+begin_src web
@@ -280,6 +300,28 @@ scheme://user@host:port/path?query#fragment
 </label>
 <button hx-post="/contact" hx-target="#contact" hx-include="#search">Search</button>
 #+end_src
+
+*** HTMX browser and server URLs
+
+- Multi-URL without page reload ::
+- Browser URL :: A browser URL represents read-only GET views of the application
+  state e.g. list, detail, detail edit. Search, filter, sort, continuous scroll
+  do not change the browser URL. Form mutation POST, PUT, PATCH URLs must
+  never be pushed to the browser history, in order to avoid unintended
+  modifications due to the double submit
+- Server URL ::
+- HTMX browser history :: =hx-push-url= creates a new browser history entry.
+  =hx-replace-url= replaces the current browser history entry. HTMX caches the
+  =body= DOM snapshot to the =localStorage=. HTMX restores the DOM snapshot from
+  the =localStorage= on navigation via back/forward buttons without making a new
+  request to the server. =hx-push-url= URLs must always be able to return a full
+  page. For pages or fragments containing sensitive information disable history
+  caching through ~hx-history="false"~
+- Fragment vs full page response :: Every browser URL must support both fragment
+  and full page response on the server. Given the HTMX configuration
+  ~htmx.config.historyRestoreAsHxRequest = false~, the server returns a fragment
+  response when the =HX-Request: true= request header is present, or a full page
+  response otherwise
 
 * Templ
 
@@ -364,31 +406,87 @@ func main() {
 #+begin_src web
 package web
 
-// Component
 templ Component(content string) {
   <div>{content}</div>
 }
 
-// Layout
-templ Base(title string, component templ.Component) {
-  <!DOCTYPE html>
-  <html lang="en">
+templ Layout(title string, component templ.Component) {
+<!doctype html>
+<html lang="en">
   <head>
-      <meta charset="utf-8"/>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-      <title>{title}</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>{title}</title>
   </head>
-  <body>
-      @component
-      {children...}
+  <body hx-ext="response-targets">
+    @component
+    {children...}
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx-ext-response-targets@2.0.4" integrity="sha384-T41oglUPvXLGBVyRdZsVRxNWnOOqCynaPubjUVjxhsjFTKrFJGEMm3/0KGmNQ+Pg" crossorigin="anonymous"></script>
   </body>
-  </html>
+</html>
 }
 
-// Page
-templ Index() {
-  @Base("Title", Component("Component")) {
+templ Page() {
+  @Layout("Title", Component("Component")) {
     <div>Children</div>
   }
 }
 #+end_src
+
+* Playwright
+
+** Playwright architecture
+
+- Playwright instance :: A Playwright instance manages different browsers
+  #+begin_src go
+  pw, err := playwright.Run()
+  #+end_src
+- Browser process (efficiency) :: Launch a single browser process for all tests
+  in a test suite
+  #+begin_src go
+  browser, err := pw.Chromium.Launch()
+  #+end_src
+- Context session (isolation) :: A browser context represents an isolated
+  browser session (cookies, local and session storage, permissions)
+  #+begin_src go
+  cx, err := browser.NewContext()
+  #+end_src
+- Page (parallelism) :: Multiple browser tabs share the same browser session and
+  can execute tests in parallel
+  #+begin_src go
+  page, err := cx.NewPage()
+  #+end_src
+
+** Locators
+
+- Locator :: A locator is a set of reliable query instructions to find an
+  element on a page in face of dynamic DOM updates. A locator is lazily
+  evaluated using auto-waiting (for unique, stable, visible, enabled elements)
+  for every action that is performed on the locator. Locators are composable and
+  can be chained. Locators can match multiple elements, and fail when the action
+  does not support multiple elements
+- Role-based locators (recommended) :: Role-based locators use ARIA
+  accessibility attributes to find elements on a page by their meaning (role and
+  visible text), not code structure (CSS selectors)
+  #+begin_src go
+  page.GetByRole(role, name string)
+  #+end_src
+- Text-based locators :: Text-based locators find elements by a user-visible
+  text on a page
+  #+begin_src go
+  page.GetByText(text string) // Non-interactive elements
+  page.GetByLabel(label string) // Interctive form controls
+  #+end_src
+- CSS locators (fragile) :: CSS locators find elements by CSS selectors e.g.
+  code structure, specific attributes
+  #+begin_src go
+  page.Locator(selector string)
+  #+end_src
+- Locator chaining :: Chain multiple locators for precise and robust location of
+  elements on a page
+  #+begin_src go
+  page.Locator("li").Filter({
+    Has: Locator, HasText: "text",
+  }).GetByRole("link").Click()
+  #+end_src
