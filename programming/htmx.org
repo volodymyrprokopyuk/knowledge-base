@@ -3,48 +3,54 @@
 ** Hypermedia
 
 - Hypermedia :: Hypermedia is an HTML document that simultaneously provides
-  markup structure for the document, and hypermedia controls (hyperlinks, form
-  actions) for the application data. Hypermedia content is self-contained: it
-  contains data, presentation markup, and operational hypermedia controls.
-  Hypermedia is used as the primary engine for the application state HATEOAS
+  markup structure for the document, and hypermedia controls (hyperlinks, forms)
+  for the application data. Hypermedia content is self-contained: it contains
+  document content, structural markup, application data, and operational
+  hypermedia controls (hyperlinks, forms). Hypermedia is used as the primary
+  engine for the application state HATEOAS
   - Server-driven UI :: The server is the single source of truth for the current
     application state, and possible next interactions
   - Zero-knowledge browser :: The browser acts purely as a hypermedia rendering
     engine with zero-knowledge about the application
   - HTML as API :: HTML is the primary API between the server and the browser
 - Hypermedia controls :: Hypermedia controls transform static documents into an
-  interactive applications with cross-document navigation and data submission
-  capabilities. HTMX extends HTML by turning any HTML element into a hypermedia
-  control. Hypermedia controls allow the browser to automatically and
-  incrementally discover the application without any prior knowledge about the
-  application
-  - Hyperlink :: A hyperlink (anchor) tag navigates to and reads another HTML
-    document specified by a hyper reference
+  interactive applications with cross-document navigation =<a>= and data
+  submission capabilities =<form>=. HTMX extends HTML by turning any HTML
+  element into a hypermedia control. Hypermedia controls allow the browser to
+  automatically and incrementally discover the application without any prior
+  knowledge about the application
+  - Hyperlink :: A hyperlink (anchor) tag navigates =GET= to a location and
+    reads content of another HTML document specified by a hyper reference
 #+begin_src web
+<!-- GET referenced document on click -->
 <a href="https://hypermedia.systems/">Hypermedia</a>
 #+end_src
-  - Form action :: The form tag submits collected information to a resource
-    identified by URL on the server
+  - Form action :: The form tag submits =POST/GET= collected data to a resource
+    identified by a URL on the server
 #+begin_src web
+<!-- POST/GET collected data on submit -->
 <form action="/signup" method="POST"></form>
 #+end_src
 - URL :: Uniform Resource Locator URL is a reference including the access
-  protocol to a resource on a network
+  protocol (scheme://) to a resource on a network e.g. HTML document, form
+  submission endpoint
 #+begin_src fish
 scheme://user@host:port/path?query#fragment
 #+end_src
 
-** REST
+** REST architecture
 
 - REST :: REpresentational State Transfer REST is a client-server architecture
-  with stateless communication through the uniform interface that allows for
-  caching
+  between zero-knowledge browsers (hypermedia presenters) and single source of
+  truth servers (hypermedia creators) with stateless communication through the
+  uniform interface that allows for content caching
 - Uniform interface :: The uniform interface provides rolling release for
-  continuous updates, and avoids complexities of JSON API versioning
+  continuous application updates, and avoids complexities of JSON API versioning
   - Resource identification :: Uniform identification of resources through URLs
     automatically discovered from hypermedia responses
   - Resource representation :: Automatic negotiation of resource representation
-    through the =Accept= and =Content-Type= HTTP headers
+    through the =Accept= request HTTP headers and =Content-Type= response HTTP
+    headers
   - Resource manipulation :: Uniform manipulation of resources through HTTP
     verbs and semantic response status codes
 | Verb   | Operation      | Characteristic |
@@ -55,7 +61,7 @@ scheme://user@host:port/path?query#fragment
 | GET    | Read           | Read-only      |
 | DELETE | Delete         | Idempotent     |
 
-| Status code                  | Meaning                                         |
+| Response status code         | Meaning                                         |
 |------------------------------+-------------------------------------------------|
 | 200 OK                       | Query success (read only)                       |
 | 201 Created                  | Create success (non-idempotent)                 |
@@ -75,17 +81,17 @@ scheme://user@host:port/path?query#fragment
 | 502 Bad Gateway              | Unavailable downstream service                  |
 | 503 Service Unavailable      | Unavailable current service                     |
   - Self-describing messages, stateless communication :: Self-describing request
-    and response messages including request and response headers contain all
-    necessary information to process the request server-side and navigate the
-    application client-side. Once a hypermedia application is entered into, all
-    functionality and resources are automatically discovered through
-    self-describing messages. The server handles requests without the need to
-    remember previous requests
+    and response messages including request and response HTTP headers contain
+    all necessary information to process the request on the server and navigate
+    the application in the browser. Once a hypermedia application is entered
+    into, all functionality (forms) and resources (links) are automatically
+    discovered through self-describing hypermedia requests and responses. The
+    server handles requests without the need to remember previous requests
   - HATEOAS :: Hypermedia As The Engine Of Application State HATEOAS encodes the
-    state of a resource in the markup and the actions available on the resource
+    state of a resource in the markup, and the actions available on the resource
     through hypermedia controls directly within the hypermedia response. A
     browser has zero knowledge about the resource to render and the application
-    beyond the entry point URL
+    to interact with beyond the entry point URL
   - Caching :: Responses should specify caching behavior through the
     =Cache-Control= HTTP header
 
@@ -108,31 +114,31 @@ scheme://user@host:port/path?query#fragment
 ** Hypermedia-driven application
 
 - Hypermedia-driven application HDA :: A hypermedia-driven application HDA
-  adheres to the REST network architecture, the HTML markup, the HTTP protocol,
-  the uniform interface between hypermedia presenters (browsers) and hypermedia
-  creators (servers), and native browser capabilities. Only hypermedia creators
-  interact with external API e.g. identity providers, authorization servers,
-  while hypermedia presenters only interact with hypermedia creators
-#+begin_src web
-<!-- Replace #contact with HTML fragment from GET /contact response -->
-<button hx-get="/contact" hx-target="#contact">Contact</button>
-#+end_src
-- Locality of Behavior LoB :: The Locality of Behavior LoB states that behavior
-  of a unit of code should be obvious from looking only at that unit of code.
-  The LoB design pattern is the opposite of the SoC design pattern
-- Scripting in hypermedia-driven applications :: Data, presentation, and
-  behavior of HDA are controlled by the hypermedia created, the server.
-  Client-side interactivity is delegated to scripting
-  - Preserve hypermedia format :: Scripting must preserve the hypermedia format
-    (HTML over HTTP) between the browser and the server
-  - Leverage DOM-managed state :: Scripting should store state in the DOM
-    (element attributes), so the state is automatically exchanged with the
-    server without client-side data modeling
+  adheres to the REST client-server architecture, the HTML markup, the HTTP
+  protocol, the uniform interface between hypermedia presenters (browsers) and
+  hypermedia creators (servers), and native browser capabilities. Only
+  hypermedia creators internally interact with external API e.g. identity
+  providers, authorization servers, while hypermedia presenters only interact
+  with hypermedia creators over the uniform interface
+- Locality of Behavior LoB :: The Locality of Behavior states that behavior of a
+  unit of code should be obvious from looking only at that unit of code. The LoB
+  design pattern is the opposite of the Separation of Concerns SoC design
+  pattern
+- Scripting in hypermedia-driven applications :: Data, structure, and behavior
+  of HDA are controlled by the hypermedia creator (server). Interactivity in the
+  hypermedia presenter (browser) is delegated to client-side scripting
+  - Preserve hypermedia communication format :: Scripting must preserve the
+    hypermedia communication format (HTML over HTTP) between the browser and the
+    server
+  - Leverage DOM-managed state :: Scripting should exclusively store state in
+    the DOM (element attributes), so the state is automatically exchanged with
+    the server without complex client-side data modeling and data binding
   - Listen to events :: Scripting should listen to standard and custom events to
     communicate between components, instead of registering callbacks on fragile
     CSS selectors
   - Events for inline scripting :: Events are the primary integration method
-    between HTMX and alpine.js inline scripting
+    between HTMX and alpine.js inline scripting. Both HTMX and alpine.js can
+    trigger events and respond to events
 #+begin_src web
 <script>
  function sweetConfirm(el, config) {
@@ -165,31 +171,30 @@ scheme://user@host:port/path?query#fragment
 ** HTMX generalizations
 
 - HTMX generalizations :: HTMX provides declarative access to modern browser
-  features directly from server-rendered HTML, rather than imperative
-  access from client-side JavaScript
+  features directly from the server-rendered HTML, rather than imperative
+  access from the client-side JavaScript
 
 *** All elements as hypermedia controls
 
 - Any HTML element :: Any HTML element becomes a hypermedia control, and can
   issue async HTTP requests
-- Any HTTP verb :: Any HTTP verb can be used in async =fetch= HTTP requests
-| HTTP verb  | Description                        |
-|------------+------------------------------------|
-| =hx-get=   | Idempotent, read-only. =hx-params= |
-| =hx-post=  | Non-idempotent                     |
-| =hx-put=   | Idempotent, full update            |
-| =hx-patch= | Idempotent, partial update         |
-| =hx-delte= | Idempotent                         |
+- Any HTTP verb :: Any HTTP verb can be used in async HTTP requests
+| HTTP verb  | Description                |
+|------------+----------------------------|
+| =hx-get=   | Idempotent, read-only      |
+| =hx-post=  | Non-idempotent, create     |
+| =hx-put=   | Idempotent, full update    |
+| =hx-patch= | Idempotent, partial update |
+| =hx-delte= | Idempotent, delete         |
 
 *** Request triggering
 
 - Any trigger event :: Any event on any element can trigger async HTTP requests
-  - =hx-trigger= specifies events and conditions that trigger async HTTP
-    requests
+- =hx-trigger= specifies events and conditions that trigger async HTTP requests
 | Trigger                         | Description                                   |
 |---------------------------------+-----------------------------------------------|
 | =click=, =keyup=, =mouseup=     | Standard events                               |
-| =click[boolean JS expression]=  | Event filter. Scope: first event, then global |
+| =click[boolean JS]=             | Event filter. Scope: first event, then global |
 | =input changed delay:1s=        | Standard event modifiers (see below)          |
 | =load=, =revealed=, =intersect= | HTMX non-standard events                      |
 | =every <time> [boolean JS]=     | Periodic polling with optional filter         |
@@ -200,20 +205,20 @@ scheme://user@host:port/path?query#fragment
 |-------------------------------+--------------------------------------------------|
 | =once=                        | Only on the first event                          |
 | =changed=                     | Only if the value has changed                    |
-| =delay:<time>=                | Next event before delay resets previous delay    |
+| =delay:<time>=                | Next event before delay resets current delay     |
 | =throttle:<time>=             | Next event before delay is ignored               |
 | =from:<selector>=             | Triggers on events from another element (=body=) |
 | =consume=                     | Not triggers any other htmx request on parents   |
 | =queue:<first,last,all,none>= | Event queuing during in-flight requests          |
 
-| HTML element                   | Default trigger event                         |
-|--------------------------------+-----------------------------------------------|
-| =input=, =textarea=, =select=  | =change= event                                |
-| =form=                         | =submit= event                                |
-| Other elements                 | =click= event                                 |
-  - =hx-sync= synchronizes async HTTP requests between this element and an
-    element identified by the CSS selector, so only one request at a time is
-    issued, preventing concurrent requests and uncontrolled swapping of DOM
+| HTML element                  | Default trigger event |
+|-------------------------------+-----------------------|
+| =input=, =textarea=, =select= | =change=              |
+| =form=                        | =submit=              |
+| Other elements                | =click=               |
+- =hx-sync= synchronizes async HTTP requests between this element and another
+  element, so only one request at a time is issued, preventing concurrent
+  requests and uncontrolled swapping
 | Sync strategy                   | Description                                         |
 |---------------------------------+-----------------------------------------------------|
 | =drop= inter-element (default)  | Drop this new request, while in-flight old request  |
@@ -222,24 +227,40 @@ scheme://user@host:port/path?query#fragment
 |                                 | Prioritize the most recent user action e.g. search  |
 | =replace= same element          | Abort in-flight old request, start this new request |
 | =queue first,last,all=          | Queue this request, while in-flight old requests    |
-#+TBLFM: $1=drop= inter-element (default)
 
 *** Targeting and swapping
 
 - Any replace target :: HTML fragment from the response can replace any target
   DOM subtree within the current document without page reload
-  - =hx-target= targets with a CSS selector a different element than the element
-    that issued the async HTTP request (default target ~hx-target="this"~) for
-    DOM swapping with the response fragment
-  - =tx-select= selects a subtree from the response to swap the target
-  - =hx-swap= specifies how a response fragment swaps the target. A swap is
-    either a full replacement of the target or a morph of the response fragment
-    with existing DOM elements of the target
+- =hx-target= targets for swapping a different element than the element that
+  issued the async HTTP request. The default target is the element that issued
+  the request
+- =tx-select= selects a subtree from the response to swap the target
+- =hx-swap= specifies how a response fragment swaps the target. A swap is either
+  a full replacement of the target or a morph of the response fragment with
+  existing DOM elements of the target
 | Swap method   | Description                                         |
 |---------------+-----------------------------------------------------|
 | =innterHTML=  | Replaces inner HTML of the target element (default) |
 | =outerHTML=   | Repaces the target element with response fragment   |
+| =innerMorth=  | Preserves target children as much as possible       |
+| =outerMorth=  | Preserves target as much as possible                |
 | =textContent= | Replaces only text content of the target element    |
+- =hx-partial= defines target and swapping for responses that update multiple
+  elements
+#+begin_src web
+<hx-partial hx-target="#success" hx-swap="outerHTML">...</hx-partial>
+#+end_src
+- =hx-status= defines target and swapping for error responses. Multiple
+  attributes are evaluated in order of specificity
+#+begin_src web
+<form hx-target="#success"
+  hx-status:422="target:#validation-error swap:outerHTML"
+  hx-status:4xx="#error"
+  hx-status:5xx="#error"
+>
+</form>
+#+end_src
 
 *** HTMX design features
 
@@ -255,6 +276,9 @@ scheme://user@host:port/path?query#fragment
   - =<a>= defines a read-only navigation via =GET=
   - =<form>=, =<button>= define state-changing idempotent =PUT=, =PATCH=,
     =DELETE=, or non-idempotent =POST= operations
+- Request values :: The =value= of the element that issued the request is
+  automatically included in the request. Values of all form inputs are
+  automatically included in the form submission request
 - POST/Redirect/GET :: Edit form URL should be pushed to the browser history.
   Resource mutation URL should not be pushed to the browser history
   - POST a create, update form. Authorize and mutate the resource

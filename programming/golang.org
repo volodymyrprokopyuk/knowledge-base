@@ -618,6 +618,29 @@ if err != nil {
   }
 }
     #+END_SRC
+  - High-level errors vs low-level details ::
+    #+begin_src go
+type CustomError struct {
+  Status int
+  Code string
+}
+
+func (e CustomError) Error() string {
+  return fmt.Sprintf("%d %s", e.Status, e.Code)
+}
+
+errLow := errors.New("low-level details")
+errHigh := CustomError{
+  Status: 500,
+  Code: "high_level_failure",
+}
+errw := fmt.Errorf("%w: %v", errHigh, errLow)
+fmt.Printf("%v\n", errw) // 400 high_level_failure: low-level details
+errh, assert := errors.AsType[CustomError](errw)
+if assert {
+  fmt.Printf("%v\n", errh) // 400 high_level_failure
+}
+    #+end_src
   - Return error interface :: By returning the =error= interface a function can
     return different error types without modifying the function signature
 

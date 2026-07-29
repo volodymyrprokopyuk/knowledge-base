@@ -48,7 +48,8 @@ docker run --interactive --tty --network sem_default \
 *** Hash
 
 - Hash :: A Hash is a structure of String field-value pairs with efficient
-  field-level query and update under a single key. A Hash is a hash table
+  field-level query and update under a single key. A Hash is a hash table. Use
+  short filed names to save space
 - Hash operations ::
   - =hset, hget= O(1)
   - =hmset, hmget= O(1) set, get multiple fields
