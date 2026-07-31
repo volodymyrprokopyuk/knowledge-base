@@ -634,11 +634,12 @@ errHigh := CustomError{
   Status: 500,
   Code: "high_level_failure",
 }
-errw := fmt.Errorf("%w: %v", errHigh, errLow)
+errw := fmt.Errorf("%w: %w", errHigh, errLow)
 fmt.Printf("%v\n", errw) // 400 high_level_failure: low-level details
 errh, assert := errors.AsType[CustomError](errw)
 if assert {
-  fmt.Printf("%v\n", errh) // 400 high_level_failure
+  fmt.Printf("%v\n", errh) // 500 high_level_failure
+  fmt.Printf("%d %s\n", errh.Status, errh.Code) // 500 high_level_failure
 }
     #+end_src
   - Return error interface :: By returning the =error= interface a function can
