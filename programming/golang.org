@@ -644,6 +644,24 @@ if assert {
     #+end_src
   - Return error interface :: By returning the =error= interface a function can
     return different error types without modifying the function signature
+- Error handling strategy ::
+  - Request ID propagation :: Assign a request ID at the edge service and
+    propagate the request ID through the chain of service calls to serve the
+    request for traceability
+  - Immediate error capture :: Capture errors as soon as possible
+  - Boundary error translation :: Classify errors, add context, and translate
+    technical errors to domain errors that the service boundary through error
+    wrapping that preserves the root cause
+  - Deferred error reporting at the edge :: Defer errors reporting to the edge
+    services as late as possible
+  - Application vs technical error separation :: Separate the high-level,
+    human-readable, application error reporting (with a limited set of errors
+    through htmx) from the low-level, structured, technical error reporting
+    (with all possible errors through slog)
+  - Request ID in application errors :: Include the request ID into application
+    errors, so the user can report the issue with an actionable reference
+  - Error codes for localization :: Return error code suitable for error
+    localization, not error message for a specific language
 
 *** panic/recover
 
@@ -685,6 +703,9 @@ fmt.Println("continue") // panic: oh, continue
   - *Named return values* mostly for documentation of function types and
     interfaces, and also to access return values e.g. ~error~ in ~defer~
   - *Anonymous functions* (function literals) are *closures*
+  - Function parameters order :: Place mandatory structural mechanisms and
+    functional dependencies on the left, while optional data parameters and
+    variadic configuration options on the right of the function parameter list
 
 #+BEGIN_SRC go
 // multiple return values
